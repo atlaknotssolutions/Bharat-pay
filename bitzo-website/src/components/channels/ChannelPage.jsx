@@ -78,6 +78,7 @@ export default function ChannelPage() {
   // Video player modal
   const [showVideoPlayer, setShowVideoPlayer] = useState(false);
   const [currentVideo, setCurrentVideo] = useState(null);
+  const [videoDuration, setVideoDuration] = useState(null);
 
   // Helpers
   const getVideoUrl = (videoPath) => {
@@ -92,6 +93,71 @@ export default function ChannelPage() {
     }
     if (thumbnailPath.startsWith("http")) return thumbnailPath;
     return `${BACKEND_URL}/${thumbnailPath.replace(/\\/g, "/")}`;
+  };
+
+  const parseDurationToSeconds = (value) => {
+    if (value === null || value === undefined || value === "") return null;
+
+    if (typeof value === "number") return Number.isFinite(value) ? value : null;
+
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (!trimmed) return null;
+
+      const directNumber = Number(trimmed);
+      if (!Number.isNaN(directNumber)) return directNumber;
+
+      const colonParts = trimmed.split(":").map((part) => part.trim());
+      if (colonParts.length === 2) {
+        const [mins, secs] = colonParts;
+        const minsNum = Number(mins);
+        const secsNum = Number(secs);
+        if (!Number.isNaN(minsNum) && !Number.isNaN(secsNum)) {
+          return minsNum * 60 + secsNum;
+        }
+      }
+
+      if (colonParts.length === 3) {
+        const [hrs, mins, secs] = colonParts;
+        const hrsNum = Number(hrs);
+        const minsNum = Number(mins);
+        const secsNum = Number(secs);
+        if (
+          !Number.isNaN(hrsNum) &&
+          !Number.isNaN(minsNum) &&
+          !Number.isNaN(secsNum)
+        ) {
+          return hrsNum * 3600 + minsNum * 60 + secsNum;
+        }
+      }
+
+      const match = trimmed.match(
+        /(\d+)\s*(h|hr|hrs|hour|hours)?\s*(\d+)\s*(m|min|mins|minute|minutes)?\s*(\d+)?\s*(s|sec|secs|second|seconds)?/i,
+      );
+      if (match) {
+        const hours = Number(match[1] || 0);
+        const mins = Number(match[3] || 0);
+        const secs = Number(match[5] || 0);
+        return hours * 3600 + mins * 60 + secs;
+      }
+    }
+
+    return null;
+  };
+
+  const formatDuration = (value) => {
+    const seconds = parseDurationToSeconds(value);
+    if (seconds === null) return "0:00";
+
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+
+    if (hrs > 0) {
+      return `${hrs}:${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+    }
+
+    return `${mins}:${String(secs).padStart(2, "0")}`;
   };
 
   // Fetch categories
@@ -470,12 +536,14 @@ export default function ChannelPage() {
 
   const handlePlayVideo = (video) => {
     setCurrentVideo(video);
+    setVideoDuration(null);
     setShowVideoPlayer(true);
   };
 
   const handleCloseVideoPlayer = () => {
     setShowVideoPlayer(false);
     setCurrentVideo(null);
+    setVideoDuration(null);
   };
 
   if (loading) {
@@ -661,9 +729,7 @@ export default function ChannelPage() {
                         />
                       </div>
                     </div>
-                    <div className="absolute bottom-2 right-2 bg-black/80 px-2 py-0.5 text-xs rounded font-medium">
-                      {video.duration || "??:??"}
-                    </div>
+                    
                   </div>
                   <div className="mt-3">
                     <h3 className="font-medium line-clamp-2 group-hover:text-blue-400 transition-colors">
@@ -699,8 +765,14 @@ export default function ChannelPage() {
 
       {/* Video Player Modal */}
       {showVideoPlayer && currentVideo && (
-        <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50 p-4">
-          <div className="w-full max-w-6xl">
+        <div
+          className="fixed inset-0 bg-black/95 z-50 p-4 overflow-y-auto"
+          onClick={handleCloseVideoPlayer}
+        >
+          <div
+            className="mx-auto w-full max-w-6xl max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-bold">
                 {currentVideo.title || currentVideo.name}
@@ -708,32 +780,43 @@ export default function ChannelPage() {
               <button
                 onClick={handleCloseVideoPlayer}
                 className="text-white hover:text-gray-300 text-3xl font-bold"
+                aria-label="Close video player"
               >
                 ×
               </button>
             </div>
 
-            <div className="bg-black rounded-lg overflow-hidden">
+            <div className="bg-black rounded-lg overflow-hidden flex items-center justify-center">
               <video
-                className="w-full"
+                className="w-full max-h-[70vh] object-contain"
                 controls
                 autoPlay
+                playsInline
                 src={getVideoUrl(
                   currentVideo.videofile || currentVideo.videoUrl,
                 )}
+                onLoadedMetadata={(e) => {
+                  const duration = e.currentTarget.duration;
+                  if (Number.isFinite(duration) && duration > 0) {
+                    setVideoDuration(duration);
+                  }
+                }}
               >
                 Your browser does not support the video tag.
               </video>
             </div>
 
             <div className="mt-4 bg-[#1a1a1a] rounded-lg p-4">
-              <div className="flex items-center gap-4 mb-3">
-                <span className="text-gray-400">
-                  {currentVideo.views?.toLocaleString() || 0} views
-                </span>
-                <span className="text-gray-400">•</span>
-                <span className="text-gray-400">
+              <div className="flex flex-wrap items-center gap-2 mb-3 text-gray-400">
+                <span>{currentVideo.views?.toLocaleString() || 0} views</span>
+                <span>•</span>
+                <span>
                   {new Date(currentVideo.createdAt).toLocaleDateString()}
+                </span>
+                <span>•</span>
+                <span>
+                  Duration:{" "}
+                  {formatDuration(currentVideo.duration || videoDuration)}
                 </span>
               </div>
 

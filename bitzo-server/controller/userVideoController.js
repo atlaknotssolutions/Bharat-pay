@@ -1,183 +1,3 @@
-// const Video = require("../models/Videomodel");
-// const Channel = require("../models/Channel/ChannelModel");
-// const mongoose = require("mongoose");
-// const imagekit = require("../utils/imagekit");
-// const categoryModel = require("../models/CategoryModel/category.model");
-// const ChannelModel = require("../models/Channel/ChannelModel");
-
-// const createChannel = async (req, res) => {
-//   try {
-    
-
-//     const { name, channeldescription, category, contactemail, videoUrl } =
-//       req.body;
-
-//     const userId = req.user.userId;
-
-//     if (!name || !category) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Channel name and category are required",
-//       });
-//     }
-
-//     // 🔹 Check category exists
-//     const categoryData = await categoryModel.findById(category);
-//     if (!categoryData) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Category not found",
-//       });
-//     }
-
-//     let channelImageUrl = "";
-//     let channelBannerUrl = "";
-
-//     if (req.files?.channelImage?.[0]) {
-//       try {
-//         const file = req.files.channelImage[0];
-//         console.log("Uploading channel image:", {
-//           name: file.originalname,
-//           size: file.size,
-//           mimetype: file.mimetype,
-//         });
-
-//         const base64String = file.buffer.toString("base64");
-
-//         const imageRes = await imagekit.upload({
-//           file: base64String,
-//           fileName: `channel-img-${Date.now()}-${file.originalname}`,
-//           folder: "channelImages",
-//           overwriteFile: true,
-//         });
-//         channelImageUrl = imageRes.url;
-//         console.log("✅ Channel image uploaded:", channelImageUrl);
-//       } catch (imageError) {
-//         console.error("❌ ImageKit Error:", imageError);
-//         console.error("Full error:", JSON.stringify(imageError, null, 2));
-//         throw imageError;
-//       }
-//     }
-
-//     if (req.files?.channelBanner?.[0]) {
-//       try {
-//         const file = req.files.channelBanner[0];
-//         console.log("Uploading channel banner:", {
-//           name: file.originalname,
-//           size: file.size,
-//           mimetype: file.mimetype,
-//         });
-
-//         // Convert buffer to base64 string
-//         const base64String = file.buffer.toString("base64");
-
-//         const bannerRes = await imagekit.upload({
-//           file: base64String,
-//           fileName: `channel-banner-${Date.now()}-${file.originalname}`,
-//           folder: "channelBanners",
-//           overwriteFile: true,
-//         });
-//         channelBannerUrl = bannerRes.url;
-//         console.log("✅ Channel banner uploaded:", channelBannerUrl);
-//       } catch (bannerError) {
-//         console.error("❌ ImageKit Error:", bannerError);
-//         console.error("Full error:", JSON.stringify(bannerError, null, 2));
-//         throw bannerError;
-//       }
-//     }
-
-//     const newChannel = await Channel.create({
-//       name: name,
-
-//       channeldescription,
-//       category: categoryData._id,
-//       contactemail,
-//       videoUrl: videoUrl || "",
-//       channelImage: channelImageUrl,
-//       channelBanner: channelBannerUrl,
-//       creator: userId,
-//     });
-
-//     // 🔹 Populate category name for response
-//     const populatedChannel = await Channel.findById(newChannel._id).populate(
-//       "category",
-//       "name",
-//     );
-
-//     return res.status(201).json({
-//       success: true,
-//       message: "Channel created successfully",
-//       channel: populatedChannel,
-//     });
-//   } catch (error) {
-//     console.error("Error in createChannel:", error);
-//     return res.status(500).json({
-//       success: false,
-//       message: error.message || "Server error",
-//     });
-//   }
-// };
-
-
-// const uploadVideo = async (req, res) => {
-//   try {
-//     const { channelId } = req.params;
-//     const { name, description, category } = req.body;
-
-//     const channel = await ChannelModel.findById(channelId);
-//     if (!channel) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Channel not found",
-//       });
-//     }
-
-//     if (!req.files || !req.files.video) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Video file required",
-//       });
-//     }
-
-//     const videoFile = req.files.video[0];
-//     const thumbnailFile = req.files.thumbnail
-//       ? req.files.thumbnail[0]
-//       : null;
-
-//     const videoPath = videoFile.path.replace(/\\/g, "/");
-//     const thumbnailPath = thumbnailFile
-//       ? thumbnailFile.path.replace(/\\/g, "/")
-//       : null;
-
-//     const newVideo = new Video({
-//       channel: channelId, // ✅ channel id save
-//       category,
-//       title: name?.trim() || "Untitled",
-//       description,
-//       videoUrl: videoPath,
-//       thumbnail: thumbnailPath,
-//       uploadedBy: req.user?.userId,
-//     });
-
-//     await newVideo.save();
-
-//     // ✅ Also push video into channel
-//     channel.Videosuser.push(newVideo._id);
-//     await channel.save();
-
-//     res.status(201).json({
-//       success: true,
-//       message: "Video uploaded successfully",
-//       video: newVideo,
-//     });
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({
-//       success: false,
-//       message: err.message,
-//     });
-//   }
-// };
 
 
 const Video = require("../models/Videomodel");
@@ -600,6 +420,27 @@ const trendingVideos = async (req, res) => {
   }
 };
 
+
+const LatestVideos = async (req, res) => {
+  try {
+    const videos = await Video.find({})
+      .sort({ createdAt: -1 , })
+      .limit(10);
+
+    res.status(200).json({
+      success: true,
+      videos,
+    });
+  } catch (error) {
+    console.error("Error in LatestVideos:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
+
 const getVideoById = async (req, res) => {
   try {
     const { videoId } = req.params;
@@ -856,6 +697,26 @@ const subscribeChannel = async (req, res) => {
   }
 };
 
+const getSubscribedVideos = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const subscribedChannels = await User.findById(userId).select("subscribedChannels");
+    const videos = await Video.find({ channel: { $in: subscribedChannels.subscribedChannels } });
+
+
+    res.status(200).json({
+      success: true,
+      videos,
+    });
+  } catch (error) {
+    console.error("Error in getSubscribedVideos:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
 module.exports = {
   getAllVideos,
   getVideoById,
@@ -874,5 +735,6 @@ module.exports = {
   uploadVideo,
   recommendedVideos,
   trendingVideos,
-  subscribeChannel
+  subscribeChannel,
+  getSubscribedVideos,
 };
