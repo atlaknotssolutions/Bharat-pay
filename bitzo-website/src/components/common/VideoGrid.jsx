@@ -323,7 +323,7 @@ export default function NetflixStylePage() {
   }, []);
 
   const handleItemClick = (item) => {
-    navigate(`/video/${item.id}`, { state: { item } });
+    navigate(`/video/${item.id}`, { state: { video: item } });
   };
 
   return (

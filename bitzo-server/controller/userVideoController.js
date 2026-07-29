@@ -1,5 +1,3 @@
-
-
 const Video = require("../models/Videomodel");
 const Channel = require("../models/Channel/ChannelModel");
 const mongoose = require("mongoose");
@@ -103,7 +101,7 @@ const createChannel = async (req, res) => {
     // Populate category name for response
     const populatedChannel = await Channel.findById(newChannel._id).populate(
       "category",
-      "name"
+      "name",
     );
 
     return res.status(201).json({
@@ -123,7 +121,7 @@ const createChannel = async (req, res) => {
 const uploadVideo = async (req, res) => {
   try {
     const { channelId } = req.params;
-    const { name, description, category,videoType } = req.body;
+    const { name, description, category, videoType } = req.body;
 
     const channel = await ChannelModel.findById(channelId);
     if (!channel) {
@@ -155,7 +153,7 @@ const uploadVideo = async (req, res) => {
       description,
       videoUrl: videoPath,
       thumbnail: thumbnailPath,
-      videoType:videoType,
+      videoType: videoType,
       uploadedBy: req.user?.userId,
     });
 
@@ -213,7 +211,6 @@ const getChannels = async (req, res) => {
       count: channels.length,
       channels,
     });
-
   } catch (error) {
     console.error("Error in getChannels:", error.message);
     return res.status(500).json({
@@ -222,9 +219,6 @@ const getChannels = async (req, res) => {
     });
   }
 };
-
-
-
 
 // GET /api/channels/:id
 const getChannelById = async (req, res) => {
@@ -240,8 +234,8 @@ const getChannelById = async (req, res) => {
     }
 
     const channel = await Channel.findById(channelId)
-      .populate("category", "_id name")           // category ka name + _id
-      .populate("Videosuser");                     // videos ka data
+      .populate("category", "_id name") // category ka name + _id
+      .populate("Videosuser"); // videos ka data
 
     // Extra safety: check karo ki yeh channel usi user ka hai jo request kar raha hai
     if (!channel) {
@@ -260,9 +254,8 @@ const getChannelById = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      channel,   // ← sirf ek channel return ho raha hai
+      channel, // ← sirf ek channel return ho raha hai
     });
-
   } catch (error) {
     console.error("Error in getChannelById:", error.message);
     return res.status(500).json({
@@ -315,7 +308,6 @@ const getvideosByChannel = async (req, res) => {
       count: videos.length,
       videos,
     });
-
   } catch (error) {
     console.error("Error in getvideosByChannel:", error);
 
@@ -325,7 +317,6 @@ const getvideosByChannel = async (req, res) => {
     });
   }
 };
-
 
 const deleteChannel = async (req, res) => {
   try {
@@ -353,8 +344,9 @@ const deleteChannel = async (req, res) => {
 
 const getAllVideos = async (req, res) => {
   try {
-    const videos = await Video.find().populate("channel", "name channelImage")
-  .populate("uploadedBy", "name email");;
+    const videos = await Video.find()
+      .populate("channel", "name channelImage")
+      .populate("uploadedBy", "name email");
     res.status(200).json({ success: true, videos });
   } catch (error) {
     console.error("Error in getAllVideos:", error);
@@ -420,12 +412,9 @@ const trendingVideos = async (req, res) => {
   }
 };
 
-
 const LatestVideos = async (req, res) => {
   try {
-    const videos = await Video.find({})
-      .sort({ createdAt: -1 , })
-      .limit(10);
+    const videos = await Video.find({}).sort({ createdAt: -1 }).limit(10);
 
     res.status(200).json({
       success: true,
@@ -440,16 +429,17 @@ const LatestVideos = async (req, res) => {
   }
 };
 
-
 const getVideoById = async (req, res) => {
   try {
-    const { videoId } = req.params;
-    const video = await Video.findById(videoId);
+    const videoId = req.params.id || req.params.videoId;
+    const video = await Video.findById(videoId).populate("channel", "name");
+
     if (!video) {
       return res
         .status(404)
         .json({ success: false, message: "Video not found" });
     }
+
     res.status(200).json({ success: true, video });
   } catch (error) {
     console.error("Error in getVideoById:", error);
@@ -461,14 +451,16 @@ const addView = async (req, res) => {
   try {
     const { videoId } = req.params;
     const video = await Video.findById(videoId);
+
     if (!video) {
       return res
         .status(404)
         .json({ success: false, message: "Video not found" });
     }
-    // Increment view count for public view
+
     video.views = (video.views || 0) + 1;
     await video.save();
+
     res
       .status(200)
       .json({ success: true, message: "View added!", views: video.views });
@@ -651,8 +643,6 @@ const getVideoInteraction = async (req, res) => {
   }
 };
 
-
-
 const subscribeChannel = async (req, res) => {
   try {
     const { channelId } = req.params;
@@ -660,7 +650,9 @@ const subscribeChannel = async (req, res) => {
 
     const channel = await Channel.findById(channelId);
     if (!channel) {
-      return res.status(404).json({ success: false, message: "Channel not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Channel not found" });
     }
 
     // Agar already subscribed hai to unsubscribe kar do (toggle)
@@ -670,26 +662,34 @@ const subscribeChannel = async (req, res) => {
       // Unsubscribe
       await Channel.findByIdAndUpdate(channelId, {
         $pull: { subscribedBy: userId },
-        $inc: { subscribers: -1 }
+        $inc: { subscribers: -1 },
       });
 
       await User.findByIdAndUpdate(userId, {
-        $pull: { subscribedChannels: channelId }
+        $pull: { subscribedChannels: channelId },
       });
 
-      return res.json({ success: true, message: "Unsubscribed successfully", subscribed: false });
+      return res.json({
+        success: true,
+        message: "Unsubscribed successfully",
+        subscribed: false,
+      });
     } else {
       // Subscribe
       await Channel.findByIdAndUpdate(channelId, {
         $addToSet: { subscribedBy: userId },
-        $inc: { subscribers: 1 }
+        $inc: { subscribers: 1 },
       });
 
       await User.findByIdAndUpdate(userId, {
-        $addToSet: { subscribedChannels: channelId }
+        $addToSet: { subscribedChannels: channelId },
       });
 
-      return res.json({ success: true, message: "Subscribed successfully", subscribed: true });
+      return res.json({
+        success: true,
+        message: "Subscribed successfully",
+        subscribed: true,
+      });
     }
   } catch (error) {
     console.error("Subscribe error:", error);
@@ -700,9 +700,11 @@ const subscribeChannel = async (req, res) => {
 const getSubscribedVideos = async (req, res) => {
   try {
     const userId = req.user.id;
-    const subscribedChannels = await User.findById(userId).select("subscribedChannels");
-    const videos = await Video.find({ channel: { $in: subscribedChannels.subscribedChannels } });
-
+    const subscribedChannels =
+      await User.findById(userId).select("subscribedChannels");
+    const videos = await Video.find({
+      channel: { $in: subscribedChannels.subscribedChannels },
+    });
 
     res.status(200).json({
       success: true,

@@ -11,16 +11,18 @@ const videoSchema = new mongoose.Schema(
       ref: "User",
     },
 
-      channel: {
+    channel: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Channel",
       required: true,
     },
 
-   videoType: [{
-  type: String,
-  enum: ["short", "long"],
-}], 
+    videoType: [
+      {
+        type: String,
+        enum: ["short", "long"],
+      },
+    ],
 
     uploadedBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -54,6 +56,11 @@ const videoSchema = new mongoose.Schema(
     },
 
     dislikesCount: {
+      type: Number,
+      default: 0,
+    },
+
+    views: {
       type: Number,
       default: 0,
     },
