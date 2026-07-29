@@ -1,4 +1,3 @@
-
 const express = require("express");
 const router = express.Router();
 const {
@@ -15,10 +14,10 @@ const {
   getvideosByChannel,
   getChannelById,
   getChannels,
-  createChannelByUploadVideo,
   createChannel,
   subscribeChannel,
   uploadVideo,
+  recommendedVideos,
 } = require("../controller/userVideoController");
 const { imageUpload } = require("../middlewares/multer");
 const isAuthenticated = require("../middlewares/isAuthenticated");
@@ -41,27 +40,26 @@ router.post(
 //   uploadVideo
 // );
 
-
 router.post(
-  "/upload/:channelId",                              
+  "/upload/:channelId",
   isAuthenticated,
   upload.videoAndThumbnailUpload.fields([
-    { name: "video",     maxCount: 1 },
-    { name: "thumbnail", maxCount: 1 }
+    { name: "video", maxCount: 1 },
+    { name: "thumbnail", maxCount: 1 },
   ]),
-  uploadVideo
+  uploadVideo,
 );
-router.get("/channel",isAuthenticated, getChannels);
-router.get("/channel/:id",isAuthenticated, getChannelById);
-router.get("/channel/:id/videos",isAuthenticated, getvideosByChannel);
+router.get("/channel", isAuthenticated, getChannels);
+router.get("/channel/:id", isAuthenticated, getChannelById);
+router.get("/channel/:id/videos", isAuthenticated, getvideosByChannel);
 router.delete("/channel/:id", deleteChannel);
 
-router.get("/",isAuthenticated, getAllVideos);
+router.get("/recommended", isAuthenticated, recommendedVideos);
+router.get("/", isAuthenticated, getAllVideos);
 
+router.post("/subscribe/:channelId", isAuthenticated, subscribeChannel);
 
-router.post('/subscribe/:channelId', isAuthenticated, subscribeChannel);
-
-router.get("/:id",isAuthenticated, getVideoById);
+router.get("/:id", isAuthenticated, getVideoById);
 router.post("/:videoId/view", addView);
 router.post("/:videoId/like", likeVideo);
 router.post("/:videoId/dislike", dislikeVideo);

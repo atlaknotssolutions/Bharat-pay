@@ -1,51 +1,157 @@
-
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronRight, Play, Plus, Info } from "lucide-react";
+
+const BACKEND_URL = "http://localhost:8000";
+const API_BASE = `${BACKEND_URL}/api/uservideo`;
 
 // ────────────────────────────────────────────────
 // Different content arrays for each section
 // ────────────────────────────────────────────────
 const romanticShows = [
-  { id: 1, title: "Love in the Clouds", thumb: "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=400&h=225&fit=crop" },
-  { id: 2, title: "Hidden Love", thumb: "https://images.unsplash.com/photo-1509967419530-da38b4704bc6?w=400&h=225&fit=crop" },
-  { id: 3, title: "Queen of Tears", thumb: "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=400&h=225&fit=crop" },
-  { id: 4, title: "Inheritors", thumb: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=400&h=225&fit=crop" },
-  { id: 5, title: "When I Fly Towards You", thumb: "https://images.unsplash.com/photo-1522158637959-30385a09e0da?w=400&h=225&fit=crop" },
+  {
+    id: 1,
+    title: "Love in the Clouds",
+    thumb:
+      "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=400&h=225&fit=crop",
+  },
+  {
+    id: 2,
+    title: "Hidden Love",
+    thumb:
+      "https://images.unsplash.com/photo-1509967419530-da38b4704bc6?w=400&h=225&fit=crop",
+  },
+  {
+    id: 3,
+    title: "Queen of Tears",
+    thumb:
+      "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=400&h=225&fit=crop",
+  },
+  {
+    id: 4,
+    title: "Inheritors",
+    thumb:
+      "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=400&h=225&fit=crop",
+  },
+  {
+    id: 5,
+    title: "When I Fly Towards You",
+    thumb:
+      "https://images.unsplash.com/photo-1522158637959-30385a09e0da?w=400&h=225&fit=crop",
+  },
   // { id: 6, title: "Lovely Runner", thumb: "https://images.unsplash.com/photo-1519741497674-281450b9b157?w=400&h=225&fit=crop" },
 ];
 
 const kidsFilms = [
-  { id: 101, title: "Chhota Bheem: The Crown", thumb: "https://images.unsplash.com/photo-1608889825103-eb5ed706fc64?w=400&h=225&fit=crop" },
-  { id: 102, title: "Motu Patlu: Kung Fu", thumb: "https://images.unsplash.com/photo-1578632292335-df3abbb0d586?w=400&h=225&fit=crop" },
-  { id: 103, title: "Doraemon: Nobita", thumb: "https://images.unsplash.com/photo-1509347528160-9a9e33742cdb?w=400&h=225&fit=crop" },
-  { id: 104, title: "Oggy & Cockroaches", thumb: "https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?w=400&h=225&fit=crop" },
-  { id: 105, title: "Shinchan Movie", thumb: "https://images.unsplash.com/photo-1606164587034-81b84c4e11d0?w=400&h=225&fit=crop" },
-  { id: 106, title: "Tom & Jerry", thumb: "https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?w=400&h=225&fit=crop" },
+  {
+    id: 101,
+    title: "Chhota Bheem: The Crown",
+    thumb:
+      "https://images.unsplash.com/photo-1608889825103-eb5ed706fc64?w=400&h=225&fit=crop",
+  },
+  {
+    id: 102,
+    title: "Motu Patlu: Kung Fu",
+    thumb:
+      "https://images.unsplash.com/photo-1578632292335-df3abbb0d586?w=400&h=225&fit=crop",
+  },
+  {
+    id: 103,
+    title: "Doraemon: Nobita",
+    thumb:
+      "https://images.unsplash.com/photo-1509347528160-9a9e33742cdb?w=400&h=225&fit=crop",
+  },
+  {
+    id: 104,
+    title: "Oggy & Cockroaches",
+    thumb:
+      "https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?w=400&h=225&fit=crop",
+  },
+  {
+    id: 105,
+    title: "Shinchan Movie",
+    thumb:
+      "https://images.unsplash.com/photo-1606164587034-81b84c4e11d0?w=400&h=225&fit=crop",
+  },
+  {
+    id: 106,
+    title: "Tom & Jerry",
+    thumb:
+      "https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?w=400&h=225&fit=crop",
+  },
 ];
 
 const koreanContent = [
-  { id: 201, title: "Vincenzo", thumb: "https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=400&h=225&fit=crop" },
-  { id: 202, title: "Crash Landing on You", thumb: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&h=225&fit=crop" },
-  { id: 203, title: "Squid Game", thumb: "https://images.unsplash.com/photo-1608889335941-32ac5f2041b9?w=400&h=225&fit=crop" },
-  { id: 204, title: "Weak Hero Class 1", thumb: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=225&fit=crop" },
-  { id: 205, title: "Moving", thumb: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400&h=225&fit=crop" },
-  { id: 206, title: "Sweet Home", thumb: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=225&fit=crop" },
+  {
+    id: 201,
+    title: "Vincenzo",
+    thumb:
+      "https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=400&h=225&fit=crop",
+  },
+  {
+    id: 202,
+    title: "Crash Landing on You",
+    thumb:
+      "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&h=225&fit=crop",
+  },
+  {
+    id: 203,
+    title: "Squid Game",
+    thumb:
+      "https://images.unsplash.com/photo-1608889335941-32ac5f2041b9?w=400&h=225&fit=crop",
+  },
+  {
+    id: 204,
+    title: "Weak Hero Class 1",
+    thumb:
+      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=225&fit=crop",
+  },
+  {
+    id: 205,
+    title: "Moving",
+    thumb:
+      "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400&h=225&fit=crop",
+  },
+  {
+    id: 206,
+    title: "Sweet Home",
+    thumb:
+      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=225&fit=crop",
+  },
 ];
 
 const actionMovies = [
-  { id: 301, title: "Extraction 2", thumb: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=225&fit=crop" },
+  {
+    id: 301,
+    title: "Extraction 2",
+    thumb:
+      "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=225&fit=crop",
+  },
   // { id: 303, title: "RRR", thumb: "https://images.unsplash.com/photo-1626814026160-223b8cadc179?w=400&h=225&fit=crop" },
-  { id: 304, title: "Top Gun: Maverick", thumb: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=400&h=225&fit=crop" },
+  {
+    id: 304,
+    title: "Top Gun: Maverick",
+    thumb:
+      "https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=400&h=225&fit=crop",
+  },
   // { id: 305, title: "Mission: Impossible", thumb: "https://images.unsplash.com/photo-1598979151858-4a36b04f146a?w=400&h=225&fit=crop" },
 ];
 
 const trendingShorts = [
   ...koreanContent.slice(0, 3),
   ...actionMovies.slice(0, 3),
-  { id: 401, title: "Viral Dance", thumb: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=400&h=225&fit=crop" },
-  { id: 402, title: "Funny Reels", thumb: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&h=225&fit=crop" },
+  {
+    id: 401,
+    title: "Viral Dance",
+    thumb:
+      "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=400&h=225&fit=crop",
+  },
+  {
+    id: 402,
+    title: "Funny Reels",
+    thumb:
+      "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&h=225&fit=crop",
+  },
 ];
 
 // ────────────────────────────────────────────────
@@ -53,7 +159,9 @@ const trendingShorts = [
 // ────────────────────────────────────────────────
 
 function useWidth() {
-  const [width, setWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1024);
+  const [width, setWidth] = useState(
+    typeof window !== "undefined" ? window.innerWidth : 1024,
+  );
   useEffect(() => {
     const handleResize = () => setWidth(window.innerWidth);
     window.addEventListener("resize", handleResize);
@@ -123,6 +231,51 @@ function MovieCard({ item, onClick }) {
 export default function NetflixStylePage() {
   const navigate = useNavigate();
   const isMobile = useWidth() < 768;
+  const [recommendedVideos, setRecommendedVideos] = useState([]);
+  const [recommendedLoading, setRecommendedLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchRecommendedVideos = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setRecommendedVideos([]);
+        setRecommendedLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/recommended`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!response.ok) throw new Error("Failed to fetch recommended videos");
+
+        const data = await response.json();
+        const videos = Array.isArray(data.videos) ? data.videos : [];
+
+        const normalized = videos.slice(0, 8).map((video) => ({
+          id: video._id || video.id,
+          title: video.title || "Untitled video",
+          thumb: video.thumbnail
+            ? `${BACKEND_URL}/${video.thumbnail.replace(/\\/g, "/")}`
+            : "https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=400&h=225&fit=crop",
+          description: video.description || "",
+          duration: video.duration || "",
+          views: video.views || 0,
+          category: video.category || null,
+        }));
+
+        setRecommendedVideos(normalized);
+      } catch (error) {
+        console.error("Error fetching recommended videos:", error);
+        setRecommendedVideos([]);
+      } finally {
+        setRecommendedLoading(false);
+      }
+    };
+
+    fetchRecommendedVideos();
+  }, []);
 
   const handleItemClick = (item) => {
     navigate(`/video/${item.id}`, { state: { item } });
@@ -140,27 +293,39 @@ export default function NetflixStylePage() {
       `}</style>
 
       <div className="mx-auto max-w-screen-2xl px-4 pt-20 md:px-12 lg:px-16 -mt-24 relative z-10 pb-10">
-
         {/* Different content per section – design same rakh rahe hain */}
 
         <div className="mb-8 pt-8">
           <SectionHeader title="Recommended Videos" />
           <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-hide hover:scrollbar-show">
-            {romanticShows.map((item) => (
-              <div key={item.id} className="flex-shrink-0 w-[240px] md:w-[280px]">
-                <div className="relative">
-                  <MovieCard item={item} onClick={handleItemClick} />
-                  <div className="mt-2">
-                    <div className="h-1 bg-gray-700 rounded-full overflow-hidden">
-                      <div className="h-full bg-red-600 w-[${Math.floor(Math.random()*60 + 40)}%]"></div>
+            {recommendedLoading ? (
+              <p className="text-sm text-gray-400">
+                Loading recommended videos...
+              </p>
+            ) : recommendedVideos.length > 0 ? (
+              recommendedVideos.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex-shrink-0 w-[240px] md:w-[280px]"
+                >
+                  <div className="relative">
+                    <MovieCard item={item} onClick={handleItemClick} />
+                    <div className="mt-2">
+                      <div className="h-1 bg-gray-700 rounded-full overflow-hidden">
+                        <div className="h-full bg-red-600 w-[70%]"></div>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {item.views?.toLocaleString() || 0} views
+                      </p>
                     </div>
-                    <p className="text-xs text-gray-400 mt-1">
-                      {Math.floor(Math.random()*40 + 50)}% watched
-                    </p>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-sm text-gray-400">
+                No recommended videos available right now.
+              </p>
+            )}
           </div>
         </div>
 
@@ -168,7 +333,10 @@ export default function NetflixStylePage() {
           <SectionHeader title="Trending Videos" />
           <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-hide hover:scrollbar-show">
             {koreanContent.map((item) => (
-              <div key={item.id} className="flex-shrink-0 w-[240px] md:w-[280px]">
+              <div
+                key={item.id}
+                className="flex-shrink-0 w-[240px] md:w-[280px]"
+              >
                 <div className="relative">
                   <MovieCard item={item} onClick={handleItemClick} />
                   <div className="mt-2">
@@ -176,7 +344,7 @@ export default function NetflixStylePage() {
                       <div className="h-full bg-red-600 w-[${Math.floor(Math.random()*60 + 40)}%]"></div>
                     </div>
                     <p className="text-xs text-gray-400 mt-1">
-                      {Math.floor(Math.random()*40 + 50)}% watched
+                      {Math.floor(Math.random() * 40 + 50)}% watched
                     </p>
                   </div>
                 </div>
@@ -204,7 +372,9 @@ export default function NetflixStylePage() {
                     #{item.id % 10 || 1}
                   </div>
                 </div>
-                <h3 className="text-white text-sm font-medium truncate">{item.title}</h3>
+                <h3 className="text-white text-sm font-medium truncate">
+                  {item.title}
+                </h3>
               </div>
             ))}
           </div>
@@ -214,21 +384,26 @@ export default function NetflixStylePage() {
           <SectionHeader title="Latest  Videos" />
           <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-hide hover:scrollbar-show">
             {kidsFilms.map((item) => (
-              <div key={item.id} className="flex-shrink-0 w-[240px] md:w-[280px]">
+              <div
+                key={item.id}
+                className="flex-shrink-0 w-[240px] md:w-[280px]"
+              >
                 <div className="relative">
                   <MovieCard item={item} onClick={handleItemClick} />
                   <div className="mt-2">
                     <div className="h-1 bg-gray-700 rounded-full overflow-hidden">
                       <div className="h-full bg-red-600 w-[${Math.floor(Math.random()*60 + 40)}%]"></div>
                     </div>
-                    <p className="text-xs text-gray-400 mt-1">Family friendly</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Family friendly
+                    </p>
                   </div>
                 </div>
               </div>
             ))}
           </div>
         </div>
-{/* 
+        {/* 
         <div className="mb-8">
           <SectionHeader title="Action & Adventure" />
           <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-hide hover:scrollbar-show">
@@ -243,8 +418,15 @@ export default function NetflixStylePage() {
         <div className="mb-8">
           <SectionHeader title="Subscription Videos" />
           <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-hide hover:scrollbar-show">
-            {[...romanticShows.slice(2), ...koreanContent.slice(1, 4), ...actionMovies.slice(0, 3)].map((item) => (
-              <div key={item.id} className="flex-shrink-0 w-[240px] md:w-[280px]">
+            {[
+              ...romanticShows.slice(2),
+              ...koreanContent.slice(1, 4),
+              ...actionMovies.slice(0, 3),
+            ].map((item) => (
+              <div
+                key={item.id}
+                className="flex-shrink-0 w-[240px] md:w-[280px]"
+              >
                 <MovieCard item={item} onClick={handleItemClick} />
               </div>
             ))}
@@ -270,12 +452,13 @@ export default function NetflixStylePage() {
                     #{item.id % 10 || 1}
                   </div>
                 </div>
-                <h3 className="text-white text-sm font-medium truncate">{item.title}</h3>
+                <h3 className="text-white text-sm font-medium truncate">
+                  {item.title}
+                </h3>
               </div>
             ))}
           </div>
         </div>
-
       </div>
     </div>
   );
