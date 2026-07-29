@@ -233,6 +233,8 @@ export default function NetflixStylePage() {
   const isMobile = useWidth() < 768;
   const [recommendedVideos, setRecommendedVideos] = useState([]);
   const [recommendedLoading, setRecommendedLoading] = useState(true);
+  const [trendingVideos, setTrendingVideos] = useState([]);
+  const [trendingLoading, setTrendingLoading] = useState(true);
 
   useEffect(() => {
     const fetchRecommendedVideos = async () => {
@@ -275,6 +277,49 @@ export default function NetflixStylePage() {
     };
 
     fetchRecommendedVideos();
+  }, []);
+
+  useEffect(() => {
+    const fetchTrendingVideos = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setTrendingVideos([]);
+        setTrendingLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/trending`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!response.ok) throw new Error("Failed to fetch trending videos");
+
+        const data = await response.json();
+        const videos = Array.isArray(data.videos) ? data.videos : [];
+
+        const normalized = videos.slice(0, 8).map((video) => ({
+          id: video._id || video.id,
+          title: video.title || "Untitled video",
+          thumb: video.thumbnail
+            ? `${BACKEND_URL}/${video.thumbnail.replace(/\\/g, "/")}`
+            : "https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=400&h=225&fit=crop",
+          description: video.description || "",
+          duration: video.duration || "",
+          views: video.views || 0,
+          category: video.category || null,
+        }));
+
+        setTrendingVideos(normalized);
+      } catch (error) {
+        console.error("Error fetching trending videos:", error);
+        setTrendingVideos([]);
+      } finally {
+        setTrendingLoading(false);
+      }
+    };
+
+    fetchTrendingVideos();
   }, []);
 
   const handleItemClick = (item) => {
@@ -332,24 +377,34 @@ export default function NetflixStylePage() {
         <div className="mb-8">
           <SectionHeader title="Trending Videos" />
           <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-hide hover:scrollbar-show">
-            {koreanContent.map((item) => (
-              <div
-                key={item.id}
-                className="flex-shrink-0 w-[240px] md:w-[280px]"
-              >
-                <div className="relative">
-                  <MovieCard item={item} onClick={handleItemClick} />
-                  <div className="mt-2">
-                    <div className="h-1 bg-gray-700 rounded-full overflow-hidden">
-                      <div className="h-full bg-red-600 w-[${Math.floor(Math.random()*60 + 40)}%]"></div>
+            {trendingLoading ? (
+              <p className="text-sm text-gray-400">
+                Loading trending videos...
+              </p>
+            ) : trendingVideos.length > 0 ? (
+              trendingVideos.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex-shrink-0 w-[240px] md:w-[280px]"
+                >
+                  <div className="relative">
+                    <MovieCard item={item} onClick={handleItemClick} />
+                    <div className="mt-2">
+                      <div className="h-1 bg-gray-700 rounded-full overflow-hidden">
+                        <div className="h-full bg-red-600 w-[70%]"></div>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {item.views?.toLocaleString() || 0} views
+                      </p>
                     </div>
-                    <p className="text-xs text-gray-400 mt-1">
-                      {Math.floor(Math.random() * 40 + 50)}% watched
-                    </p>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-sm text-gray-400">
+                No trending videos available right now.
+              </p>
+            )}
           </div>
         </div>
 
