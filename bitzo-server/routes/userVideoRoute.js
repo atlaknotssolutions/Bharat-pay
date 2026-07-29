@@ -19,6 +19,8 @@ const {
   uploadVideo,
   recommendedVideos,
   trendingVideos,
+  LatestVideos,
+  getSubscribedVideos,
 } = require("../controller/userVideoController");
 const { imageUpload } = require("../middlewares/multer");
 const isAuthenticated = require("../middlewares/isAuthenticated");
@@ -57,6 +59,8 @@ router.delete("/channel/:id", deleteChannel);
 
 router.get("/recommended", isAuthenticated, recommendedVideos);
 router.get("/trending", isAuthenticated, trendingVideos);
+router.get("/latest", isAuthenticated, LatestVideos);
+router.get("/subscriptions", isAuthenticated, getSubscribedVideos);
 router.get("/", isAuthenticated, getAllVideos);
 
 router.post("/subscribe/:channelId", isAuthenticated, subscribeChannel);

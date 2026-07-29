@@ -235,6 +235,10 @@ export default function NetflixStylePage() {
   const [recommendedLoading, setRecommendedLoading] = useState(true);
   const [trendingVideos, setTrendingVideos] = useState([]);
   const [trendingLoading, setTrendingLoading] = useState(true);
+  const [latestVideos, setLatestVideos] = useState([]);
+  const [latestLoading, setLatestLoading] = useState(true);
+  const [subscriptionVideos, setSubscriptionVideos] = useState([]);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(true);
 
   useEffect(() => {
     const fetchRecommendedVideos = async () => {
@@ -320,6 +324,93 @@ export default function NetflixStylePage() {
     };
 
     fetchTrendingVideos();
+  }, []);
+
+  useEffect(() => {
+    const fetchLatestVideos = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setLatestVideos([]);
+        setLatestLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/latest`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!response.ok) throw new Error("Failed to fetch latest videos");
+
+        const data = await response.json();
+        const videos = Array.isArray(data.videos) ? data.videos : [];
+
+        const normalized = videos.slice(0, 8).map((video) => ({
+          id: video._id || video.id,
+          title: video.title || "Untitled video",
+          thumb: video.thumbnail
+            ? `${BACKEND_URL}/${video.thumbnail.replace(/\\/g, "/")}`
+            : "https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=400&h=225&fit=crop",
+          description: video.description || "",
+          duration: video.duration || "",
+          views: video.views || 0,
+          category: video.category || null,
+        }));
+
+        setLatestVideos(normalized);
+      } catch (error) {
+        console.error("Error fetching latest videos:", error);
+        setLatestVideos([]);
+      } finally {
+        setLatestLoading(false);
+      }
+    };
+
+    fetchLatestVideos();
+  }, []);
+
+  useEffect(() => {
+    const fetchSubscriptionVideos = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setSubscriptionVideos([]);
+        setSubscriptionLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/subscriptions`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!response.ok)
+          throw new Error("Failed to fetch subscription videos");
+
+        const data = await response.json();
+        const videos = Array.isArray(data.videos) ? data.videos : [];
+
+        const normalized = videos.slice(0, 8).map((video) => ({
+          id: video._id || video.id,
+          title: video.title || "Untitled video",
+          thumb: video.thumbnail
+            ? `${BACKEND_URL}/${video.thumbnail.replace(/\\/g, "/")}`
+            : "https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=400&h=225&fit=crop",
+          description: video.description || "",
+          duration: video.duration || "",
+          views: video.views || 0,
+          category: video.category || null,
+        }));
+
+        setSubscriptionVideos(normalized);
+      } catch (error) {
+        console.error("Error fetching subscription videos:", error);
+        setSubscriptionVideos([]);
+      } finally {
+        setSubscriptionLoading(false);
+      }
+    };
+
+    fetchSubscriptionVideos();
   }, []);
 
   const handleItemClick = (item) => {
@@ -436,26 +527,34 @@ export default function NetflixStylePage() {
         </div>
 
         <div className="mb-8">
-          <SectionHeader title="Latest  Videos" />
+          <SectionHeader title="Latest Videos" />
           <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-hide hover:scrollbar-show">
-            {kidsFilms.map((item) => (
-              <div
-                key={item.id}
-                className="flex-shrink-0 w-[240px] md:w-[280px]"
-              >
-                <div className="relative">
-                  <MovieCard item={item} onClick={handleItemClick} />
-                  <div className="mt-2">
-                    <div className="h-1 bg-gray-700 rounded-full overflow-hidden">
-                      <div className="h-full bg-red-600 w-[${Math.floor(Math.random()*60 + 40)}%]"></div>
+            {latestLoading ? (
+              <p className="text-sm text-gray-400">Loading latest videos...</p>
+            ) : latestVideos.length > 0 ? (
+              latestVideos.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex-shrink-0 w-[240px] md:w-[280px]"
+                >
+                  <div className="relative">
+                    <MovieCard item={item} onClick={handleItemClick} />
+                    <div className="mt-2">
+                      <div className="h-1 bg-gray-700 rounded-full overflow-hidden">
+                        <div className="h-full bg-red-600 w-[70%]"></div>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {item.views?.toLocaleString() || 0} views
+                      </p>
                     </div>
-                    <p className="text-xs text-gray-400 mt-1">
-                      Family friendly
-                    </p>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-sm text-gray-400">
+                No latest videos available right now.
+              </p>
+            )}
           </div>
         </div>
         {/* 
@@ -473,18 +572,24 @@ export default function NetflixStylePage() {
         <div className="mb-8">
           <SectionHeader title="Subscription Videos" />
           <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-hide hover:scrollbar-show">
-            {[
-              ...romanticShows.slice(2),
-              ...koreanContent.slice(1, 4),
-              ...actionMovies.slice(0, 3),
-            ].map((item) => (
-              <div
-                key={item.id}
-                className="flex-shrink-0 w-[240px] md:w-[280px]"
-              >
-                <MovieCard item={item} onClick={handleItemClick} />
-              </div>
-            ))}
+            {subscriptionLoading ? (
+              <p className="text-sm text-gray-400">
+                Loading subscription videos...
+              </p>
+            ) : subscriptionVideos.length > 0 ? (
+              subscriptionVideos.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex-shrink-0 w-[240px] md:w-[280px]"
+                >
+                  <MovieCard item={item} onClick={handleItemClick} />
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-gray-400">
+                Subscribe to channels to see their videos here.
+              </p>
+            )}
           </div>
         </div>
 

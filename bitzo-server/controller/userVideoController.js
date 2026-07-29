@@ -1,6 +1,7 @@
 const Video = require("../models/Videomodel");
 const Channel = require("../models/Channel/ChannelModel");
 const mongoose = require("mongoose");
+const path = require("path");
 const imagekit = require("../utils/imagekit");
 const categoryModel = require("../models/CategoryModel/category.model");
 const ChannelModel = require("../models/Channel/ChannelModel");
@@ -141,10 +142,25 @@ const uploadVideo = async (req, res) => {
     const videoFile = req.files.video[0];
     const thumbnailFile = req.files.thumbnail ? req.files.thumbnail[0] : null;
 
-    const videoPath = videoFile.path.replace(/\\/g, "/");
-    const thumbnailPath = thumbnailFile
-      ? thumbnailFile.path.replace(/\\/g, "/")
-      : null;
+    const normalizeMediaPath = (filePath) => {
+      if (!filePath) return null;
+
+      const normalized = filePath.replace(/\\/g, "/");
+
+      if (/^https?:\/\//i.test(normalized)) {
+        return normalized;
+      }
+
+      const basename = path.basename(normalized);
+      if (normalized.includes("uploads/")) {
+        return normalized.replace(/^.*?(uploads\/.*)$/, "$1");
+      }
+
+      return `uploads/${basename}`;
+    };
+
+    const videoPath = normalizeMediaPath(videoFile.path);
+    const thumbnailPath = normalizeMediaPath(thumbnailFile?.path || null);
 
     const newVideo = new Video({
       channel: channelId,
@@ -450,20 +466,48 @@ const getVideoById = async (req, res) => {
 const addView = async (req, res) => {
   try {
     const { videoId } = req.params;
-    const video = await Video.findById(videoId);
+    const { watchedPercent, userId } = req.body || {};
 
+    const video = await Video.findById(videoId);
     if (!video) {
       return res
         .status(404)
         .json({ success: false, message: "Video not found" });
     }
 
-    video.views = (video.views || 0) + 1;
+    const normalizedUserId = userId || req.user?.userId || req.user?.id;
+    const watchedEnough = Number(watchedPercent) >= 80;
+
+    if (watchedEnough && normalizedUserId) {
+      const alreadyCounted = (video.viewers || []).some(
+        (viewer) => viewer.userId?.toString() === normalizedUserId.toString(),
+      );
+
+      if (!alreadyCounted) {
+        video.viewers.push({
+          userId: normalizedUserId,
+          completedAt: new Date(),
+        });
+        video.views = (video.views || 0) + 1;
+      }
+    }
+
     await video.save();
 
-    res
-      .status(200)
-      .json({ success: true, message: "View added!", views: video.views });
+    res.status(200).json({
+      success: true,
+      message: watchedEnough ? "View counted" : "Watch progress recorded",
+      views: video.views,
+      counted:
+        watchedEnough &&
+        !!normalizedUserId &&
+        !(
+          (video.viewers || []).some(
+            (viewer) =>
+              viewer.userId?.toString() === normalizedUserId.toString(),
+          ) && Number(watchedPercent) >= 80
+        ),
+    });
   } catch (error) {
     console.error("Error in addView:", error);
     res.status(500).json({ success: false, message: "Server error" });
@@ -737,6 +781,7 @@ module.exports = {
   uploadVideo,
   recommendedVideos,
   trendingVideos,
+  LatestVideos,
   subscribeChannel,
   getSubscribedVideos,
 };

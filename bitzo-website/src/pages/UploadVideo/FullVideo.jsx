@@ -1,5 +1,3 @@
-
-
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import {
@@ -112,21 +110,36 @@ export default function YouTubeLikeVideoPage() {
   const [videoDetails, setVideoDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ likes: 0, dislikes: 0 });
+  const [viewCounted, setViewCounted] = useState(false);
 
   const videoRef = useRef(null);
   const controlsTimer = useRef(null);
   const viewTracked = useRef(false);
 
   const entry = getVideoEntry(videoData.id);
+  const resolveMediaUrl = (value) => {
+    if (!value) return "";
+    if (/^https?:\/\//i.test(value)) return value;
+
+    const normalized = value.replace(/\\/g, "/");
+    if (normalized.startsWith("uploads/")) {
+      return `${BACKEND_URL}/${normalized}`;
+    }
+    if (normalized.includes("uploads/")) {
+      return `${BACKEND_URL}/${normalized.split("uploads/").pop()}`;
+    }
+    if (normalized.startsWith("/uploads/")) {
+      return `${BACKEND_URL}${normalized}`;
+    }
+
+    return `${BACKEND_URL}/${normalized}`;
+  };
+
   const resolvedVideoUrl = videoDetails?.videoUrl
-    ? /^https?:\/\//i.test(videoDetails.videoUrl)
-      ? videoDetails.videoUrl
-      : `${BACKEND_URL}/${videoDetails.videoUrl.replace(/\\/g, "/")}`
+    ? resolveMediaUrl(videoDetails.videoUrl)
     : entry.video;
   const resolvedPoster = videoDetails?.thumbnail
-    ? /^https?:\/\//i.test(videoDetails.thumbnail)
-      ? videoDetails.thumbnail
-      : `${BACKEND_URL}/${videoDetails.thumbnail.replace(/\\/g, "/")}`
+    ? resolveMediaUrl(videoDetails.thumbnail)
     : entry.poster;
 
   // Format time MM:SS
@@ -189,8 +202,51 @@ export default function YouTubeLikeVideoPage() {
     if (!id || viewTracked.current) return;
 
     viewTracked.current = true;
-    fetch(`${API_BASE}/${id}/view`, { method: "POST" }).catch(() => {});
+    fetch(`${API_BASE}/${id}/view`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        watchedPercent: 0,
+        userId: localStorage.getItem("user")
+          ? JSON.parse(localStorage.getItem("user"))._id ||
+            JSON.parse(localStorage.getItem("user")).id
+          : null,
+      }),
+    })
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (data.success && typeof data.views === "number") {
+          setVideoDetails((prev) =>
+            prev ? { ...prev, views: data.views } : prev,
+          );
+        }
+      })
+      .catch(() => {});
   }, [id]);
+
+  useEffect(() => {
+    if (!id || !duration || !videoRef.current || viewCounted) return;
+
+    const percent = duration > 0 ? (currentTime / duration) * 100 : 0;
+    if (percent >= 80) {
+      setViewCounted(true);
+      const token = localStorage.getItem("token");
+      const user = localStorage.getItem("user");
+      const parsedUser = user ? JSON.parse(user) : null;
+
+      fetch(`${API_BASE}/${id}/view`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          watchedPercent: 100,
+          userId: parsedUser?._id || parsedUser?.id || null,
+        }),
+      }).catch(() => {});
+    }
+  }, [currentTime, duration, id, viewCounted]);
 
   // Auto-hide controls
   const handleMouseMove = () => {

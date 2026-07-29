@@ -65,6 +65,19 @@ const videoSchema = new mongoose.Schema(
       default: 0,
     },
 
+    viewers: [
+      {
+        userId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+        completedAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
+
     // ✅ ANONYMOUS COMMENTS
     comments: [
       {
