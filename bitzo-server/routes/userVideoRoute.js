@@ -14,13 +14,20 @@ const {
   getvideosByChannel,
   getChannelById,
   getChannels,
+  getSubscribedChannels,
+  getUserWatchHistory,
+  getUserLikedVideos,
+  getUserWatchLaterVideos,
+  getUserUploadedVideos,
   createChannel,
   subscribeChannel,
   uploadVideo,
   recommendedVideos,
   trendingVideos,
   LatestVideos,
+  HistoricalVideos,
   getSubscribedVideos,
+  LikedVideos,
 } = require("../controller/userVideoController");
 const { imageUpload } = require("../middlewares/multer");
 const isAuthenticated = require("../middlewares/isAuthenticated");
@@ -53,6 +60,11 @@ router.post(
   uploadVideo,
 );
 router.get("/channel", isAuthenticated, getChannels);
+router.get("/subscribed-channels", isAuthenticated, getSubscribedChannels);
+router.get("/history", isAuthenticated, getUserWatchHistory);
+router.get("/liked-videos", isAuthenticated, getUserLikedVideos);
+router.get("/watch-later", isAuthenticated, getUserWatchLaterVideos);
+router.get("/my-videos", isAuthenticated, getUserUploadedVideos);
 router.get("/channel/:id", isAuthenticated, getChannelById);
 router.get("/channel/:id/videos", isAuthenticated, getvideosByChannel);
 router.delete("/channel/:id", deleteChannel);
@@ -61,8 +73,9 @@ router.get("/recommended", isAuthenticated, recommendedVideos);
 router.get("/trending", isAuthenticated, trendingVideos);
 router.get("/latest", isAuthenticated, LatestVideos);
 router.get("/subscriptions", isAuthenticated, getSubscribedVideos);
+router.get("/history", isAuthenticated, HistoricalVideos);
 router.get("/", isAuthenticated, getAllVideos);
-
+router.get("/liked", isAuthenticated, LikedVideos);
 router.post("/subscribe/:channelId", isAuthenticated, subscribeChannel);
 
 router.get("/:id", isAuthenticated, getVideoById);

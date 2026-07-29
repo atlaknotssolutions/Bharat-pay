@@ -236,6 +236,41 @@ const getChannels = async (req, res) => {
   }
 };
 
+const getSubscribedChannels = async (req, res) => {
+  try {
+    const userId = req.user?.id || req.user?.userId || req.user?._id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const user = await User.findById(userId).populate({
+      path: "subscribedChannels",
+      select: "name channelImage _id",
+    });
+
+    const channels = (user?.subscribedChannels || []).map((channel) => ({
+      _id: channel._id,
+      name: channel.name,
+      channelImage: channel.channelImage || "",
+      path: `/channel/${channel._id}`,
+    }));
+
+    return res.status(200).json({
+      success: true,
+      channels,
+    });
+  } catch (error) {
+    console.error("Error in getSubscribedChannels:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
 // GET /api/channels/:id
 const getChannelById = async (req, res) => {
   try {
@@ -278,6 +313,122 @@ const getChannelById = async (req, res) => {
       success: false,
       message: "Server error",
     });
+  }
+};
+
+const mapVideoToListItem = (video) => ({
+  _id: video?._id,
+  id: video?._id,
+  title: video?.title || "Untitled video",
+  thumbnail:
+    video?.thumbnail ||
+    "https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=800",
+  channel: video?.channel?.name || "Unknown channel",
+  channelName: video?.channel?.name || "Unknown channel",
+  duration: video?.duration || "—",
+  watchedDate: video?.updatedAt
+    ? new Date(video.updatedAt).toLocaleDateString()
+    : "Recently watched",
+  createdAt: video?.createdAt,
+  videoUrl: video?.videoUrl,
+  views: video?.views || 0,
+  likesCount: video?.likesCount || 0,
+});
+
+const getUserWatchHistory = async (req, res) => {
+  try {
+    const userId = req.user?.id || req.user?.userId || req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const user = await User.findById(userId).populate({
+      path: "viewedVideos",
+      populate: {
+        path: "channel",
+        select: "name channelImage",
+      },
+      options: { sort: { updatedAt: -1 } },
+    });
+
+    const videos = (user?.viewedVideos || []).map(mapVideoToListItem);
+
+    return res.status(200).json({ success: true, videos });
+  } catch (error) {
+    console.error("Error in getUserWatchHistory:", error.message);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+const getUserLikedVideos = async (req, res) => {
+  try {
+    const userId = req.user?.id || req.user?.userId || req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const user = await User.findById(userId).populate({
+      path: "likedVideos",
+      populate: {
+        path: "channel",
+        select: "name channelImage",
+      },
+      options: { sort: { createdAt: -1 } },
+    });
+
+    const videos = (user?.likedVideos || []).map(mapVideoToListItem);
+
+    return res.status(200).json({ success: true, videos });
+  } catch (error) {
+    console.error("Error in getUserLikedVideos:", error.message);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+const getUserWatchLaterVideos = async (req, res) => {
+  try {
+    const userId = req.user?.id || req.user?.userId || req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const user = await User.findById(userId).populate({
+      path: "watchLaterVideos",
+      populate: {
+        path: "channel",
+        select: "name channelImage",
+      },
+      options: { sort: { createdAt: -1 } },
+    });
+
+    const videos = (user?.watchLaterVideos || []).map(mapVideoToListItem);
+
+    return res.status(200).json({ success: true, videos });
+  } catch (error) {
+    console.error("Error in getUserWatchLaterVideos:", error.message);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+const getUserUploadedVideos = async (req, res) => {
+  try {
+    const userId = req.user?.id || req.user?.userId || req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const videos = await Video.find({ uploadedBy: userId })
+      .populate("channel", "name channelImage")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      videos: videos.map(mapVideoToListItem),
+    });
+  } catch (error) {
+    console.error("Error in getUserUploadedVideos:", error.message);
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
@@ -490,6 +641,12 @@ const addView = async (req, res) => {
         });
         video.views = (video.views || 0) + 1;
       }
+
+      const user = await User.findById(normalizedUserId);
+      if (user && !user.viewedVideos?.some((id) => id.toString() === videoId)) {
+        user.viewedVideos.push(video._id);
+        await user.save();
+      }
     }
 
     await video.save();
@@ -517,6 +674,7 @@ const addView = async (req, res) => {
 const likeVideo = async (req, res) => {
   try {
     const { videoId } = req.params;
+    const userId = req.user?.id || req.user?.userId || req.user?._id;
 
     const video = await Video.findById(videoId);
     if (!video) {
@@ -526,13 +684,41 @@ const likeVideo = async (req, res) => {
       });
     }
 
-    video.likesCount = (video.likesCount || 0) + 1;
+    let liked = false;
+    if (userId) {
+      const user = await User.findById(userId);
+      if (user) {
+        const alreadyLiked = (user.likedVideos || []).some(
+          (id) => id.toString() === videoId,
+        );
+
+        if (alreadyLiked) {
+          user.likedVideos = (user.likedVideos || []).filter(
+            (id) => id.toString() !== videoId,
+          );
+          video.likesCount = Math.max(0, (video.likesCount || 0) - 1);
+        } else {
+          user.likedVideos.push(video._id);
+          video.likesCount = (video.likesCount || 0) + 1;
+          liked = true;
+        }
+
+        await user.save();
+      }
+    }
+
+    if (!userId) {
+      video.likesCount = (video.likesCount || 0) + 1;
+      liked = true;
+    }
+
     await video.save();
 
     res.status(200).json({
       success: true,
-      message: "Video liked",
+      message: liked ? "Video liked" : "Video like removed",
       likes: video.likesCount,
+      liked,
     });
   } catch (error) {
     console.error("Error in likeVideo:", error);
@@ -774,6 +960,111 @@ const getSubscribedVideos = async (req, res) => {
   }
 };
 
+const HistoricalVideos = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const user = await User.findById(userId).select("viewedVideos");
+    const viewedVideoIds = user?.viewedVideos || [];
+
+    if (viewedVideoIds.length === 0) {
+      return res.status(200).json({
+        success: true,
+        videos: [],
+      });
+    }
+
+    // Fetch all videos that the user has viewed
+    const videos = await Video.find({
+      _id: { $in: viewedVideoIds },
+    })
+      .populate("channel", "name channelImage")
+      .populate("uploadedBy", "name email");
+
+    // Preserve the order of viewedVideos (most recent watched first)
+    // Assuming newer watches are pushed to the end of the array
+    const videoMap = new Map(
+      videos.map((v) => [v._id.toString(), v])
+    );
+
+    const orderedVideos = viewedVideoIds
+      .slice()
+      .reverse()
+      .map((id) => videoMap.get(id.toString()))
+      .filter(Boolean);
+
+    res.status(200).json({
+      success: true,
+      videos: orderedVideos,
+    });
+  } catch (error) {
+    console.error("Error in HistoricalVideos:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
+const LikedVideos = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const user = await User.findById(userId).select("likedVideos");
+    const likedVideoIds = user?.likedVideos || [];
+
+    if (likedVideoIds.length === 0) {
+      return res.status(200).json({
+        success: true,
+        videos: [],
+      });
+    }
+
+    // Fetch all liked videos
+    const videos = await Video.find({
+      _id: { $in: likedVideoIds },
+    })
+      .populate("channel", "name channelImage")
+      .populate("uploadedBy", "name email");
+
+    // Preserve the order of likedVideos (most recently liked first)
+    // Assuming newer likes are pushed to the end of the array
+    const videoMap = new Map(
+      videos.map((v) => [v._id.toString(), v])
+    );
+
+    const orderedVideos = likedVideoIds
+      .slice()
+      .reverse()
+      .map((id) => videoMap.get(id.toString()))
+      .filter(Boolean);
+
+    res.status(200).json({
+      success: true,
+      videos: orderedVideos,
+    });
+  } catch (error) {
+    console.error("Error in LikedVideos:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
+
 module.exports = {
   getAllVideos,
   getVideoById,
@@ -786,7 +1077,12 @@ module.exports = {
   getVideoInteraction,
   createChannel,
   getChannels,
+  getSubscribedChannels,
   getChannelById,
+  getUserWatchHistory,
+  getUserLikedVideos,
+  getUserWatchLaterVideos,
+  getUserUploadedVideos,
   getvideosByChannel,
   deleteChannel,
   uploadVideo,
@@ -795,4 +1091,6 @@ module.exports = {
   LatestVideos,
   subscribeChannel,
   getSubscribedVideos,
+  HistoricalVideos,
+  LikedVideos,
 };

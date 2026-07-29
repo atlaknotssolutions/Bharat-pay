@@ -159,6 +159,20 @@ const userSchema = new mongoose.Schema(
       },
     ],
 
+    likedVideos: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Video",
+      },
+    ],
+
+    watchLaterVideos: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Video",
+      },
+    ],
+
     subscribedChannels: [
       {
         type: mongoose.Schema.Types.ObjectId,
