@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "https://bitzo-server-2.onrender.com/api",
+  baseURL: "http://localhost:8000/api",
 });
 
 // Products

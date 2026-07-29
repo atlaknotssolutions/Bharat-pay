@@ -1,7 +1,7 @@
 // import { useState, useEffect } from "react";
 // import axios from "axios";
 
-// const BASE_URL = "https://bitzo-server-2.onrender.com/api";
+// const BASE_URL = "http://localhost:8000/api";
 
 // export default function VideoUpload() {
 //   const [view, setView] = useState("list"); // list | upload | player | update
@@ -265,7 +265,7 @@
 // import { useState, useEffect } from "react";
 // import axios from "axios";
 
-// const BASE_URL = "https://bitzo-server-2.onrender.com/api";
+// const BASE_URL = "http://localhost:8000/api";
 
 // export default function VideoUpload() {
 //   const [view, setView] = useState("list"); // list | upload | player | update
@@ -378,7 +378,7 @@
 
 //         <div className="flex-1 flex flex-col items-center">
 //           <video
-//             src={`https://bitzo-server-2.onrender.com/${videoSrc}`}
+//             src={`http://localhost:8000/${videoSrc}`}
 //             controls
 //             autoPlay
 //             playsInline
@@ -632,7 +632,7 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import { Loader2, Plus, ArrowLeft, Edit, Trash2, Play } from "lucide-react";
 
-const BASE_URL = "https://bitzo-server-2.onrender.com/api";
+const BASE_URL = "http://localhost:8000/api";
 
 export default function VideoManagement() {
   const [view, setView] = useState("list"); // list | upload | player | update

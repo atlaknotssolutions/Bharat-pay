@@ -131,7 +131,7 @@ const AllUsers = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const API_URL = "https://bitzo-server-2.onrender.com/api/admin/alluser"; // update if needed
+  const API_URL = "http://localhost:8000/api/admin/alluser"; // update if needed
 
   useEffect(() => {
     const fetchUsers = async () => {

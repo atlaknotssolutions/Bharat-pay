@@ -18,7 +18,7 @@
 // //     setIsLoading(true);
 
 // //     try {
-// //       const response = await fetch('https://bitzo-server-2.onrender.com/api/admin/login', {
+// //       const response = await fetch('http://localhost:8000/api/admin/login', {
 // //         method: 'POST',
 // //         headers: {
 // //           'Content-Type': 'application/json',
@@ -168,7 +168,7 @@
 //     setIsLoading(true);
 
 //     try {
-//       const response = await axios.post('https://bitzo-server-2.onrender.com/api/admin/login', {
+//       const response = await axios.post('http://localhost:8000/api/admin/login', {
 //         email,
 //         password,
 //       });
@@ -357,7 +357,7 @@ export default function Login() {
 
     try {
       const res = await axios.post(
-        "https://bitzo-server-2.onrender.com/api/admin/login",
+        "http://localhost:8000/api/admin/login",
         { email, password },
         { headers: { "Content-Type": "application/json" } },
       );
