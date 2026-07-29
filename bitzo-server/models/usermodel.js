@@ -159,6 +159,13 @@ const userSchema = new mongoose.Schema(
       },
     ],
 
+    subscribedChannels: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Channel",
+      },
+    ],
+
     viewedVideos: [
       {
         type: mongoose.Schema.Types.ObjectId,

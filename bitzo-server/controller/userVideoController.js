@@ -743,12 +743,23 @@ const subscribeChannel = async (req, res) => {
 
 const getSubscribedVideos = async (req, res) => {
   try {
-    const userId = req.user.id;
-    const subscribedChannels =
-      await User.findById(userId).select("subscribedChannels");
+    const userId = req.user?.id || req.user?.userId || req.user?._id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const user = await User.findById(userId).select("subscribedChannels");
+    const subscribedChannelIds = user?.subscribedChannels || [];
+
     const videos = await Video.find({
-      channel: { $in: subscribedChannels.subscribedChannels },
-    });
+      channel: { $in: subscribedChannelIds },
+    })
+      .sort({ createdAt: -1 })
+      .populate("channel", "name channelImage")
+      .populate("uploadedBy", "name email");
 
     res.status(200).json({
       success: true,

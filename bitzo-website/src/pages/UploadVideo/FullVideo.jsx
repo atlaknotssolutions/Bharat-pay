@@ -111,6 +111,11 @@ export default function YouTubeLikeVideoPage() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ likes: 0, dislikes: 0 });
   const [viewCounted, setViewCounted] = useState(false);
+  const [comments, setComments] = useState([]);
+  const [commentText, setCommentText] = useState("");
+  const [commentLoading, setCommentLoading] = useState(false);
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [subscribeLoading, setSubscribeLoading] = useState(false);
 
   const videoRef = useRef(null);
   const controlsTimer = useRef(null);
@@ -195,7 +200,25 @@ export default function YouTubeLikeVideoPage() {
       }
     };
 
+    const fetchComments = async () => {
+      if (!id) return;
+
+      try {
+        const token = localStorage.getItem("token");
+        const response = await fetch(`${API_BASE}/${id}/comments`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        const data = await response.json();
+        if (data.success) {
+          setComments(Array.isArray(data.comments) ? data.comments : []);
+        }
+      } catch (error) {
+        console.error("Error fetching comments:", error);
+      }
+    };
+
     fetchVideo();
+    fetchComments();
   }, [id]);
 
   useEffect(() => {
@@ -306,6 +329,69 @@ export default function YouTubeLikeVideoPage() {
       }
     } catch (error) {
       console.error("Error updating reaction:", error);
+    }
+  };
+
+  const handleSubscribe = async () => {
+    const channelId = videoDetails?.channel?._id || videoDetails?.channel?.id;
+    if (!channelId) return;
+
+    setSubscribeLoading(true);
+    const token = localStorage.getItem("token");
+
+    try {
+      const response = await fetch(`${API_BASE}/subscribe/${channelId}`, {
+        method: "POST",
+        headers: token
+          ? {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            }
+          : { "Content-Type": "application/json" },
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        setIsSubscribed(Boolean(data.subscribed));
+      }
+    } catch (error) {
+      console.error("Error subscribing to channel:", error);
+    } finally {
+      setSubscribeLoading(false);
+    }
+  };
+
+  const handleCommentSubmit = async (e) => {
+    e.preventDefault();
+    if (!id || !commentText.trim()) return;
+
+    setCommentLoading(true);
+    const token = localStorage.getItem("token");
+
+    try {
+      const response = await fetch(`${API_BASE}/${id}/comment`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ commentText: commentText.trim() }),
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        const newComment = {
+          _id: Date.now().toString(),
+          text: commentText.trim(),
+          createdAt: new Date().toISOString(),
+        };
+        setComments((prev) => [newComment, ...prev]);
+        setCommentText("");
+      }
+    } catch (error) {
+      console.error("Error posting comment:", error);
+    } finally {
+      setCommentLoading(false);
     }
   };
 
@@ -515,8 +601,20 @@ export default function YouTubeLikeVideoPage() {
                     <span>{stats.dislikes}</span>
                   </button>
 
-                  <button className="flex-1 md:flex-none bg-white text-black font-medium px-6 py-2 rounded-full hover:bg-gray-200 flex items-center justify-center gap-2">
-                    Subscribe
+                  <button
+                    onClick={handleSubscribe}
+                    disabled={subscribeLoading}
+                    className={`flex-1 md:flex-none px-6 py-2 rounded-full font-medium flex items-center justify-center gap-2 transition ${
+                      isSubscribed
+                        ? "bg-white/15 text-white hover:bg-white/20"
+                        : "bg-white text-black hover:bg-gray-200"
+                    } ${subscribeLoading ? "opacity-70" : ""}`}
+                  >
+                    {subscribeLoading
+                      ? "Please wait..."
+                      : isSubscribed
+                        ? "Subscribed"
+                        : "Subscribe"}
                   </button>
                 </div>
               </div>
@@ -541,27 +639,56 @@ export default function YouTubeLikeVideoPage() {
               Comments • {Math.floor(Math.random() * 8000 + 500)}
             </h3>
 
-            <div className="flex gap-3 mb-6">
+            <form onSubmit={handleCommentSubmit} className="flex gap-3 mb-6">
               <div className="w-10 h-10 rounded-full bg-gray-600 flex-shrink-0" />
               <div className="flex-1">
                 <input
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
                   placeholder="Add a comment..."
                   className="w-full bg-[#0f0f0f] border border-gray-700 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-blue-500"
                 />
                 <div className="flex justify-end gap-3 mt-2">
-                  <button className="px-4 py-1.5 text-sm hover:bg-white/10 rounded">
+                  <button
+                    type="button"
+                    onClick={() => setCommentText("")}
+                    className="px-4 py-1.5 text-sm hover:bg-white/10 rounded"
+                  >
                     Cancel
                   </button>
-                  <button className="px-6 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-full text-sm font-medium flex items-center gap-2">
-                    <Send size={16} /> Comment
+                  <button
+                    type="submit"
+                    disabled={commentLoading || !commentText.trim()}
+                    className="px-6 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-full text-sm font-medium flex items-center gap-2 disabled:opacity-60"
+                  >
+                    <Send size={16} />{" "}
+                    {commentLoading ? "Posting..." : "Comment"}
                   </button>
                 </div>
               </div>
-            </div>
+            </form>
 
-            <div className="text-gray-500 text-center py-8">
-              No comments yet • Be the first to share what you think!
-            </div>
+            {comments.length > 0 ? (
+              <div className="space-y-3">
+                {comments.map((comment) => (
+                  <div
+                    key={comment._id}
+                    className="rounded-lg bg-[#0f0f0f] p-3 border border-gray-800"
+                  >
+                    <p className="text-sm text-white">{comment.text}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {comment.createdAt
+                        ? new Date(comment.createdAt).toLocaleString()
+                        : "Just now"}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-gray-500 text-center py-8">
+                No comments yet • Be the first to share what you think!
+              </div>
+            )}
           </div>
         </div>
 
