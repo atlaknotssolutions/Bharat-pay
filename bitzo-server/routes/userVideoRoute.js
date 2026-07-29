@@ -28,6 +28,8 @@ const {
   HistoricalVideos,
   getSubscribedVideos,
   LikedVideos,
+  WatchLaterVideos,
+  RemoveFromWatchLater,
 } = require("../controller/userVideoController");
 const { imageUpload } = require("../middlewares/multer");
 const isAuthenticated = require("../middlewares/isAuthenticated");
@@ -77,6 +79,10 @@ router.get("/history", isAuthenticated, HistoricalVideos);
 router.get("/", isAuthenticated, getAllVideos);
 router.get("/liked", isAuthenticated, LikedVideos);
 router.post("/subscribe/:channelId", isAuthenticated, subscribeChannel);
+
+
+router.get("/watch-later", isAuthenticated, WatchLaterVideos);
+router.delete("/watch-later/:videoId", isAuthenticated, RemoveFromWatchLater);
 
 router.get("/:id", isAuthenticated, getVideoById);
 router.post("/:videoId/view", addView);

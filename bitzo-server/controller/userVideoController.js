@@ -1065,6 +1065,97 @@ const LikedVideos = async (req, res) => {
 };
 
 
+const WatchLaterVideos = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const user = await User.findById(userId).select("watchLater");
+    const watchLaterIds = user?.watchLater || [];
+
+    if (watchLaterIds.length === 0) {
+      return res.status(200).json({
+        success: true,
+        videos: [],
+      });
+    }
+
+    // Fetch all watch later videos
+    const videos = await Video.find({
+      _id: { $in: watchLaterIds },
+    })
+      .populate("channel", "name channelImage")
+      .populate("uploadedBy", "name email");
+
+    // Preserve the order of watchLater (most recently added first)
+    const videoMap = new Map(
+      videos.map((v) => [v._id.toString(), v])
+    );
+
+    const orderedVideos = watchLaterIds
+      .slice()
+      .reverse()
+      .map((id) => videoMap.get(id.toString()))
+      .filter(Boolean);
+
+    res.status(200).json({
+      success: true,
+      videos: orderedVideos,
+    });
+  } catch (error) {
+    console.error("Error in WatchLaterVideos:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
+// Remove a video from Watch Later
+const RemoveFromWatchLater = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const { videoId } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    if (!videoId) {
+      return res.status(400).json({
+        success: false,
+        message: "Video ID is required",
+      });
+    }
+
+    await User.findByIdAndUpdate(userId, {
+      $pull: { watchLater: videoId },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Video removed from Watch Later",
+    });
+  } catch (error) {
+    console.error("Error in RemoveFromWatchLater:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
+
+
+
 module.exports = {
   getAllVideos,
   getVideoById,
@@ -1093,4 +1184,6 @@ module.exports = {
   getSubscribedVideos,
   HistoricalVideos,
   LikedVideos,
+  WatchLaterVideos,
+  RemoveFromWatchLater,
 };
