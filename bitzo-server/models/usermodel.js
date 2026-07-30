@@ -1,5 +1,3 @@
-
-
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
@@ -9,11 +7,6 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: [true, "Name is required"],
       trim: true,
-    },
-
-    avatar: {
-      type: String,
-      default: null, // or a default avatar URL
     },
 
     email: {
@@ -45,17 +38,16 @@ const userSchema = new mongoose.Schema(
 
     googleId: String,
 
-    // In your userSchema
+    // Avatar
     avatar: {
-      type: String, // URL ke liye
+      type: String, // URL
       default: null,
     },
 
     avatarFileId: {
-      // ← Naya field add karo (ye bahut zaroori hai delete ke liye)
       type: String,
       default: null,
-      select: false, // sensitive nahi hai lekin phir bhi
+      select: false,
     },
 
     trustScore: {
@@ -81,7 +73,7 @@ const userSchema = new mongoose.Schema(
       },
     ],
 
-   likedVideos: [
+    likedVideos: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Video",
@@ -98,7 +90,7 @@ const userSchema = new mongoose.Schema(
     subscribedChannels: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Channel",          // ← Channel model
+        ref: "Channel",
       },
     ],
 
@@ -108,8 +100,6 @@ const userSchema = new mongoose.Schema(
         ref: "Video",
       },
     ],
-
-    
 
     viewedVideos: [
       {
@@ -124,7 +114,7 @@ const userSchema = new mongoose.Schema(
       min: 0,
     },
   },
-  { timestamps: true },
+  { timestamps: true }
 );
 
 userSchema.methods.comparePassword = async function (candidatePassword) {

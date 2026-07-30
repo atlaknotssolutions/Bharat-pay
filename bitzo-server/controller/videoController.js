@@ -63,59 +63,6 @@ exports.updateVideoupdated = async (req, res) => {
 
 
 
-// exports.uploadVideo = async (req, res) => {
-//   try {
-//     if (!req.file) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Video file is required",
-//       });
-//     }
-
-//     const {
-//       title,
-//       description,
-//       type,
-//       duration,
-//       category,
-//       subCategory,
-//     } = req.body;
-
-  
-
-//     const filePath = req.file.path.replace(/\\/g, "/");
-
-//     const video = await Video.create({
-//       title,
-//       description: description || "",
-//       type,
-//       duration: duration ? Number(duration) : undefined,
-//       category,            // ✅ category save
-//       subCategory,         // ✅ subCategory save
-//       videoUrl: filePath,
-//     });
-
-//     const baseUrl = `${req.protocol}://${req.get("host")}`;
-//     const fullVideoUrl = `${baseUrl}/${filePath}`;
-
-//     res.status(201).json({
-//       success: true,
-//       message: "Video uploaded successfully",
-//       video: {
-//         ...video.toObject(),
-//         videoUrl: fullVideoUrl,
-//       },
-//     });
-//   } catch (error) {
-//     console.error("Upload error:", error);
-//     res.status(500).json({
-//       success: false,
-//       message: "Server error during upload",
-//       error: error.message,
-//     });
-//   }
-// };
-
 
 exports.uploadVideo = async (req, res) => {
   try {
@@ -166,59 +113,6 @@ exports.uploadVideo = async (req, res) => {
     });
   }
 };
-
-/**
- * 📥 Get All Videos
- */
-// exports.getAllVideos = async (req, res) => {
-//   try {
-//     const videos = await Video.find().sort({ createdAt: -1 });
-
-//     res.status(200).json({
-//       success: true,
-//       count: videos.length,
-//       videos
-//     });
-
-//   } catch (error) {
-//     res.status(500).json({
-//       success: false,
-//       message: error.message
-//     });
-//   }
-// };
-
-// exports.getAllVideos = async (req, res) => {
-//   try {
-//     const videos = await Video.find()
-//       .populate("category", "name")        // ✅ category name
-//       .sort({ createdAt: -1 });
-
-//     const baseUrl = `${req.protocol}://${req.get("host")}`;
-
-//     // ✅ full video URL for frontend
-//     const updatedVideos = videos.map((video) => {
-//       const videoObj = video.toObject();
-//       return {
-//         ...videoObj,
-//         videoUrl: `${baseUrl}/${videoObj.videoUrl}`,
-//       };
-//     });
-
-//     res.status(200).json({
-//       success: true,
-//       count: updatedVideos.length,
-//       videos: updatedVideos,
-//     });
-
-//   } catch (error) {
-//     console.error("Get videos error:", error);
-//     res.status(500).json({
-//       success: false,
-//       message: error.message,
-//     });
-//   }
-// };
 
 
 exports.getAllVideos = async (req, res) => {
