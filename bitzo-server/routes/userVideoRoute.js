@@ -30,6 +30,7 @@ const {
   LikedVideos,
   WatchLaterVideos,
   RemoveFromWatchLater,
+  addToWatchLater,
 } = require("../controller/userVideoController");
 const { imageUpload } = require("../middlewares/multer");
 const isAuthenticated = require("../middlewares/isAuthenticated");
@@ -45,12 +46,7 @@ router.post(
   createChannel,
 );
 
-// router.post(
-//   "/upload/:channelId",
-//   isAuthenticated,
-//   ...uploadToBackblaze,
-//   uploadVideo
-// );
+
 
 router.post(
   "/upload/:channelId",
@@ -75,15 +71,18 @@ router.get("/recommended", isAuthenticated, recommendedVideos);
 router.get("/trending", isAuthenticated, trendingVideos);
 router.get("/latest", isAuthenticated, LatestVideos);
 router.get("/subscriptions", isAuthenticated, getSubscribedVideos);
-router.get("/history", isAuthenticated, HistoricalVideos);
+// router.get("/history", isAuthenticated, HistoricalVideos);
 router.get("/", isAuthenticated, getAllVideos);
 router.get("/liked", isAuthenticated, LikedVideos);
 router.post("/subscribe/:channelId", isAuthenticated, subscribeChannel);
 
 
-router.get("/watch-later", isAuthenticated, WatchLaterVideos);
-router.delete("/watch-later/:videoId", isAuthenticated, RemoveFromWatchLater);
+router.get("/history", isAuthenticated, WatchLaterVideos);
+router.delete("/history/:videoId", isAuthenticated, RemoveFromWatchLater);
 
+// Watch Later (jo aapne diya tha)
+router.delete("/watch-later/:videoId", isAuthenticated, RemoveFromWatchLater);
+router.post("/watch-later/:videoId", isAuthenticated, addToWatchLater);
 router.get("/:id", isAuthenticated, getVideoById);
 router.post("/:videoId/view", addView);
 router.post("/:videoId/like", likeVideo);

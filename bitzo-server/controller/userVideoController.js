@@ -272,11 +272,12 @@ const getSubscribedChannels = async (req, res) => {
 };
 
 // GET /api/channels/:id
+// GET /api/uservideo/channel/:id
+// Public channel page (channel info + videos)
 const getChannelById = async (req, res) => {
   try {
     const channelId = req.params.id;
 
-    // channel ID valid mongoose ObjectId hai ya nahi → simple check
     if (!mongoose.Types.ObjectId.isValid(channelId)) {
       return res.status(400).json({
         success: false,
@@ -284,11 +285,12 @@ const getChannelById = async (req, res) => {
       });
     }
 
+    // Channel details
     const channel = await Channel.findById(channelId)
-      .populate("category", "_id name") // category ka name + _id
-      .populate("Videosuser"); // videos ka data
+      .populate("category", "_id name")
+      .populate("creator", "name email")
+      .lean();
 
-    // Extra safety: check karo ki yeh channel usi user ka hai jo request kar raha hai
     if (!channel) {
       return res.status(404).json({
         success: false,
@@ -296,16 +298,34 @@ const getChannelById = async (req, res) => {
       });
     }
 
-    if (channel.user.toString() !== req.user.id) {
-      return res.status(403).json({
-        success: false,
-        message: "You are not authorized to view this channel",
-      });
+    // Videos of this channel
+    const videos = await Video.find({ channel: channelId })
+      .populate("uploadedBy", "_id name email")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Check if current user is subscribed
+    let isSubscribed = false;
+    const userId = req.user?.id || req.user?.userId || req.user?._id;
+
+    if (userId) {
+      const user = await User.findById(userId).select("subscribedChannels");
+      isSubscribed = (user?.subscribedChannels || []).some(
+        (id) => id.toString() === channelId
+      );
     }
 
     return res.status(200).json({
       success: true,
-      channel, // ← sirf ek channel return ho raha hai
+      channel: {
+        ...channel,
+        isSubscribed,
+        subscribersCount: channel.subscribersCount || 0,
+        videoCount: videos.length,
+        handle: channel.handle || channel.name?.toLowerCase().replace(/\s+/g, "") || "channel",
+        description: channel.channeldescription || channel.description || "",
+      },
+      videos,
     });
   } catch (error) {
     console.error("Error in getChannelById:", error.message);
@@ -315,6 +335,8 @@ const getChannelById = async (req, res) => {
     });
   }
 };
+
+
 
 const mapVideoToListItem = (video) => ({
   _id: video?._id,
@@ -599,7 +621,10 @@ const LatestVideos = async (req, res) => {
 const getVideoById = async (req, res) => {
   try {
     const videoId = req.params.id || req.params.videoId;
-    const video = await Video.findById(videoId).populate("channel", "name");
+    const video = await Video.findById(videoId).populate(
+      "channel",
+      "name subscribersCount channelImage"
+    );
 
     if (!video) {
       return res
@@ -607,7 +632,42 @@ const getVideoById = async (req, res) => {
         .json({ success: false, message: "Video not found" });
     }
 
-    res.status(200).json({ success: true, video });
+    const userId = req.user?.id || req.user?.userId || req.user?._id;
+    let userReaction = null;
+    let isSubscribed = false;
+    let watchedPercent = 0;
+
+    if (userId) {
+      const user = await User.findById(userId);
+      if (user) {
+        if ((user.likedVideos || []).some((i) => i.toString() === videoId)) {
+          userReaction = "like";
+        } else if (
+          (user.dislikedVideos || []).some((i) => i.toString() === videoId)
+        ) {
+          userReaction = "dislike";
+        }
+
+        isSubscribed = (user.subscriptions || []).some(
+          (chId) => chId.toString() === video.channel?._id?.toString()
+        );
+      }
+
+      const viewerEntry = (video.viewers || []).find(
+        (v) => v.userId?.toString() === userId.toString()
+      );
+      if (viewerEntry) watchedPercent = viewerEntry.watchedPercent || 0;
+    }
+
+    res.status(200).json({
+      success: true,
+      video: {
+        ...video.toObject(),
+        userReaction,
+        isSubscribed,
+        watchedPercent,
+      },
+    });
   } catch (error) {
     console.error("Error in getVideoById:", error);
     res.status(500).json({ success: false, message: "Server error" });
@@ -627,23 +687,47 @@ const addView = async (req, res) => {
     }
 
     const normalizedUserId = userId || req.user?.userId || req.user?.id;
-    const watchedEnough = Number(watchedPercent) >= 80;
+    const percent = Math.min(100, Math.max(0, Number(watchedPercent) || 0));
+    const watchedEnough = percent >= 80;
 
-    if (watchedEnough && normalizedUserId) {
-      const alreadyCounted = (video.viewers || []).some(
-        (viewer) => viewer.userId?.toString() === normalizedUserId.toString(),
+    let newlyCounted = false;
+
+    if (normalizedUserId) {
+      video.viewers = video.viewers || [];
+      const viewerEntry = video.viewers.find(
+        (v) => v.userId?.toString() === normalizedUserId.toString()
       );
 
-      if (!alreadyCounted) {
+      if (viewerEntry) {
+        if (percent > (viewerEntry.watchedPercent || 0)) {
+          viewerEntry.watchedPercent = percent;
+        }
+        if (watchedEnough && !viewerEntry.counted) {
+          viewerEntry.counted = true;
+          viewerEntry.completedAt = new Date();
+          video.views = (video.views || 0) + 1;
+          newlyCounted = true;
+        }
+      } else {
         video.viewers.push({
           userId: normalizedUserId,
-          completedAt: new Date(),
+          watchedPercent: percent,
+          counted: watchedEnough,
+          completedAt: watchedEnough ? new Date() : undefined,
         });
-        video.views = (video.views || 0) + 1;
+        if (watchedEnough) {
+          video.views = (video.views || 0) + 1;
+          newlyCounted = true;
+        }
       }
 
       const user = await User.findById(normalizedUserId);
-      if (user && !user.viewedVideos?.some((id) => id.toString() === videoId)) {
+      if (
+        user &&
+        watchedEnough &&
+        !user.viewedVideos?.some((i) => i.toString() === videoId)
+      ) {
+        user.viewedVideos = user.viewedVideos || [];
         user.viewedVideos.push(video._id);
         await user.save();
       }
@@ -655,15 +739,8 @@ const addView = async (req, res) => {
       success: true,
       message: watchedEnough ? "View counted" : "Watch progress recorded",
       views: video.views,
-      counted:
-        watchedEnough &&
-        !!normalizedUserId &&
-        !(
-          (video.viewers || []).some(
-            (viewer) =>
-              viewer.userId?.toString() === normalizedUserId.toString(),
-          ) && Number(watchedPercent) >= 80
-        ),
+      watchedPercent: percent,
+      counted: newlyCounted,
     });
   } catch (error) {
     console.error("Error in addView:", error);
@@ -678,47 +755,55 @@ const likeVideo = async (req, res) => {
 
     const video = await Video.findById(videoId);
     if (!video) {
-      return res.status(404).json({
-        success: false,
-        message: "Video not found",
-      });
-    }
-
-    let liked = false;
-    if (userId) {
-      const user = await User.findById(userId);
-      if (user) {
-        const alreadyLiked = (user.likedVideos || []).some(
-          (id) => id.toString() === videoId,
-        );
-
-        if (alreadyLiked) {
-          user.likedVideos = (user.likedVideos || []).filter(
-            (id) => id.toString() !== videoId,
-          );
-          video.likesCount = Math.max(0, (video.likesCount || 0) - 1);
-        } else {
-          user.likedVideos.push(video._id);
-          video.likesCount = (video.likesCount || 0) + 1;
-          liked = true;
-        }
-
-        await user.save();
-      }
+      return res.status(404).json({ success: false, message: "Video not found" });
     }
 
     if (!userId) {
       video.likesCount = (video.likesCount || 0) + 1;
-      liked = true;
+      await video.save();
+      return res.status(200).json({
+        success: true,
+        likes: video.likesCount,
+        dislikes: video.dislikesCount || 0,
+        reaction: "like",
+      });
     }
 
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    user.likedVideos = user.likedVideos || [];
+    user.dislikedVideos = user.dislikedVideos || [];
+
+    const alreadyLiked = user.likedVideos.some((i) => i.toString() === videoId);
+    const alreadyDisliked = user.dislikedVideos.some((i) => i.toString() === videoId);
+
+    let reaction = null;
+
+    if (alreadyLiked) {
+      user.likedVideos = user.likedVideos.filter((i) => i.toString() !== videoId);
+      video.likesCount = Math.max(0, (video.likesCount || 0) - 1);
+      reaction = null;
+    } else {
+      if (alreadyDisliked) {
+        user.dislikedVideos = user.dislikedVideos.filter((i) => i.toString() !== videoId);
+        video.dislikesCount = Math.max(0, (video.dislikesCount || 0) - 1);
+      }
+      user.likedVideos.push(video._id);
+      video.likesCount = (video.likesCount || 0) + 1;
+      reaction = "like";
+    }
+
+    await user.save();
     await video.save();
 
     res.status(200).json({
       success: true,
-      message: liked ? "Video liked" : "Video like removed",
       likes: video.likesCount,
-      liked,
+      dislikes: video.dislikesCount || 0,
+      reaction,
     });
   } catch (error) {
     console.error("Error in likeVideo:", error);
@@ -726,28 +811,134 @@ const likeVideo = async (req, res) => {
   }
 };
 
+// dislikeVideo waise hi rahega — usme already `|| []` defaults hain, koi change nahi chahiye.
+
 const dislikeVideo = async (req, res) => {
   try {
     const { videoId } = req.params;
+    const userId = req.user?.id || req.user?.userId || req.user?._id;
 
     const video = await Video.findById(videoId);
     if (!video) {
-      return res.status(404).json({
-        success: false,
-        message: "Video not found",
+      return res.status(404).json({ success: false, message: "Video not found" });
+    }
+
+    // Guest → just increment
+    if (!userId) {
+      video.dislikesCount = (video.dislikesCount || 0) + 1;
+      await video.save();
+      return res.status(200).json({
+        success: true,
+        likes: video.likesCount || 0,
+        dislikes: video.dislikesCount,
+        reaction: "dislike",
       });
     }
 
-    video.dislikesCount = (video.dislikesCount || 0) + 1;
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    // Ensure arrays exist
+    user.likedVideos = user.likedVideos || [];
+    user.dislikedVideos = user.dislikedVideos || [];
+
+    const alreadyLiked = user.likedVideos.some(
+      (id) => id.toString() === videoId
+    );
+    const alreadyDisliked = user.dislikedVideos.some(
+      (id) => id.toString() === videoId
+    );
+
+    let reaction = null;
+
+    if (alreadyDisliked) {
+      // Toggle off dislike
+      user.dislikedVideos = user.dislikedVideos.filter(
+        (id) => id.toString() !== videoId
+      );
+      video.dislikesCount = Math.max(0, (video.dislikesCount || 0) - 1);
+      reaction = null;
+    } else {
+      // Remove like if exists
+      if (alreadyLiked) {
+        user.likedVideos = user.likedVideos.filter(
+          (id) => id.toString() !== videoId
+        );
+        video.likesCount = Math.max(0, (video.likesCount || 0) - 1);
+      }
+      // Add dislike
+      user.dislikedVideos.push(video._id);
+      video.dislikesCount = (video.dislikesCount || 0) + 1;
+      reaction = "dislike";
+    }
+
+    await user.save();
     await video.save();
 
     res.status(200).json({
       success: true,
-      message: "Video disliked",
+      likes: video.likesCount || 0,
       dislikes: video.dislikesCount,
+      reaction, // "dislike" | null
     });
   } catch (error) {
     console.error("Error in dislikeVideo:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// ==================== SUBSCRIBE / UNSUBSCRIBE ====================
+const subscribeChannel = async (req, res) => {
+  try {
+    const { channelId } = req.params;
+    const userId = req.user?.id || req.user?.userId || req.user?._id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Login required" });
+    }
+
+    const user = await User.findById(userId);
+    const channel = await User.findById(channelId); // assuming channel is also a User
+
+    if (!user || !channel) {
+      return res.status(404).json({ success: false, message: "Not found" });
+    }
+
+    user.subscribedChannels = user.subscribedChannels || [];
+    channel.subscribersCount = channel.subscribersCount || 0;
+
+    const alreadySubscribed = user.subscribedChannels.some(
+      (id) => id.toString() === channelId
+    );
+
+    let subscribed = false;
+
+    if (alreadySubscribed) {
+      // Unsubscribe
+      user.subscribedChannels = user.subscribedChannels.filter(
+        (id) => id.toString() !== channelId
+      );
+      channel.subscribersCount = Math.max(0, channel.subscribersCount - 1);
+      subscribed = false;
+    } else {
+      // Subscribe
+      user.subscribedChannels.push(channel._id);
+      channel.subscribersCount += 1;
+      subscribed = true;
+    }
+
+    await user.save();
+    await channel.save();
+
+    res.status(200).json({
+      success: true,
+      subscribed,
+      subscribersCount: channel.subscribersCount,
+    });
+  } catch (error) {
+    console.error("Error in subscribeChannel:", error);
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
@@ -873,59 +1064,59 @@ const getVideoInteraction = async (req, res) => {
   }
 };
 
-const subscribeChannel = async (req, res) => {
-  try {
-    const { channelId } = req.params;
-    const userId = req.user.id;
+// const subscribeChannel = async (req, res) => {
+//   try {
+//     const { channelId } = req.params;
+//     const userId = req.user.id;
 
-    const channel = await Channel.findById(channelId);
-    if (!channel) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Channel not found" });
-    }
+//     const channel = await Channel.findById(channelId);
+//     if (!channel) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "Channel not found" });
+//     }
 
-    // Agar already subscribed hai to unsubscribe kar do (toggle)
-    const isSubscribed = channel.subscribedBy.includes(userId);
+//     // Agar already subscribed hai to unsubscribe kar do (toggle)
+//     const isSubscribed = channel.subscribedBy.includes(userId);
 
-    if (isSubscribed) {
-      // Unsubscribe
-      await Channel.findByIdAndUpdate(channelId, {
-        $pull: { subscribedBy: userId },
-        $inc: { subscribers: -1 },
-      });
+//     if (isSubscribed) {
+//       // Unsubscribe
+//       await Channel.findByIdAndUpdate(channelId, {
+//         $pull: { subscribedBy: userId },
+//         $inc: { subscribers: -1 },
+//       });
 
-      await User.findByIdAndUpdate(userId, {
-        $pull: { subscribedChannels: channelId },
-      });
+//       await User.findByIdAndUpdate(userId, {
+//         $pull: { subscribedChannels: channelId },
+//       });
 
-      return res.json({
-        success: true,
-        message: "Unsubscribed successfully",
-        subscribed: false,
-      });
-    } else {
-      // Subscribe
-      await Channel.findByIdAndUpdate(channelId, {
-        $addToSet: { subscribedBy: userId },
-        $inc: { subscribers: 1 },
-      });
+//       return res.json({
+//         success: true,
+//         message: "Unsubscribed successfully",
+//         subscribed: false,
+//       });
+//     } else {
+//       // Subscribe
+//       await Channel.findByIdAndUpdate(channelId, {
+//         $addToSet: { subscribedBy: userId },
+//         $inc: { subscribers: 1 },
+//       });
 
-      await User.findByIdAndUpdate(userId, {
-        $addToSet: { subscribedChannels: channelId },
-      });
+//       await User.findByIdAndUpdate(userId, {
+//         $addToSet: { subscribedChannels: channelId },
+//       });
 
-      return res.json({
-        success: true,
-        message: "Subscribed successfully",
-        subscribed: true,
-      });
-    }
-  } catch (error) {
-    console.error("Subscribe error:", error);
-    res.status(500).json({ success: false, message: "Server error" });
-  }
-};
+//       return res.json({
+//         success: true,
+//         message: "Subscribed successfully",
+//         subscribed: true,
+//       });
+//     }
+//   } catch (error) {
+//     console.error("Subscribe error:", error);
+//     res.status(500).json({ success: false, message: "Server error" });
+//   }
+// };
 
 const getSubscribedVideos = async (req, res) => {
   try {
@@ -1153,7 +1344,53 @@ const RemoveFromWatchLater = async (req, res) => {
   }
 };
 
+const addToWatchLater = async (req, res) => {
+  try {
+    const userId = req.user?.id || req.user?.userId || req.user?._id;
+    const { videoId } = req.params;
 
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    if (!videoId) {
+      return res.status(400).json({ success: false, message: "Video ID required" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    user.watchLaterVideos = user.watchLaterVideos || [];
+    user.watchLater = user.watchLater || [];
+
+    const alreadyAdded =
+      user.watchLaterVideos.some((id) => id.toString() === videoId) ||
+      user.watchLater.some((id) => id.toString() === videoId);
+
+    if (alreadyAdded) {
+      return res.status(200).json({
+        success: true,
+        message: "Already in Watch Later",
+        added: false,
+      });
+    }
+
+    user.watchLaterVideos.push(videoId);
+    user.watchLater.push(videoId);
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Added to Watch Later",
+      added: true,
+    });
+  } catch (error) {
+    console.error("Error in addToWatchLater:", error);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
 
 
 module.exports = {
@@ -1186,4 +1423,5 @@ module.exports = {
   LikedVideos,
   WatchLaterVideos,
   RemoveFromWatchLater,
+  addToWatchLater
 };

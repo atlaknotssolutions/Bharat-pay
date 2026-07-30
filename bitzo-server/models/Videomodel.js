@@ -65,18 +65,28 @@ const videoSchema = new mongoose.Schema(
       default: 0,
     },
 
-    viewers: [
-      {
-        userId: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "User",
-        },
-        completedAt: {
-          type: Date,
-          default: Date.now,
-        },
-      },
-    ],
+   viewers: [
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    watchedPercent: {
+      type: Number,
+      default: 0,
+    },
+    counted: {
+      type: Boolean,
+      default: false,
+    },
+    completedAt: {
+      type: Date,
+    },
+  },
+],
+
+
+    
 
     // ✅ ANONYMOUS COMMENTS
     comments: [

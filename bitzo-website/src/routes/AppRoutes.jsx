@@ -21,6 +21,7 @@ import WatchLaterTab from "../pages/Settings/WatchLaterTab";
 import ChannelPage from "../components/channels/ChannelPage";
 import ChannelCustomization from "../components/channels/ChannelCustomization";
 import Leaderboard from "../pages/Settings/Leaderboard";
+import SubscribedChannels from "../pages/UploadVideo/SubscribedChannels";
 
 export default function AppRoutes() {
   return (
@@ -38,6 +39,7 @@ export default function AppRoutes() {
           <Route path="reel" element={<ReelPlayerPage />} />
           <Route path="video/:id" element={<FullVideo />} />
           <Route path="profile" element={<Profile />} />
+          <Route path="subscribechannel/:id" element={<SubscribedChannels />} />
 
           <Route path="/history" element={<WatchHistoryTab />} />
           <Route path="/liked-videos" element={<LikedVideosTab />} />
