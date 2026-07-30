@@ -1344,6 +1344,8 @@ const RemoveFromWatchLater = async (req, res) => {
   }
 };
 
+
+
 const addToWatchLater = async (req, res) => {
   try {
     const userId = req.user?.id || req.user?.userId || req.user?._id;
@@ -1393,6 +1395,69 @@ const addToWatchLater = async (req, res) => {
 };
 
 
+const getSearchHints = async (req, res) => {
+  try {
+    const q = (req.query.q || "").trim();
+
+    if (!q || q.length < 1) {
+      return res.status(200).json({
+        success: true,
+        data: [],
+      });
+    }
+
+    const regex = new RegExp(q, "i");
+
+    // Videos titles se hints
+    const videoHints = await Video.find({ title: regex })
+      .select("title")
+      .limit(6)
+      .lean();
+
+    // Channels se hints
+    const channelHints = await Channel.find({
+      $or: [{ name: regex }, { handle: regex }],
+    })
+      .select("name handle")
+      .limit(4)
+      .lean();
+
+    const hints = [
+      ...videoHints.map((v) => ({
+        type: "video",
+        text: v.title,
+      })),
+      ...channelHints.map((c) => ({
+        type: "channel",
+        text: c.name || c.handle,
+      })),
+    ];
+
+    // unique + limit
+    const unique = [];
+    const seen = new Set();
+    for (const h of hints) {
+      const key = h.text.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push(h);
+      }
+      if (unique.length >= 8) break;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: unique,
+    });
+  } catch (err) {
+    console.error("Search hints error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch hints",
+    });
+  }
+};
+
 
 module.exports = {
   getAllVideos,
@@ -1424,5 +1489,6 @@ module.exports = {
   LikedVideos,
   WatchLaterVideos,
   RemoveFromWatchLater,
-  addToWatchLater
+  addToWatchLater,
+  getSearchHints
 };

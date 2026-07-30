@@ -31,6 +31,7 @@ const {
   WatchLaterVideos,
   RemoveFromWatchLater,
   addToWatchLater,
+  getSearchHints,
 } = require("../controller/userVideoController");
 const { imageUpload } = require("../middlewares/multer");
 const isAuthenticated = require("../middlewares/isAuthenticated");
@@ -79,7 +80,7 @@ router.post("/subscribe/:channelId", isAuthenticated, subscribeChannel);
 
 router.get("/history", isAuthenticated, WatchLaterVideos);
 router.delete("/history/:videoId", isAuthenticated, RemoveFromWatchLater);
-
+router.get("/search/hints", getSearchHints);
 // Watch Later (jo aapne diya tha)
 router.delete("/watch-later/:videoId", isAuthenticated, RemoveFromWatchLater);
 router.post("/watch-later/:videoId", isAuthenticated, addToWatchLater);
