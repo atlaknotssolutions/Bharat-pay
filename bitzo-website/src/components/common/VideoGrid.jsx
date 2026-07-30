@@ -868,11 +868,7 @@ function MovieCard({ item, onClick, onAddToWatchLater }) {
               </div>
             </div>
             <div>
-              <div className="flex items-center text-xs text-gray-300 mb-1">
-                <span className="mr-2">New</span>
-                <span className="mr-2">2024–25</span>
-                <span className="border border-gray-500 px-1">U/A</span>
-              </div>
+             
               <h3 className="text-white text-sm font-semibold">{item.title}</h3>
             </div>
           </div>
