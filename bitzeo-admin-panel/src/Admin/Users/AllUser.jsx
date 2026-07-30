@@ -366,7 +366,7 @@ export default function Users() {
       setDetailModal(true);
       setSelectedUser(null);
 
-      const res = await axios.get(`${BASE_URL}/users/${userId}`);
+      const res = await axios.get(`${BASE_URL}/admin/users/${userId}`);
       setSelectedUser(res.data?.data || null);
     } catch (err) {
       console.error(err);
