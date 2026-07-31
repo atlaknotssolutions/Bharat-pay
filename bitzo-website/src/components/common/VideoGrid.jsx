@@ -78,77 +78,6 @@ const kidsFilms = [
   },
 ];
 
-const koreanContent = [
-  {
-    id: 201,
-    title: "Vincenzo",
-    thumb:
-      "https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=400&h=225&fit=crop",
-  },
-  {
-    id: 202,
-    title: "Crash Landing on You",
-    thumb:
-      "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&h=225&fit=crop",
-  },
-  {
-    id: 203,
-    title: "Squid Game",
-    thumb:
-      "https://images.unsplash.com/photo-1608889335941-32ac5f2041b9?w=400&h=225&fit=crop",
-  },
-  {
-    id: 204,
-    title: "Weak Hero Class 1",
-    thumb:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=225&fit=crop",
-  },
-  {
-    id: 205,
-    title: "Moving",
-    thumb:
-      "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400&h=225&fit=crop",
-  },
-  {
-    id: 206,
-    title: "Sweet Home",
-    thumb:
-      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=225&fit=crop",
-  },
-];
-
-const actionMovies = [
-  {
-    id: 301,
-    title: "Extraction 2",
-    thumb:
-      "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=225&fit=crop",
-  },
-  {
-    id: 304,
-    title: "Top Gun: Maverick",
-    thumb:
-      "https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=400&h=225&fit=crop",
-  },
-];
-
-const trendingShorts = [
-  ...koreanContent.slice(0, 3),
-  ...actionMovies.slice(0, 3),
-  {
-    id: 401,
-    title: "Viral Dance",
-    thumb:
-      "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=400&h=225&fit=crop",
-  },
-  {
-    id: 402,
-    title: "Funny Reels",
-    thumb:
-      "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&h=225&fit=crop",
-  },
-];
-
 // ────────────────────────────────────────────────
 // Reusable components
 // ────────────────────────────────────────────────
@@ -261,6 +190,10 @@ export default function NetflixStylePage() {
   const [latestLoading, setLatestLoading] = useState(true);
   const [subscriptionVideos, setSubscriptionVideos] = useState([]);
   const [subscriptionLoading, setSubscriptionLoading] = useState(true);
+  const [trendingShortsVideos, setTrendingShortsVideos] = useState([]);
+  const [trendingShortsLoading, setTrendingShortsLoading] = useState(true);
+  const [topShortsVideos, setTopShortsVideos] = useState([]);
+  const [topShortsLoading, setTopShortsLoading] = useState(true);
 
   useEffect(() => {
     const fetchRecommendedVideos = async () => {
@@ -293,6 +226,7 @@ export default function NetflixStylePage() {
           duration: video.duration || "",
           views: video.views || 0,
           category: video.category || null,
+          videoType: video.videoType || null,
         }));
 
         setRecommendedVideos(normalized);
@@ -338,6 +272,7 @@ export default function NetflixStylePage() {
           duration: video.duration || "",
           views: video.views || 0,
           category: video.category || null,
+          videoType: video.videoType || null,
         }));
 
         setTrendingVideos(normalized);
@@ -383,6 +318,7 @@ export default function NetflixStylePage() {
           duration: video.duration || "",
           views: video.views || 0,
           category: video.category || null,
+          videoType: video.videoType || null,
         }));
 
         setLatestVideos(normalized);
@@ -429,6 +365,7 @@ export default function NetflixStylePage() {
           duration: video.duration || "",
           views: video.views || 0,
           category: video.category || null,
+          videoType: video.videoType || null,
         }));
 
         setSubscriptionVideos(normalized);
@@ -443,7 +380,112 @@ export default function NetflixStylePage() {
     fetchSubscriptionVideos();
   }, []);
 
+  useEffect(() => {
+    const fetchTrendingShorts = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setTrendingShortsVideos([]);
+        setTrendingShortsLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/trending-shorts`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!response.ok) throw new Error("Failed to fetch trending shorts");
+
+        const data = await response.json();
+        const videos = Array.isArray(data.videos) ? data.videos : [];
+
+        const normalized = videos.slice(0, 8).map((video) => ({
+          id: video._id || video.id,
+          title: video.title || "Untitled video",
+          thumb: video.thumbnail
+            ? video.thumbnail.startsWith("http")
+              ? video.thumbnail.replace(/\\/g, "/")
+              : `${BACKEND_URL}/${video.thumbnail.replace(/\\/g, "/")}`
+            : "https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=400&h=225&fit=crop",
+          videoUrl: video.videoUrl
+            ? video.videoUrl.startsWith("http")
+              ? video.videoUrl.replace(/\\/g, "/")
+              : `${BACKEND_URL}/${video.videoUrl.replace(/\\/g, "/")}`
+            : "",
+          videoType: video.videoType || null,
+          views: video.views || 0,
+        }));
+
+        setTrendingShortsVideos(normalized);
+      } catch (error) {
+        console.error("Error fetching trending shorts:", error);
+        setTrendingShortsVideos([]);
+      } finally {
+        setTrendingShortsLoading(false);
+      }
+    };
+
+    fetchTrendingShorts();
+  }, []);
+
+  useEffect(() => {
+    const fetchTopShorts = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setTopShortsVideos([]);
+        setTopShortsLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/top-shorts`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!response.ok) throw new Error("Failed to fetch top shorts");
+
+        const data = await response.json();
+        const videos = Array.isArray(data.videos) ? data.videos : [];
+
+        const normalized = videos.slice(0, 8).map((video) => ({
+          id: video._id || video.id,
+          title: video.title || "Untitled video",
+          thumb: video.thumbnail
+            ? video.thumbnail.startsWith("http")
+              ? video.thumbnail.replace(/\\/g, "/")
+              : `${BACKEND_URL}/${video.thumbnail.replace(/\\/g, "/")}`
+            : "https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=400&h=225&fit=crop",
+          videoUrl: video.videoUrl
+            ? video.videoUrl.startsWith("http")
+              ? video.videoUrl.replace(/\\/g, "/")
+              : `${BACKEND_URL}/${video.videoUrl.replace(/\\/g, "/")}`
+            : "",
+          videoType: video.videoType || null,
+          views: video.views || 0,
+        }));
+
+        setTopShortsVideos(normalized);
+      } catch (error) {
+        console.error("Error fetching top shorts:", error);
+        setTopShortsVideos([]);
+      } finally {
+        setTopShortsLoading(false);
+      }
+    };
+
+    fetchTopShorts();
+  }, []);
+
   const handleItemClick = (item) => {
+    const isShort = Array.isArray(item.videoType)
+      ? item.videoType.includes("short")
+      : item.videoType === "short";
+
+    if (isShort) {
+      navigate("/shorts", { state: { video: item } });
+      return;
+    }
+
     navigate(`/video/${item.id}`, { state: { video: item } });
   };
 
@@ -571,27 +613,37 @@ export default function NetflixStylePage() {
         <div className="mb-12">
           <SectionHeader title="Trending Shorts" />
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            {trendingShorts.map((item) => (
-              <div
-                key={item.id}
-                onClick={() => handleItemClick(item)}
-                className="cursor-pointer group"
-              >
-                <div className="relative aspect-video rounded-md overflow-hidden mb-2">
-                  <img
-                    src={item.thumb}
-                    alt={item.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  <div className="absolute top-2 right-2 bg-black/70 rounded px-2 py-1 text-xs">
-                    #{item.id % 10 || 1}
+            {trendingShortsLoading ? (
+              <p className="text-sm text-gray-400">
+                Loading trending shorts...
+              </p>
+            ) : trendingShortsVideos.length > 0 ? (
+              trendingShortsVideos.map((item) => (
+                <div
+                  key={item.id}
+                  onClick={() => handleItemClick(item)}
+                  className="cursor-pointer group"
+                >
+                  <div className="relative aspect-video rounded-md overflow-hidden mb-2">
+                    <img
+                      src={item.thumb}
+                      alt={item.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <div className="absolute top-2 right-2 bg-black/70 rounded px-2 py-1 text-xs">
+                      #{item.id % 10 || 1}
+                    </div>
                   </div>
+                  <h3 className="text-white text-sm font-medium truncate">
+                    {item.title}
+                  </h3>
                 </div>
-                <h3 className="text-white text-sm font-medium truncate">
-                  {item.title}
-                </h3>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-sm text-gray-400">
+                No trending shorts available right now.
+              </p>
+            )}
           </div>
         </div>
 
@@ -665,27 +717,37 @@ export default function NetflixStylePage() {
         <div className="mb-12">
           <SectionHeader title="Top Shorts" />
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            {trendingShorts.map((item) => (
-              <div
-                key={item.id}
-                onClick={() => handleItemClick(item)}
-                className="cursor-pointer group"
-              >
-                <div className="relative aspect-video rounded-md overflow-hidden mb-2">
-                  <img
-                    src={item.thumb}
-                    alt={item.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  <div className="absolute top-2 right-2 bg-black/70 rounded px-2 py-1 text-xs">
-                    #{item.id % 10 || 1}
+            {topShortsLoading ? (
+              <p className="text-sm text-gray-400">
+                Loading top shorts...
+              </p>
+            ) : topShortsVideos.length > 0 ? (
+              topShortsVideos.map((item) => (
+                <div
+                  key={item.id}
+                  onClick={() => handleItemClick(item)}
+                  className="cursor-pointer group"
+                >
+                  <div className="relative aspect-video rounded-md overflow-hidden mb-2">
+                    <img
+                      src={item.thumb}
+                      alt={item.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <div className="absolute top-2 right-2 bg-black/70 rounded px-2 py-1 text-xs">
+                      #{item.id % 10 || 1}
+                    </div>
                   </div>
+                  <h3 className="text-white text-sm font-medium truncate">
+                    {item.title}
+                  </h3>
                 </div>
-                <h3 className="text-white text-sm font-medium truncate">
-                  {item.title}
-                </h3>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-sm text-gray-400">
+                No top shorts available right now.
+              </p>
+            )}
           </div>
         </div>
       </div>

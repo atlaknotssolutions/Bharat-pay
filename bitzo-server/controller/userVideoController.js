@@ -325,7 +325,7 @@ const getChannelById = async (req, res) => {
       channel: {
         ...channel,
         isSubscribed,
-        subscribersCount: channel.subscribersCount || 0,
+        subscribersCount: channel.subscribedBy?.length || 0,
         videoCount: videos.length,
         handle: channel.handle || channel.name?.toLowerCase().replace(/\s+/g, "") || "channel",
         description: channel.channeldescription || channel.description || "",
@@ -555,7 +555,10 @@ const recommendedVideos = async (req, res) => {
     let videos = [];
 
     if (userCategory) {
-      const categoryVideos = await Video.find({ category: userCategory })
+      const categoryVideos = await Video.find({
+        category: userCategory,
+        videoType: "long",
+      })
         .sort({ createdAt: -1 }) // recent first
         .limit(10);
 
@@ -568,6 +571,7 @@ const recommendedVideos = async (req, res) => {
 
       const otherVideos = await Video.find({
         category: { $ne: userCategory },
+        videoType: "long",
       })
         .sort({ createdAt: -1 })
         .limit(remaining);
@@ -589,7 +593,7 @@ const recommendedVideos = async (req, res) => {
 };
 const trendingVideos = async (req, res) => {
   try {
-    const videos = await Video.find({})
+    const videos = await Video.find({ videoType: "long" })
       .sort({ views: -1, createdAt: -1 })
       .limit(10);
 
@@ -608,7 +612,7 @@ const trendingVideos = async (req, res) => {
 
 const LatestVideos = async (req, res) => {
   try {
-    const videos = await Video.find({}).sort({ createdAt: -1 }).limit(10);
+    const videos = await Video.find({ videoType: "long" }).sort({ createdAt: -1 }).limit(10);
 
     res.status(200).json({
       success: true,
@@ -623,12 +627,50 @@ const LatestVideos = async (req, res) => {
   }
 };
 
+const trendingShorts = async (req, res) => {
+  try {
+    const videos = await Video.find({ videoType: "short" })
+      .sort({ views: -1, createdAt: -1 })
+      .limit(10);
+
+    res.status(200).json({
+      success: true,
+      videos,
+    });
+  } catch (error) {
+    console.error("Error in trendingShorts:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
+const topShorts = async (req, res) => {
+  try {
+    const videos = await Video.find({ videoType: "short" })
+      .sort({ views: -1, createdAt: -1 })
+      .limit(10);
+
+    res.status(200).json({
+      success: true,
+      videos,
+    });
+  } catch (error) {
+    console.error("Error in topShorts:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
 const getVideoById = async (req, res) => {
   try {
     const videoId = req.params.id || req.params.videoId;
     const video = await Video.findById(videoId).populate(
       "channel",
-      "name subscribersCount channelImage"
+      "name subscribersCount channelImage subscribedBy"
     );
 
     if (!video) {
@@ -653,7 +695,7 @@ const getVideoById = async (req, res) => {
           userReaction = "dislike";
         }
 
-        isSubscribed = (user.subscriptions || []).some(
+        isSubscribed = (user.subscribedChannels || []).some(
           (chId) => chId.toString() === video.channel?._id?.toString()
         );
       }
@@ -671,6 +713,7 @@ const getVideoById = async (req, res) => {
         userReaction,
         isSubscribed,
         watchedPercent,
+        subscribersCount: video.channel?.subscribedBy?.length || 0,
       },
     });
   } catch (error) {
@@ -905,14 +948,14 @@ const subscribeChannel = async (req, res) => {
     }
 
     const user = await User.findById(userId);
-    const channel = await User.findById(channelId); // assuming channel is also a User
+    const channel = await Channel.findById(channelId);
 
     if (!user || !channel) {
       return res.status(404).json({ success: false, message: "Not found" });
     }
 
     user.subscribedChannels = user.subscribedChannels || [];
-    channel.subscribersCount = channel.subscribersCount || 0;
+    channel.subscribedBy = channel.subscribedBy || [];
 
     const alreadySubscribed = user.subscribedChannels.some(
       (id) => id.toString() === channelId
@@ -925,12 +968,14 @@ const subscribeChannel = async (req, res) => {
       user.subscribedChannels = user.subscribedChannels.filter(
         (id) => id.toString() !== channelId
       );
-      channel.subscribersCount = Math.max(0, channel.subscribersCount - 1);
+      channel.subscribedBy = channel.subscribedBy.filter(
+        (id) => id.toString() !== userId
+      );
       subscribed = false;
     } else {
       // Subscribe
       user.subscribedChannels.push(channel._id);
-      channel.subscribersCount += 1;
+      channel.subscribedBy.push(user._id);
       subscribed = true;
     }
 
@@ -940,7 +985,7 @@ const subscribeChannel = async (req, res) => {
     res.status(200).json({
       success: true,
       subscribed,
-      subscribersCount: channel.subscribersCount,
+      subscribersCount: channel.subscribedBy.length,
     });
   } catch (error) {
     console.error("Error in subscribeChannel:", error);
@@ -1138,6 +1183,7 @@ const getSubscribedVideos = async (req, res) => {
 
     const videos = await Video.find({
       channel: { $in: subscribedChannelIds },
+      videoType: "long",
     })
       .sort({ createdAt: -1 })
       .populate("channel", "name channelImage")
@@ -1488,6 +1534,8 @@ module.exports = {
   recommendedVideos,
   trendingVideos,
   LatestVideos,
+  trendingShorts,
+  topShorts,
   subscribeChannel,
   getSubscribedVideos,
   HistoricalVideos,

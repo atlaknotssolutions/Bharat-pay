@@ -17,7 +17,10 @@ const BACKEND_URL = "http://localhost:8000";
 
 // Helpers
 const getToken = () => localStorage.getItem("token") || null;
-const getUserId = () => localStorage.getItem("userId") || null;
+const getUserId = () => {
+  const user = JSON.parse(localStorage.getItem("user") || "null");
+  return user?.id || user?._id || null;
+};
 
 // Static fallback categories
 const STATIC_CATEGORIES = [
@@ -71,6 +74,7 @@ export default function ChannelPage() {
   const [videoname, setVideoname] = useState("");
   const [videoDescription, setVideoDescription] = useState("");
   const [videoCategory, setVideoCategory] = useState("");
+  const [videoType, setVideoType] = useState("short"); // short or long
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -271,7 +275,7 @@ export default function ChannelPage() {
         };
 
         setChannel(channelData);
-        setSubscribersCount(selected.subscribers || 0);
+        setSubscribersCount(selected.subscribedBy?.length || 0);
         setIsSubscribed(selected.subscribedBy?.includes(getUserId()) || false);
 
         navigate(`/channel/${cleanHandle}`, { replace: true });
@@ -316,14 +320,12 @@ export default function ChannelPage() {
       if (!res.ok) throw new Error(result.message || "Subscription failed");
 
       setIsSubscribed(result.subscribed);
-      setSubscribersCount((prev) => (result.subscribed ? prev + 1 : prev - 1));
+      setSubscribersCount(result.subscribersCount);
 
       // Update channel object
       setChannel((prev) => ({
         ...prev,
-        subscribers: result.subscribed
-          ? prev.subscribers + 1
-          : prev.subscribers - 1,
+        subscribers: result.subscribersCount,
       }));
     } catch (error) {
       console.error("Subscription error:", error);
@@ -427,6 +429,30 @@ export default function ChannelPage() {
     }
   };
 
+  // Generate thumbnail from video if user didn't upload one
+  const generateVideoThumbnail = (file) => {
+    return new Promise((resolve) => {
+      const video = document.createElement("video");
+      video.src = URL.createObjectURL(file);
+      video.onloadedmetadata = () => {
+        video.currentTime = Math.min(1, video.duration / 4 || 1);
+      };
+      video.onseeked = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(
+          (blob) => resolve(blob),
+          "image/jpeg",
+          0.85
+        );
+      };
+      video.onerror = () => resolve(null);
+    });
+  };
+
   const handleUploadVideo = async (e) => {
     e.preventDefault();
     const token = getToken();
@@ -469,10 +495,17 @@ export default function ChannelPage() {
       formData.append("name", videoname.trim());
       formData.append("description", videoDescription || "");
       formData.append("category", videoCategory);
+      formData.append("videoType", videoType);
       formData.append("video", videoFile);
 
+      // Thumbnail: use uploaded or generate
       if (thumbnailFile) {
         formData.append("thumbnail", thumbnailFile);
+      } else {
+        const generated = await generateVideoThumbnail(videoFile);
+        if (generated) {
+          formData.append("thumbnail", generated, "auto-thumbnail.jpg");
+        }
       }
 
       const response = await fetch(
@@ -522,6 +555,7 @@ export default function ChannelPage() {
       setVideoname("");
       setVideoDescription("");
       setVideoCategory("");
+      setVideoType("short");
       setAgreeTerms(false);
       setSelectedUploadChannelId("");
     } catch (error) {
@@ -1028,6 +1062,36 @@ export default function ChannelPage() {
                     Selected: {videoFile?.name}
                   </div>
                 )}
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-300 mb-1">
+                  Video Type
+                </label>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setVideoType("short")}
+                    className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition ${
+                      videoType === "short"
+                        ? "bg-green-600 text-white"
+                        : "bg-[#0f0f0f] border border-gray-700 text-gray-400 hover:bg-gray-800"
+                    }`}
+                  >
+                    Short
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setVideoType("long")}
+                    className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition ${
+                      videoType === "long"
+                        ? "bg-green-600 text-white"
+                        : "bg-[#0f0f0f] border border-gray-700 text-gray-400 hover:bg-gray-800"
+                    }`}
+                  >
+                    Long
+                  </button>
+                </div>
               </div>
 
               <div>

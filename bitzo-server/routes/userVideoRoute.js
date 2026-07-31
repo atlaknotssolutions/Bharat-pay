@@ -25,6 +25,8 @@ const {
   recommendedVideos,
   trendingVideos,
   LatestVideos,
+  trendingShorts,
+  topShorts,
   HistoricalVideos,
   getSubscribedVideos,
   LikedVideos,
@@ -72,6 +74,8 @@ router.get("/recommended", isAuthenticated, recommendedVideos);
 router.get("/trending", isAuthenticated, trendingVideos);
 router.get("/latest", isAuthenticated, LatestVideos);
 router.get("/subscriptions", isAuthenticated, getSubscribedVideos);
+router.get("/trending-shorts", isAuthenticated, trendingShorts);
+router.get("/top-shorts", isAuthenticated, topShorts);
 // router.get("/history", isAuthenticated, HistoricalVideos);
 router.get("/", isAuthenticated, getAllVideos);
 router.get("/liked", isAuthenticated, LikedVideos);
