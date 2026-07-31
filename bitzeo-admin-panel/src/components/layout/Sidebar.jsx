@@ -1,53 +1,85 @@
-import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Users, ShoppingBag, Package, Settings, LogOut } from 'lucide-react'
+import { NavLink, useNavigate } from "react-router-dom";
+import {
+  LayoutDashboard,
+  Users,
+  ShoppingBag,
+  Package,
+  LogOut,
+  FolderOpen,
+  Video,
+  Box,
+} from "lucide-react";
+import toast from "react-hot-toast";
 
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
-  { to: "/category", icon: LayoutDashboard, label: "Category" },
-  // { to: "/subcategory", icon: LayoutDashboard, label: "Subcategory" },
+  { to: "/category", icon: FolderOpen, label: "Category" },
   { to: "/alluser", icon: Users, label: "Users" },
-  // { to: "/alluser", icon: Users, label: "Users" },
-  { to: "/video", icon: Package, label: "Video" },
+  { to: "/video", icon: Video, label: "Video" },
   { to: "/orders", icon: ShoppingBag, label: "Orders" },
-  { to: "/products", icon: Package, label: "Products" },
-]
+  { to: "/products", icon: Box, label: "Products" },
+];
 
 export default function Sidebar() {
-  return (
-    <aside className="hidden md:flex md:flex-col md:w-64 md:bg-white md:border-r md:border-gray-200 md:fixed md:inset-y-0">
+  const navigate = useNavigate();
 
+  const handleLogout = () => {
+    // Clear token & user data
+    localStorage.removeItem("adminToken");
+    localStorage.removeItem("adminUser");
+
+    toast.success("Logged out successfully!", {
+      style: {
+        background: "#1f2937",
+        color: "#f9fafb",
+        border: "1px solid #374151",
+      },
+    });
+
+    navigate("/login");
+  };
+
+  return (
+    <aside className="hidden md:flex md:flex-col md:w-64 md:bg-gray-950 md:border-r md:border-gray-800 md:fixed md:inset-y-0 z-30">
       {/* Logo */}
-      <div className="h-16 flex items-center px-6 border-b">
-        <h1 className="text-xl font-bold text-indigo-600">AdminX</h1>
+      <div className="h-16 flex items-center px-6 border-b border-gray-800 shrink-0">
+        <h1 className="text-xl font-bold text-white tracking-tight">
+          Admin<span className="text-indigo-400">X</span>
+        </h1>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto scrollbar-thin">
-        {navItems.map(item => (
+      <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
+        {navItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
+            end={item.to === "/"}
             className={({ isActive }) =>
-              `flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-colors ${
+              `flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-all duration-200 ${
                 isActive
-                  ? 'bg-indigo-50 text-indigo-700'
-                  : 'text-gray-700 hover:bg-gray-100'
+                  ? "bg-indigo-600/20 text-indigo-400 border border-indigo-500/30"
+                  : "text-gray-400 hover:bg-gray-800/70 hover:text-gray-200 border border-transparent"
               }`
             }
           >
-            <item.icon className="w-5 h-5 mr-3" />
+            <item.icon className="w-5 h-5 mr-3 shrink-0" />
             {item.label}
           </NavLink>
         ))}
       </nav>
 
-      {/* Bottom */}
-      <div className="p-4 border-t">
-        <button className="flex items-center w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg">
+      {/* Bottom - Logout */}
+      <div className="p-4 border-t border-gray-800 shrink-0">
+        <button
+          onClick={handleLogout}
+          className="flex items-center w-full px-3 py-2.5 text-sm font-medium text-red-400 
+                     hover:bg-red-500/10 hover:text-red-300 rounded-lg transition-all duration-200"
+        >
           <LogOut className="w-5 h-5 mr-3" />
           Logout
         </button>
       </div>
     </aside>
-  )
+  );
 }
