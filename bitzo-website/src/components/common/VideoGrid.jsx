@@ -285,7 +285,9 @@ export default function NetflixStylePage() {
           id: video._id || video.id,
           title: video.title || "Untitled video",
           thumb: video.thumbnail
-            ? `${BACKEND_URL}/${video.thumbnail.replace(/\\/g, "/")}`
+            ? video.thumbnail.startsWith("http")
+              ? video.thumbnail.replace(/\\/g, "/")
+              : `${BACKEND_URL}/${video.thumbnail.replace(/\\/g, "/")}`
             : "https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=400&h=225&fit=crop",
           description: video.description || "",
           duration: video.duration || "",
@@ -328,7 +330,9 @@ export default function NetflixStylePage() {
           id: video._id || video.id,
           title: video.title || "Untitled video",
           thumb: video.thumbnail
-            ? `${BACKEND_URL}/${video.thumbnail.replace(/\\/g, "/")}`
+            ? video.thumbnail.startsWith("http")
+              ? video.thumbnail.replace(/\\/g, "/")
+              : `${BACKEND_URL}/${video.thumbnail.replace(/\\/g, "/")}`
             : "https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=400&h=225&fit=crop",
           description: video.description || "",
           duration: video.duration || "",
@@ -371,7 +375,9 @@ export default function NetflixStylePage() {
           id: video._id || video.id,
           title: video.title || "Untitled video",
           thumb: video.thumbnail
-            ? `${BACKEND_URL}/${video.thumbnail.replace(/\\/g, "/")}`
+            ? video.thumbnail.startsWith("http")
+              ? video.thumbnail.replace(/\\/g, "/")
+              : `${BACKEND_URL}/${video.thumbnail.replace(/\\/g, "/")}`
             : "https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=400&h=225&fit=crop",
           description: video.description || "",
           duration: video.duration || "",
@@ -415,7 +421,9 @@ export default function NetflixStylePage() {
           id: video._id || video.id,
           title: video.title || "Untitled video",
           thumb: video.thumbnail
-            ? `${BACKEND_URL}/${video.thumbnail.replace(/\\/g, "/")}`
+            ? video.thumbnail.startsWith("http")
+              ? video.thumbnail.replace(/\\/g, "/")
+              : `${BACKEND_URL}/${video.thumbnail.replace(/\\/g, "/")}`
             : "https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=400&h=225&fit=crop",
           description: video.description || "",
           duration: video.duration || "",

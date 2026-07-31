@@ -103,6 +103,7 @@ export default function YouTubeLikeVideoPage() {
   const [videoDetails, setVideoDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ likes: 0, dislikes: 0 });
+  const [reactionLoading, setReactionLoading] = useState(false);
   const [viewCounted, setViewCounted] = useState(false);
   const [watchPercent, setWatchPercent] = useState(0);
   const [comments, setComments] = useState([]);
@@ -328,8 +329,9 @@ export default function YouTubeLikeVideoPage() {
 
   // ==================== LIKE / DISLIKE (Correct) ====================
   const handleReaction = async (type) => {
-    if (!id) return;
+    if (!id || reactionLoading) return;
 
+    setReactionLoading(true);
     const token = localStorage.getItem("token");
     const endpoint =
       type === "like"
@@ -353,6 +355,8 @@ export default function YouTubeLikeVideoPage() {
       }
     } catch (error) {
       console.error("Error updating reaction:", error);
+    } finally {
+      setReactionLoading(false);
     }
   };
 
@@ -623,6 +627,7 @@ export default function YouTubeLikeVideoPage() {
                   {/* Like */}
                   <button
                     onClick={() => handleReaction("like")}
+                    disabled={reactionLoading}
                     className={`flex items-center gap-2 px-4 py-2 rounded-full transition ${
                       reaction === "like"
                         ? "bg-white/20 text-white"
@@ -639,6 +644,7 @@ export default function YouTubeLikeVideoPage() {
                   {/* Dislike */}
                   <button
                     onClick={() => handleReaction("dislike")}
+                    disabled={reactionLoading}
                     className={`flex items-center gap-2 px-4 py-2 rounded-full transition ${
                       reaction === "dislike"
                         ? "bg-white/20 text-white"

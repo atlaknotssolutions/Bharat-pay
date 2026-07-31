@@ -214,16 +214,29 @@
 // };
 
 const multer = require("multer");
-const path = require("path");
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+const cloudinary = require("../config/cloudinary");
 
-// Disk storage (saves files to uploads/ folder)
-const diskStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "uploads/"); // make sure this folder exists!
-  },
-  filename: (req, file, cb) => {
-    const uniqueName = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, uniqueName + path.extname(file.originalname).toLowerCase());
+// Cloudinary storage (uploads videos & thumbnails to Cloudinary)
+const cloudinaryStorage = new CloudinaryStorage({
+  cloudinary,
+  params: async (req, file) => {
+    const base = {
+      folder: "ugc_videos",
+      public_id: `video_${Date.now()}_${Math.round(Math.random() * 1e9)}`,
+    };
+    if (file.fieldname === "video") {
+      return {
+        ...base,
+        resource_type: "video",
+        allowed_formats: ["mp4", "mov", "mkv"],
+      };
+    }
+    return {
+      ...base,
+      resource_type: "image",
+      allowed_formats: ["jpg", "jpeg", "png", "webp"],
+    };
   },
 });
 
@@ -248,7 +261,7 @@ const fileFilter = (req, file, cb) => {
 
 // Multer instance for video + thumbnail
 const videoAndThumbnailUpload = multer({
-  storage: diskStorage,
+  storage: cloudinaryStorage,
   fileFilter: fileFilter,
   limits: { fileSize: 500 * 1024 * 1024 } // 500 MB
 });

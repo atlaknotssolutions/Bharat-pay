@@ -130,7 +130,9 @@ exports.getAllVideos = async (req, res) => {
       const videoObj = video.toObject();
       return {
         ...videoObj,
-        videoUrl: `${baseUrl}/${videoObj.videoUrl}`, // assuming videoUrl is stored as relative path
+        videoUrl: videoObj.videoUrl?.startsWith("http")
+          ? videoObj.videoUrl
+          : `${baseUrl}/${videoObj.videoUrl}`, // assuming videoUrl is stored as relative path
       };
     });
 
@@ -268,7 +270,9 @@ exports.getMyVideos = async (req, res) => {
       const videoObj = video.toObject();
       return {
         ...videoObj,
-        videoUrl: `${baseUrl}/${videoObj.videoUrl}`,
+        videoUrl: videoObj.videoUrl?.startsWith("http")
+          ? videoObj.videoUrl
+          : `${baseUrl}/${videoObj.videoUrl}`,
       };
     });
 

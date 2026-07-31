@@ -190,6 +190,11 @@ const uploadVideo = async (req, res) => {
       video: newVideo,
     });
   } catch (err) {
+
+    // console.error("========== VIDEO UPLOAD ERROR ==========");
+    // console.error(error);
+    // console.error("Message:", error.message);
+    // console.error("Stack:", error.stack);
     console.error(err);
     res.status(500).json({
       success: false,
