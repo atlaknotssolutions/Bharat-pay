@@ -1,12 +1,24 @@
 import React, { useEffect, useState } from "react";
 import { Eye, Clock, Heart, ArrowUpDown } from "lucide-react";
 
+const BACKEND_URL = "http://localhost:8000";
+
+const toMediaUrl = (value) => {
+  if (!value) return "";
+  if (/^https?:\/\//i.test(value)) return value.replace(/\\/g, "/");
+
+  const normalized = value.replace(/\\/g, "/");
+  if (normalized.startsWith("/uploads/")) return `${BACKEND_URL}${normalized}`;
+  if (normalized.startsWith("uploads/")) return `${BACKEND_URL}/${normalized}`;
+  return `${BACKEND_URL}/${normalized.replace(/^\/+/, "")}`;
+};
+
 const normalizeVideo = (video) => ({
   id: video?._id || video?.id,
   title: video?.title || "Untitled video",
   channel: video?.channelName || video?.channel?.name || "Unknown channel",
   thumbnail:
-    video?.thumbnail ||
+    toMediaUrl(video?.thumbnail || video?.thumb || "") ||
     "https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=800",
   views: Number(video?.views || 0),
   duration: video?.duration || "—",
@@ -110,7 +122,9 @@ export default function YourVideosTab({ openDetail, sortBy, onSortChange }) {
               <div className="flex flex-col sm:flex-row">
                 <div className="relative aspect-video sm:aspect-[4/3] sm:w-44 md:w-52 flex-shrink-0">
                   <img
-                    src={video.thumbnail}
+                    src={
+                      video.thumbnail || "uploads/1785320561817-355290654.jpg"
+                    }
                     alt={video.title}
                     className="w-full h-full object-cover"
                   />

@@ -338,7 +338,7 @@ export default function NetflixStylePage() {
                 Loading trending shorts...
               </p>
             ) : shorts.length > 0 ? (
-              shorts.slice(0, 6).map((item) => (
+              shorts.map((item) => (
                 <div
                   key={item.id}
                   onClick={() => handleItemClick(item)}
@@ -361,6 +361,14 @@ export default function NetflixStylePage() {
                   <h3 className="text-white text-sm font-medium truncate">
                     {item.title}
                   </h3>
+                  <div className="mt-1 flex items-center gap-3 text-[11px] text-gray-400">
+                    <span>
+                      {Number(item.views || 0).toLocaleString()} views
+                    </span>
+                    <span>
+                      {Number(item.likes || 0).toLocaleString()} likes
+                    </span>
+                  </div>
                 </div>
               ))
             ) : (
@@ -438,7 +446,7 @@ export default function NetflixStylePage() {
             {loading && shorts.length === 0 ? (
               <p className="text-sm text-gray-400">Loading top shorts...</p>
             ) : shorts.length > 0 ? (
-              shorts.slice(6).map((item) => (
+              shorts.map((item) => (
                 <div
                   key={item.id}
                   onClick={() => handleItemClick(item)}
@@ -461,6 +469,14 @@ export default function NetflixStylePage() {
                   <h3 className="text-white text-sm font-medium truncate">
                     {item.title}
                   </h3>
+                  <div className="mt-1 flex items-center gap-3 text-[11px] text-gray-400">
+                    <span>
+                      {Number(item.views || 0).toLocaleString()} views
+                    </span>
+                    <span>
+                      {Number(item.likes || 0).toLocaleString()} likes
+                    </span>
+                  </div>
                 </div>
               ))
             ) : (

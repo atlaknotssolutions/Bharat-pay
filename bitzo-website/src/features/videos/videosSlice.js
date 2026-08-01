@@ -54,6 +54,13 @@ const normalizeShort = (video) => ({
   raw: video,
 });
 
+const getVideosArray = (payload) => {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.videos)) return payload.videos;
+  if (Array.isArray(payload?.data)) return payload.data;
+  return [];
+};
+
 export const fetchHomeVideos = createAsyncThunk(
   "videos/fetchHomeVideos",
   async (_, { rejectWithValue }) => {
@@ -107,23 +114,15 @@ export const fetchHomeVideos = createAsyncThunk(
       ]);
 
       return {
-        recommended: (recommendedData.videos || [])
-          .slice(0, 8)
-          .map(normalizeVideoListItem),
-        trending: (trendingData.videos || [])
-          .slice(0, 8)
-          .map(normalizeVideoListItem),
-        latest: (latestData.videos || [])
-          .slice(0, 8)
-          .map(normalizeVideoListItem),
-        subscriptions: (
-          subscriptionsData.videos ||
-          subscriptionsData.data ||
-          []
-        )
-          .slice(0, 8)
-          .map(normalizeVideoListItem),
-        shorts: (shortsData.videos || []).slice(0, 8).map(normalizeShort),
+        recommended: getVideosArray(recommendedData).map(
+          normalizeVideoListItem,
+        ),
+        trending: getVideosArray(trendingData).map(normalizeVideoListItem),
+        latest: getVideosArray(latestData).map(normalizeVideoListItem),
+        subscriptions: getVideosArray(subscriptionsData).map(
+          normalizeVideoListItem,
+        ),
+        shorts: getVideosArray(shortsData).map(normalizeShort),
       };
     } catch (error) {
       return rejectWithValue(error.message || "Failed to load videos");
