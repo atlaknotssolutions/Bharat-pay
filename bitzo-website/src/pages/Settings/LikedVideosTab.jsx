@@ -37,7 +37,9 @@ export default function LikedVideosTab({ openDetail }) {
         <div className="text-center py-16 md:py-24 text-zinc-500">
           <Heart size={48} className="mx-auto mb-4 text-zinc-600" />
           <p className="text-xl md:text-2xl font-medium">No liked videos yet</p>
-          <p className="mt-3 text-sm md:text-base">Tap the heart to save videos here</p>
+          <p className="mt-3 text-sm md:text-base">
+            Tap the heart to save videos here
+          </p>
         </div>
       ) : (
         <div className="space-y-4 max-h-[calc(100vh-180px)] overflow-y-auto pb-6 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-zinc-900">
@@ -65,7 +67,7 @@ export default function LikedVideosTab({ openDetail }) {
                   <div className="flex items-center gap-3 text-sm text-zinc-400 mt-auto">
                     <div className="flex items-center gap-1.5 text-red-400">
                       <Heart size={14} className="fill-red-500" />
-                      <span>{video.likes || 0}</span>
+                      <span>{video.likesCount ?? video.likes ?? 0}</span>
                     </div>
                   </div>
                 </div>

@@ -346,11 +346,16 @@ export default function NetflixStylePage() {
           headers: { Authorization: `Bearer ${token}` },
         });
 
-        if (!response.ok)
+        if (!response.ok) {
           throw new Error("Failed to fetch subscription videos");
+        }
 
         const data = await response.json();
-        const videos = Array.isArray(data.videos) ? data.videos : [];
+        const videos = Array.isArray(data?.videos)
+          ? data.videos
+          : Array.isArray(data?.data)
+            ? data.data
+            : [];
 
         const normalized = videos.slice(0, 8).map((video) => ({
           id: video._id || video.id,
@@ -365,6 +370,8 @@ export default function NetflixStylePage() {
           views: video.views || 0,
           category: video.category || null,
           videoType: video.videoType || null,
+          videoUrl: video.videoUrl || "",
+          channel: video.channel || null,
         }));
 
         setSubscriptionVideos(normalized);

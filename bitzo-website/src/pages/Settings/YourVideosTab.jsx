@@ -1,60 +1,54 @@
+import React, { useEffect, useState } from "react";
+import { Eye, Clock, Heart, ArrowUpDown } from "lucide-react";
 
-
-import React from "react";
-import { Eye, Clock, IndianRupee, ArrowUpDown } from "lucide-react";
-
-const myVideos = [
-  {
-    id: "v1",
-    title: "After 100th Attempt – Cute Cats Funny Moments",
-    thumbnail: "https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?w=800",
-    views: 12496,
-    avgWatchPercent: 68,
-    earnings: 42.5,
-    totalWatchTime: "18h 45m",
-    status: "Public",
-    uploadDate: "2025-12-15",
-  },
-  {
-    id: "v2",
-    title: "How I Made ₹50K in One Month – Side Hustle Tips",
-    thumbnail: "https://images.unsplash.com/photo-1556155092-490a1ba16284?w=800",
-    views: 45800,
-    avgWatchPercent: 42,
-    earnings: 185.2,
-    totalWatchTime: "3d 12h",
-    status: "Limited",
-    uploadDate: "2025-11-28",
-  },
-  {
-    id: "v3",
-    title: "Quick 5-Minute Breakfast Ideas for Busy People",
-    thumbnail: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800",
-    views: 9200,
-    avgWatchPercent: 55,
-    earnings: 18.9,
-    totalWatchTime: "6h 20m",
-    status: "Public",
-    uploadDate: "2026-01-10",
-  },
-  {
-    id: "v4",
-    title: "Best Places to Visit in Bhopal 2026 | Budget Travel Guide",
-    thumbnail: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800",
-    views: 28500,
-    avgWatchPercent: 61,
-    earnings: 92.8,
-    totalWatchTime: "2d 8h",
-    status: "Public",
-    uploadDate: "2026-01-05",
-  },
-];
+const normalizeVideo = (video) => ({
+  id: video?._id || video?.id,
+  title: video?.title || "Untitled video",
+  channel: video?.channelName || video?.channel?.name || "Unknown channel",
+  thumbnail:
+    video?.thumbnail ||
+    "https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=800",
+  views: Number(video?.views || 0),
+  duration: video?.duration || "—",
+  likesCount: Number(video?.likesCount || video?.likes || 0),
+  status: video?.status || "Public",
+  uploadDate: video?.createdAt
+    ? new Date(video.createdAt).toLocaleDateString()
+    : "Recently uploaded",
+  createdAt: video?.createdAt,
+  raw: video,
+});
 
 export default function YourVideosTab({ openDetail, sortBy, onSortChange }) {
-  const sortedVideos = [...myVideos].sort((a, b) => {
-    if (sortBy === "latest") return new Date(b.uploadDate) - new Date(a.uploadDate);
+  const [videos, setVideos] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setVideos([]);
+      setLoading(false);
+      return;
+    }
+
+    fetch("http://localhost:8000/api/uservideo/my-videos", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        const list = Array.isArray(data?.videos) ? data.videos : [];
+        setVideos(list.map(normalizeVideo));
+      })
+      .catch(() => setVideos([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const sortedVideos = [...videos].sort((a, b) => {
+    if (sortBy === "latest") {
+      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+    }
     if (sortBy === "views") return b.views - a.views;
-    if (sortBy === "earnings") return b.earnings - a.earnings;
+    if (sortBy === "earnings") return b.likesCount - a.likesCount;
     return 0;
   });
 
@@ -75,7 +69,6 @@ export default function YourVideosTab({ openDetail, sortBy, onSortChange }) {
 
   return (
     <div className="space-y-5 md:space-y-6 px-3 sm:px-4 md:px-0 ml-5 mt-5">
-      {/* Header with sort */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h3 className="text-lg md:text-xl font-semibold">Your Videos</h3>
 
@@ -93,18 +86,25 @@ export default function YourVideosTab({ openDetail, sortBy, onSortChange }) {
         </div>
       </div>
 
-      {/* Empty state */}
-      {sortedVideos.length === 0 ? (
+      {loading ? (
         <div className="text-center py-16 md:py-24 text-zinc-500">
-          <p className="text-xl md:text-2xl font-medium">No videos uploaded yet</p>
-          <p className="mt-3 text-sm md:text-base">Upload your first video to get started</p>
+          Loading your videos...
+        </div>
+      ) : sortedVideos.length === 0 ? (
+        <div className="text-center py-16 md:py-24 text-zinc-500">
+          <p className="text-xl md:text-2xl font-medium">
+            No videos uploaded yet
+          </p>
+          <p className="mt-3 text-sm md:text-base">
+            Upload your first video to get started
+          </p>
         </div>
       ) : (
         <div className="space-y-4 md:space-y-5 max-h-[calc(100vh-180px)] overflow-y-auto pb-6 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-zinc-900">
           {sortedVideos.map((video) => (
             <div
               key={video.id}
-              onClick={() => openDetail(video)}
+              onClick={() => openDetail(video.raw || video)}
               className="bg-zinc-900/80 border border-zinc-800 rounded-xl overflow-hidden hover:border-zinc-600 transition-all cursor-pointer active:scale-[0.995] group"
             >
               <div className="flex flex-col sm:flex-row">
@@ -118,6 +118,9 @@ export default function YourVideosTab({ openDetail, sortBy, onSortChange }) {
                 </div>
 
                 <div className="p-3.5 md:p-4 flex-1 flex flex-col">
+                  <p className="text-sm text-zinc-400 mb-1.5">
+                    {video.channel || "Unknown channel"}
+                  </p>
                   <h4 className="font-medium text-base md:text-lg line-clamp-2 mb-2.5 group-hover:text-red-400 transition-colors">
                     {video.title}
                   </h4>
@@ -129,11 +132,11 @@ export default function YourVideosTab({ openDetail, sortBy, onSortChange }) {
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Clock size={14} />
-                      <span>{video.avgWatchPercent}% avg</span>
+                      <span>{video.duration}</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-red-400">
-                      <IndianRupee size={14} />
-                      <span>₹{video.earnings.toFixed(2)}</span>
+                      <Heart size={14} className="fill-red-500" />
+                      <span>{video.likesCount.toLocaleString()}</span>
                     </div>
                   </div>
 
