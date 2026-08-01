@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useLocation } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchHomeVideos } from "../features/videos/videosSlice";
 import {
   Heart,
   MessageCircle,
@@ -37,6 +39,7 @@ const normalizeShort = (v) => ({
     : Number(v.comments) || 0,
   isLiked: v.userReaction === "like",
   reaction: v.userReaction || null,
+  thumbnail: toMediaUrl(v.thumbnail || v.thumb || ""),
 });
 
 const formatViews = (n) => {
@@ -55,10 +58,12 @@ const formatCount = (n) => {
 
 export default function Shorts() {
   const location = useLocation();
+  const dispatch = useDispatch();
   const initialShort = location.state?.video || null;
+  const { shorts: reduxShorts, loading } = useSelector((state) => state.videos);
 
   const [shorts, setShorts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingState, setLoadingState] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [liked, setLiked] = useState({});
   const [pendingLike, setPendingLike] = useState({});
@@ -109,77 +114,60 @@ export default function Shorts() {
 
   // ─── Load real shorts from backend ───
   useEffect(() => {
+    dispatch(fetchHomeVideos());
+  }, [dispatch]);
+
+  useEffect(() => {
     let cancelled = false;
 
-    const fetchShorts = async () => {
-      const token = localStorage.getItem("token");
+    const list = (reduxShorts || [])
+      .map(normalizeShort)
+      .filter((short) => short.videoUrl);
 
-      try {
-        let fetched = [];
-        if (token) {
-          const response = await fetch(`${API_BASE}/trending-shorts`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          const data = await response.json();
-          fetched = Array.isArray(data.videos) ? data.videos : [];
-        }
+    if (!list.length) {
+      setLoadingState(false);
+      return;
+    }
 
-        if (cancelled) return;
+    let queue = list;
+    let startIndex = 0;
 
-        const list = fetched.map(normalizeShort).filter((s) => s.videoUrl);
-
-        let queue = list;
-        let startIndex = 0;
-
-        if (initialShort) {
-          const existingIdx = list.findIndex((s) => s.id === initialShort.id);
-
-          if (existingIdx >= 0) {
-            // Clicked short is already in the backend queue → start there
-            startIndex = existingIdx;
-          } else {
-            // Clicked short not in queue → put it first, then the rest
-            const clicked = normalizeShort(initialShort);
-            queue = [clicked, ...list.filter((s) => s.id !== clicked.id)];
-            startIndex = 0;
-          }
-        }
-
-        if (queue.length === 0 && initialShort) {
-          const clicked = normalizeShort(initialShort);
-          if (clicked.videoUrl) {
-            queue = [clicked];
-            startIndex = 0;
-          }
-        }
-
-        const likedMap = Object.fromEntries(
-          queue.map((short) => [short.id, Boolean(short.isLiked)]),
-        );
-
-        setShorts(queue);
-        setLiked(likedMap);
-        setCurrentIndex(startIndex);
-      } catch (error) {
-        console.error("Error loading shorts:", error);
-        if (!cancelled && initialShort) {
-          const clicked = normalizeShort(initialShort);
-          if (clicked.videoUrl) {
-            setShorts([clicked]);
-            setCurrentIndex(0);
-          }
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
+    if (initialShort) {
+      const existingIdx = list.findIndex(
+        (short) => short.id === initialShort.id,
+      );
+      if (existingIdx >= 0) {
+        startIndex = existingIdx;
+      } else {
+        const clicked = normalizeShort(initialShort);
+        queue = [clicked, ...list.filter((short) => short.id !== clicked.id)];
+        startIndex = 0;
       }
-    };
+    }
 
-    fetchShorts();
+    if (queue.length === 0 && initialShort) {
+      const clicked = normalizeShort(initialShort);
+      if (clicked.videoUrl) {
+        queue = [clicked];
+        startIndex = 0;
+      }
+    }
+
+    const likedMap = Object.fromEntries(
+      queue.map((short) => [short.id, Boolean(short.isLiked)]),
+    );
+
+    if (!cancelled) {
+      setShorts(queue);
+      setLiked(likedMap);
+      setCurrentIndex(startIndex);
+      setLoadingState(false);
+    }
+
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [reduxShorts, initialShort]);
 
   // ─── Change video with bounds check ───
   const goToVideo = (newIndex) => {
@@ -372,7 +360,7 @@ export default function Shorts() {
         ref={containerRef}
         onScroll={handleScroll}
         className="
-          h-screen w-full max-w-[500px]
+          h-screen w-full max-w-125
           overflow-y-scroll
           snap-y snap-mandatory
           scroll-smooth

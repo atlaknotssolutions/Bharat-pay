@@ -1,65 +1,34 @@
-
-
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import { Eye, Clock, DollarSign, ArrowUpDown, X } from "lucide-react";
-
-// Fake data
-const myVideos = [
-  {
-    id: "v1",
-    title: "After 100th Attempt – Cute Cats Funny Moments",
-    thumbnail:
-      "https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?w=400",
-    views: 12496,
-    avgWatchPercent: 68,
-    earnings: 42.5,
-    totalWatchTime: "18h 45m",
-    status: "Public",
-    uploadDate: "2025-12-15",
-  },
-  {
-    id: "v2",
-    title: "How I Made ₹50K in One Month – Side Hustle Tips",
-    thumbnail:
-      "https://images.unsplash.com/photo-1556155092-490a1ba16284?w=400",
-    views: 45800,
-    avgWatchPercent: 42,
-    earnings: 185.2,
-    totalWatchTime: "3d 12h",
-    status: "Limited",
-    uploadDate: "2025-11-28",
-  },
-  {
-    id: "v3",
-    title: "Quick 5-Minute Breakfast Ideas for Busy People",
-    thumbnail:
-      "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400",
-    views: 9200,
-    avgWatchPercent: 55,
-    earnings: 18.9,
-    totalWatchTime: "6h 20m",
-    status: "Public",
-    uploadDate: "2026-01-10",
-  },
-];
+import { fetchMyVideos } from "../../features/videos/videosSlice";
 
 export default function MyVideos() {
+  const dispatch = useDispatch();
+  const { myVideos, myVideosLoading } = useSelector((state) => state.videos);
   const [sortBy, setSortBy] = useState("latest");
   const [selectedVideo, setSelectedVideo] = useState(null);
 
-  const sortedVideos = [...myVideos].sort((a, b) => {
-    if (sortBy === "latest") return new Date(b.uploadDate) - new Date(a.uploadDate);
-    if (sortBy === "views") return b.views - a.views;
-    if (sortBy === "earnings") return b.earnings - a.earnings;
-    return 0;
-  });
+  useEffect(() => {
+    dispatch(fetchMyVideos());
+  }, [dispatch]);
+
+  const sortedVideos = useMemo(() => {
+    return [...myVideos].sort((a, b) => {
+      if (sortBy === "latest")
+        return new Date(b.uploadDate) - new Date(a.uploadDate);
+      if (sortBy === "views") return b.views - a.views;
+      if (sortBy === "earnings") return b.earnings - a.earnings;
+      return 0;
+    });
+  }, [myVideos, sortBy]);
 
   const handleSortChange = (e) => setSortBy(e.target.value);
   const openDetail = (video) => setSelectedVideo(video);
   const closeDetail = () => setSelectedVideo(null);
 
   const getStatusBadge = (status) => {
-    const isActive = status.toLowerCase() === "public";
+    const isActive = String(status || "Public").toLowerCase() === "public";
     return (
       <span
         className={`
@@ -112,13 +81,13 @@ export default function MyVideos() {
             "
           >
             <div className="flex flex-col sm:flex-row">
-              <div className="relative w-full sm:w-36 h-52 sm:h-24 flex-shrink-0">
+              <div className="relative w-full sm:w-36 h-52 sm:h-24 shrink-0">
                 <img
-                  src={video.thumbnail}
+                  src={video.thumb || video.thumbnail}
                   alt={video.title}
                   className="w-full h-full object-cover"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent sm:opacity-0 sm:hover:opacity-100 transition-opacity" />
+                <div className="absolute inset-0 bg-linear-to-t from-black/60 to-transparent sm:opacity-0 sm:hover:opacity-100 transition-opacity" />
               </div>
 
               <div className="flex-1 p-4 flex flex-col">
@@ -191,7 +160,7 @@ export default function MyVideos() {
             <div className="p-6 space-y-7">
               <div>
                 <img
-                  src={selectedVideo.thumbnail}
+                  src={selectedVideo.thumb || selectedVideo.thumbnail}
                   alt={selectedVideo.title}
                   className="w-full h-56 object-cover rounded-xl border border-zinc-800 shadow-md"
                 />
@@ -199,16 +168,39 @@ export default function MyVideos() {
                   {selectedVideo.title}
                 </h3>
                 <p className="mt-2 text-sm text-zinc-500">
-                  Uploaded: {new Date(selectedVideo.uploadDate).toLocaleDateString("en-IN")}
+                  Uploaded:{" "}
+                  {new Date(selectedVideo.uploadDate).toLocaleDateString(
+                    "en-IN",
+                  )}
                 </p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 {[
-                  { icon: Eye, color: "blue", label: "Total Views", value: selectedVideo.views.toLocaleString() },
-                  { icon: Clock, color: "purple", label: "Avg. Watch %", value: `${selectedVideo.avgWatchPercent}%` },
-                  { icon: Clock, color: "emerald", label: "Total Watch Time", value: selectedVideo.totalWatchTime },
-                  { icon: DollarSign, color: "red", label: "Total Earnings", value: `₹${selectedVideo.earnings.toFixed(2)}` },
+                  {
+                    icon: Eye,
+                    color: "blue",
+                    label: "Total Views",
+                    value: selectedVideo.views.toLocaleString(),
+                  },
+                  {
+                    icon: Clock,
+                    color: "purple",
+                    label: "Avg. Watch %",
+                    value: `${selectedVideo.avgWatchPercent}%`,
+                  },
+                  {
+                    icon: Clock,
+                    color: "emerald",
+                    label: "Total Watch Time",
+                    value: selectedVideo.totalWatchTime,
+                  },
+                  {
+                    icon: DollarSign,
+                    color: "red",
+                    label: "Total Earnings",
+                    value: `₹${selectedVideo.earnings.toFixed(2)}`,
+                  },
                 ].map((item, i) => (
                   <div
                     key={i}
@@ -217,7 +209,10 @@ export default function MyVideos() {
                       shadow-sm shadow-black/30
                     "
                   >
-                    <item.icon size={28} className={`mx-auto mb-3 text-${item.color}-500`} />
+                    <item.icon
+                      size={28}
+                      className={`mx-auto mb-3 text-${item.color}-500`}
+                    />
                     <p className={`text-2xl font-bold text-${item.color}-400`}>
                       {item.value}
                     </p>
@@ -228,7 +223,9 @@ export default function MyVideos() {
 
               <div className="pt-4 border-t border-zinc-800">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-zinc-400">Status</span>
+                  <span className="text-sm font-medium text-zinc-400">
+                    Status
+                  </span>
                   {getStatusBadge(selectedVideo.status)}
                 </div>
               </div>
