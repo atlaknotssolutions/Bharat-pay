@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Bookmark, Clock, X } from "lucide-react";
+import { toast } from "react-toastify";
 
 const API_BASE = "http://localhost:8000/api/uservideo";
 
@@ -55,9 +56,13 @@ export default function WatchLaterTab({ openDetail }) {
         setVideos((prev) =>
           prev.filter((v) => String(v._id || v.id) !== targetId),
         );
+        toast.success("Removed from Watch Later");
+      } else {
+        toast.error(data.message || "Failed to remove from Watch Later");
       }
     } catch (error) {
       console.error("Failed to remove from Watch Later:", error);
+      toast.error("Something went wrong");
     }
   };
 

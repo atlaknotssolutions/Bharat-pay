@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Eye, EyeOff, Mail, Lock, User, ArrowRight } from "lucide-react";
-import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google"; // ← added
+import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
+import { toast } from "react-toastify";
 import { getDeviceId } from "./deviceId";
 
 const API_BASE = "http://localhost:8000/api";
@@ -41,7 +42,7 @@ export default function AuthPage() {
     localStorage.setItem("token", data.token);
     localStorage.setItem("user", JSON.stringify(data.user));
     window.dispatchEvent(new Event("auth-change"));
-    alert("Welcome! Authentication successful.");
+    toast.success("Welcome! Authentication successful.");
     navigate(from, { replace: true });
   };
 
@@ -89,6 +90,7 @@ export default function AuthPage() {
       handleAuthSuccess(data);
     } catch (err) {
       setError(err.message);
+      toast.error(err.message || "Authentication failed");
     } finally {
       setLoading(false);
     }
@@ -115,14 +117,18 @@ export default function AuthPage() {
 
       handleAuthSuccess(data);
     } catch (err) {
-      setError(err.message || "Could not sign in with Google");
+      const message = err.message || "Could not sign in with Google";
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogleError = () => {
-    setError("Google sign-in failed. Please try again.");
+    const message = "Google sign-in failed. Please try again.";
+    setError(message);
+    toast.error(message);
   };
 
   return (

@@ -1,6 +1,6 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 import {
   Bell,
   Search,
@@ -88,9 +88,17 @@ export default function SubscribedChannels() {
         if (typeof data.subscribersCount === "number") {
           setSubscribersCount(data.subscribersCount);
         }
+        toast.success(
+          data.subscribed
+            ? "Subscribed successfully"
+            : "Unsubscribed successfully",
+        );
+      } else {
+        toast.error(data.message || "Subscription action failed");
       }
     } catch (err) {
       console.error(err);
+      toast.error("Something went wrong");
     } finally {
       setSubscribeLoading(false);
     }

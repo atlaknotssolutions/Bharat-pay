@@ -1,7 +1,7 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronRight, Play, Plus, Info } from "lucide-react";
+import { toast } from "react-toastify";
 
 const BACKEND_URL = "http://localhost:8000";
 const API_BASE = `${BACKEND_URL}/api/uservideo`;
@@ -169,7 +169,6 @@ function MovieCard({ item, onClick, onAddToWatchLater }) {
               </div>
             </div>
             <div>
-             
               <h3 className="text-white text-sm font-semibold">{item.title}</h3>
             </div>
           </div>
@@ -493,7 +492,7 @@ export default function NetflixStylePage() {
   const handleAddToWatchLater = async (item) => {
     const token = localStorage.getItem("token");
     if (!token) {
-      alert("Please login first");
+      toast.error("Please login first");
       return;
     }
 
@@ -509,13 +508,13 @@ export default function NetflixStylePage() {
       const data = await res.json();
 
       if (data.success) {
-        alert(data.message || "Added to Watch Later");
+        toast.success(data.message || "Added to Watch Later");
       } else {
-        alert(data.message || "Failed to add");
+        toast.error(data.message || "Failed to add");
       }
     } catch (err) {
       console.error("Add to Watch Later error:", err);
-      alert("Something went wrong");
+      toast.error("Something went wrong");
     }
   };
 
@@ -718,9 +717,7 @@ export default function NetflixStylePage() {
           <SectionHeader title="Top Shorts" />
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
             {topShortsLoading ? (
-              <p className="text-sm text-gray-400">
-                Loading top shorts...
-              </p>
+              <p className="text-sm text-gray-400">Loading top shorts...</p>
             ) : topShortsVideos.length > 0 ? (
               topShortsVideos.map((item) => (
                 <div
