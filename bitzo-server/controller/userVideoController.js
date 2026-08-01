@@ -190,7 +190,6 @@ const uploadVideo = async (req, res) => {
       video: newVideo,
     });
   } catch (err) {
-
     // console.error("========== VIDEO UPLOAD ERROR ==========");
     // console.error(error);
     // console.error("Message:", error.message);
@@ -316,7 +315,7 @@ const getChannelById = async (req, res) => {
     if (userId) {
       const user = await User.findById(userId).select("subscribedChannels");
       isSubscribed = (user?.subscribedChannels || []).some(
-        (id) => id.toString() === channelId
+        (id) => id.toString() === channelId,
       );
     }
 
@@ -327,7 +326,10 @@ const getChannelById = async (req, res) => {
         isSubscribed,
         subscribersCount: channel.subscribedBy?.length || 0,
         videoCount: videos.length,
-        handle: channel.handle || channel.name?.toLowerCase().replace(/\s+/g, "") || "channel",
+        handle:
+          channel.handle ||
+          channel.name?.toLowerCase().replace(/\s+/g, "") ||
+          "channel",
         description: channel.channeldescription || channel.description || "",
       },
       videos,
@@ -340,8 +342,6 @@ const getChannelById = async (req, res) => {
     });
   }
 };
-
-
 
 const mapVideoToListItem = (video) => ({
   _id: video?._id,
@@ -612,7 +612,9 @@ const trendingVideos = async (req, res) => {
 
 const LatestVideos = async (req, res) => {
   try {
-    const videos = await Video.find({ videoType: "long" }).sort({ createdAt: -1 }).limit(10);
+    const videos = await Video.find({ videoType: "long" })
+      .sort({ createdAt: -1 })
+      .limit(10);
 
     res.status(200).json({
       success: true,
@@ -633,9 +635,39 @@ const trendingShorts = async (req, res) => {
       .sort({ views: -1, createdAt: -1 })
       .limit(10);
 
+    const userId = req.user?.id || req.user?.userId || req.user?._id;
+    let user = null;
+
+    if (userId) {
+      user = await User.findById(userId);
+    }
+
+    const likedVideoIds = new Set(
+      (user?.likedVideos || []).map((id) => id.toString()),
+    );
+    const dislikedVideoIds = new Set(
+      (user?.dislikedVideos || []).map((id) => id.toString()),
+    );
+
+    const videosWithReaction = videos.map((video) => {
+      const videoId = video._id?.toString();
+      let userReaction = null;
+
+      if (videoId && likedVideoIds.has(videoId)) {
+        userReaction = "like";
+      } else if (videoId && dislikedVideoIds.has(videoId)) {
+        userReaction = "dislike";
+      }
+
+      return {
+        ...video.toObject(),
+        userReaction,
+      };
+    });
+
     res.status(200).json({
       success: true,
-      videos,
+      videos: videosWithReaction,
     });
   } catch (error) {
     console.error("Error in trendingShorts:", error);
@@ -670,7 +702,7 @@ const getVideoById = async (req, res) => {
     const videoId = req.params.id || req.params.videoId;
     const video = await Video.findById(videoId).populate(
       "channel",
-      "name subscribersCount channelImage subscribedBy"
+      "name subscribersCount channelImage subscribedBy",
     );
 
     if (!video) {
@@ -696,12 +728,12 @@ const getVideoById = async (req, res) => {
         }
 
         isSubscribed = (user.subscribedChannels || []).some(
-          (chId) => chId.toString() === video.channel?._id?.toString()
+          (chId) => chId.toString() === video.channel?._id?.toString(),
         );
       }
 
       const viewerEntry = (video.viewers || []).find(
-        (v) => v.userId?.toString() === userId.toString()
+        (v) => v.userId?.toString() === userId.toString(),
       );
       if (viewerEntry) watchedPercent = viewerEntry.watchedPercent || 0;
     }
@@ -743,7 +775,7 @@ const addView = async (req, res) => {
     if (normalizedUserId) {
       video.viewers = video.viewers || [];
       const viewerEntry = video.viewers.find(
-        (v) => v.userId?.toString() === normalizedUserId.toString()
+        (v) => v.userId?.toString() === normalizedUserId.toString(),
       );
 
       if (viewerEntry) {
@@ -799,44 +831,72 @@ const addView = async (req, res) => {
 const likeVideo = async (req, res) => {
   try {
     const { videoId } = req.params;
+    const normalizedVideoId = videoId?.toString();
     const userId = req.user?.id || req.user?.userId || req.user?._id;
 
-    const video = await Video.findById(videoId);
-    if (!video) {
-      return res.status(404).json({ success: false, message: "Video not found" });
-    }
-
+    // Guest users (no auth) – just increment, no toggle
     if (!userId) {
-      video.likesCount = (video.likesCount || 0) + 1;
-      await video.save();
+      const video = await Video.findByIdAndUpdate(
+        videoId,
+        { $inc: { likesCount: 1 } },
+        { new: true },
+      );
+      if (!video) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Video not found" });
+      }
       return res.status(200).json({
         success: true,
-        likes: video.likesCount,
+        likes: video.likesCount || 0,
         dislikes: video.dislikesCount || 0,
         reaction: "like",
       });
     }
 
-    const user = await User.findById(userId);
+    // Authenticated user
+    const [video, user] = await Promise.all([
+      Video.findById(normalizedVideoId),
+      User.findById(userId),
+    ]);
+
+    if (!video) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Video not found" });
+    }
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
+    // Ensure arrays exist
     user.likedVideos = user.likedVideos || [];
     user.dislikedVideos = user.dislikedVideos || [];
 
-    const alreadyLiked = user.likedVideos.some((i) => i.toString() === videoId);
-    const alreadyDisliked = user.dislikedVideos.some((i) => i.toString() === videoId);
+    const alreadyLiked = user.likedVideos.some(
+      (id) => id.toString() === normalizedVideoId,
+    );
+    const alreadyDisliked = user.dislikedVideos.some(
+      (id) => id.toString() === normalizedVideoId,
+    );
 
     let reaction = null;
 
     if (alreadyLiked) {
-      user.likedVideos = user.likedVideos.filter((i) => i.toString() !== videoId);
+      // UNLIKE
+      user.likedVideos = user.likedVideos.filter(
+        (id) => id.toString() !== normalizedVideoId,
+      );
       video.likesCount = Math.max(0, (video.likesCount || 0) - 1);
       reaction = null;
     } else {
+      // LIKE (and remove dislike if present)
       if (alreadyDisliked) {
-        user.dislikedVideos = user.dislikedVideos.filter((i) => i.toString() !== videoId);
+        user.dislikedVideos = user.dislikedVideos.filter(
+          (id) => id.toString() !== normalizedVideoId,
+        );
         video.dislikesCount = Math.max(0, (video.dislikesCount || 0) - 1);
       }
       user.likedVideos.push(video._id);
@@ -844,18 +904,18 @@ const likeVideo = async (req, res) => {
       reaction = "like";
     }
 
-    await user.save();
-    await video.save();
+    await Promise.all([user.save(), video.save()]);
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      likes: video.likesCount,
+      likes: video.likesCount || 0,
       dislikes: video.dislikesCount || 0,
-      reaction,
+      reaction, // "like" | null
+      liked: reaction === "like",
     });
   } catch (error) {
     console.error("Error in likeVideo:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
@@ -866,74 +926,84 @@ const dislikeVideo = async (req, res) => {
     const { videoId } = req.params;
     const userId = req.user?.id || req.user?.userId || req.user?._id;
 
-    const video = await Video.findById(videoId);
-    if (!video) {
-      return res.status(404).json({ success: false, message: "Video not found" });
-    }
-
-    // Guest → just increment
     if (!userId) {
-      video.dislikesCount = (video.dislikesCount || 0) + 1;
-      await video.save();
+      const video = await Video.findByIdAndUpdate(
+        videoId,
+        { $inc: { dislikesCount: 1 } },
+        { new: true },
+      );
+      if (!video) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Video not found" });
+      }
       return res.status(200).json({
         success: true,
         likes: video.likesCount || 0,
-        dislikes: video.dislikesCount,
+        dislikes: video.dislikesCount || 0,
         reaction: "dislike",
       });
     }
 
-    const user = await User.findById(userId);
+    const [video, user] = await Promise.all([
+      Video.findById(videoId),
+      User.findById(userId),
+    ]);
+
+    if (!video) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Video not found" });
+    }
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
-    // Ensure arrays exist
     user.likedVideos = user.likedVideos || [];
     user.dislikedVideos = user.dislikedVideos || [];
 
     const alreadyLiked = user.likedVideos.some(
-      (id) => id.toString() === videoId
+      (id) => id.toString() === videoId,
     );
     const alreadyDisliked = user.dislikedVideos.some(
-      (id) => id.toString() === videoId
+      (id) => id.toString() === videoId,
     );
 
     let reaction = null;
 
     if (alreadyDisliked) {
-      // Toggle off dislike
+      // REMOVE DISLIKE
       user.dislikedVideos = user.dislikedVideos.filter(
-        (id) => id.toString() !== videoId
+        (id) => id.toString() !== videoId,
       );
       video.dislikesCount = Math.max(0, (video.dislikesCount || 0) - 1);
       reaction = null;
     } else {
-      // Remove like if exists
+      // DISLIKE (and remove like if present)
       if (alreadyLiked) {
         user.likedVideos = user.likedVideos.filter(
-          (id) => id.toString() !== videoId
+          (id) => id.toString() !== videoId,
         );
         video.likesCount = Math.max(0, (video.likesCount || 0) - 1);
       }
-      // Add dislike
       user.dislikedVideos.push(video._id);
       video.dislikesCount = (video.dislikesCount || 0) + 1;
       reaction = "dislike";
     }
 
-    await user.save();
-    await video.save();
+    await Promise.all([user.save(), video.save()]);
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       likes: video.likesCount || 0,
-      dislikes: video.dislikesCount,
+      dislikes: video.dislikesCount || 0,
       reaction, // "dislike" | null
     });
   } catch (error) {
     console.error("Error in dislikeVideo:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
@@ -944,7 +1014,9 @@ const subscribeChannel = async (req, res) => {
     const userId = req.user?.id || req.user?.userId || req.user?._id;
 
     if (!userId) {
-      return res.status(401).json({ success: false, message: "Login required" });
+      return res
+        .status(401)
+        .json({ success: false, message: "Login required" });
     }
 
     const user = await User.findById(userId);
@@ -958,7 +1030,7 @@ const subscribeChannel = async (req, res) => {
     channel.subscribedBy = channel.subscribedBy || [];
 
     const alreadySubscribed = user.subscribedChannels.some(
-      (id) => id.toString() === channelId
+      (id) => id.toString() === channelId,
     );
 
     let subscribed = false;
@@ -966,10 +1038,10 @@ const subscribeChannel = async (req, res) => {
     if (alreadySubscribed) {
       // Unsubscribe
       user.subscribedChannels = user.subscribedChannels.filter(
-        (id) => id.toString() !== channelId
+        (id) => id.toString() !== channelId,
       );
       channel.subscribedBy = channel.subscribedBy.filter(
-        (id) => id.toString() !== userId
+        (id) => id.toString() !== userId,
       );
       subscribed = false;
     } else {
@@ -1231,9 +1303,7 @@ const HistoricalVideos = async (req, res) => {
 
     // Preserve the order of viewedVideos (most recent watched first)
     // Assuming newer watches are pushed to the end of the array
-    const videoMap = new Map(
-      videos.map((v) => [v._id.toString(), v])
-    );
+    const videoMap = new Map(videos.map((v) => [v._id.toString(), v]));
 
     const orderedVideos = viewedVideoIds
       .slice()
@@ -1283,9 +1353,7 @@ const LikedVideos = async (req, res) => {
 
     // Preserve the order of likedVideos (most recently liked first)
     // Assuming newer likes are pushed to the end of the array
-    const videoMap = new Map(
-      videos.map((v) => [v._id.toString(), v])
-    );
+    const videoMap = new Map(videos.map((v) => [v._id.toString(), v]));
 
     const orderedVideos = likedVideoIds
       .slice()
@@ -1305,7 +1373,6 @@ const LikedVideos = async (req, res) => {
     });
   }
 };
-
 
 const WatchLaterVideos = async (req, res) => {
   try {
@@ -1335,9 +1402,7 @@ const WatchLaterVideos = async (req, res) => {
       .populate("uploadedBy", "name email");
 
     // Preserve the order of watchLater (most recently added first)
-    const videoMap = new Map(
-      videos.map((v) => [v._id.toString(), v])
-    );
+    const videoMap = new Map(videos.map((v) => [v._id.toString(), v]));
 
     const orderedVideos = watchLaterIds
       .slice()
@@ -1395,8 +1460,6 @@ const RemoveFromWatchLater = async (req, res) => {
   }
 };
 
-
-
 const addToWatchLater = async (req, res) => {
   try {
     const userId = req.user?.id || req.user?.userId || req.user?._id;
@@ -1407,12 +1470,16 @@ const addToWatchLater = async (req, res) => {
     }
 
     if (!videoId) {
-      return res.status(400).json({ success: false, message: "Video ID required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Video ID required" });
     }
 
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     user.watchLaterVideos = user.watchLaterVideos || [];
@@ -1444,7 +1511,6 @@ const addToWatchLater = async (req, res) => {
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
-
 
 const getSearchHints = async (req, res) => {
   try {
@@ -1509,7 +1575,6 @@ const getSearchHints = async (req, res) => {
   }
 };
 
-
 module.exports = {
   getAllVideos,
   getVideoById,
@@ -1543,5 +1608,5 @@ module.exports = {
   WatchLaterVideos,
   RemoveFromWatchLater,
   addToWatchLater,
-  getSearchHints
+  getSearchHints,
 };

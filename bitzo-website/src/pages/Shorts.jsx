@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import {
@@ -31,8 +30,12 @@ const normalizeShort = (v) => ({
   title: v.title || "Untitled Short",
   videoUrl: toMediaUrl(v.videoUrl),
   views: Number(v.views) || 0,
-  likes: Number(v.likesCount) || 0,
-  comments: Array.isArray(v.comments) ? v.comments.length : Number(v.comments) || 0,
+  likes: Number(v.likesCount ?? v.likes) || 0,
+  comments: Array.isArray(v.comments)
+    ? v.comments.length
+    : Number(v.comments) || 0,
+  isLiked: v.userReaction === "like",
+  reaction: v.userReaction || null,
 });
 
 const formatViews = (n) => {
@@ -57,6 +60,7 @@ export default function Shorts() {
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [liked, setLiked] = useState({});
+  const [pendingLike, setPendingLike] = useState({});
   const [muted, setMuted] = useState(true);
 
   const containerRef = useRef(null);
@@ -81,17 +85,13 @@ export default function Shorts() {
 
         if (cancelled) return;
 
-        const list = fetched
-          .map(normalizeShort)
-          .filter((s) => s.videoUrl);
+        const list = fetched.map(normalizeShort).filter((s) => s.videoUrl);
 
         let queue = list;
         let startIndex = 0;
 
         if (initialShort) {
-          const existingIdx = list.findIndex(
-            (s) => s.id === initialShort.id
-          );
+          const existingIdx = list.findIndex((s) => s.id === initialShort.id);
 
           if (existingIdx >= 0) {
             // Clicked short is already in the backend queue → start there
@@ -112,7 +112,12 @@ export default function Shorts() {
           }
         }
 
+        const likedMap = Object.fromEntries(
+          queue.map((short) => [short.id, Boolean(short.isLiked)]),
+        );
+
         setShorts(queue);
+        setLiked(likedMap);
         setCurrentIndex(startIndex);
       } catch (error) {
         console.error("Error loading shorts:", error);
@@ -153,8 +158,8 @@ export default function Shorts() {
   const handlers = useSwipeable({
     onSwipedLeft: () => goToVideo(currentIndex + 1),
     onSwipedRight: () => goToVideo(currentIndex - 1),
-    trackMouse: true,           // for desktop testing (optional)
-    delta: 60,                  // how many px needed to count as swipe
+    trackMouse: true, // for desktop testing (optional)
+    delta: 60, // how many px needed to count as swipe
     preventScrollOnSwipe: true, // prevents vertical scroll conflict
     swipeDuration: 400,
   });
@@ -166,7 +171,7 @@ export default function Shorts() {
 
       if (i === currentIndex) {
         video.currentTime = 0; // restart from beginning (optional)
-        video.muted = muted;   // respect global mute
+        video.muted = muted; // respect global mute
         video.play().catch(() => {});
       } else {
         video.pause();
@@ -186,27 +191,43 @@ export default function Shorts() {
   };
 
   const toggleLike = async (short) => {
-    const isNowLiked = !liked[short.id];
-    setLiked((prev) => ({ ...prev, [short.id]: isNowLiked }));
-
     const token = localStorage.getItem("token");
-    if (!token || !short.id) return;
+    if (!token || !short.id || pendingLike[short.id]) return;
+
+    const wasLiked = Boolean(liked[short.id]);
+    const nextLiked = !wasLiked;
+
+    setPendingLike((prev) => ({ ...prev, [short.id]: true }));
+    setLiked((prev) => ({ ...prev, [short.id]: nextLiked }));
 
     try {
       const response = await fetch(`${API_BASE}/${short.id}/like`, {
         method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers: { Authorization: `Bearer ${token}` },
       });
       const data = await response.json();
+
       if (data.success && typeof data.likes === "number") {
         setShorts((prev) =>
           prev.map((s) =>
-            s.id === short.id ? { ...s, likes: data.likes } : s
-          )
+            s.id === short.id
+              ? {
+                  ...s,
+                  likes: data.likes,
+                  isLiked: data.liked === true,
+                  reaction: data.reaction || null,
+                }
+              : s,
+          ),
         );
+      } else {
+        setLiked((prev) => ({ ...prev, [short.id]: wasLiked }));
       }
     } catch (error) {
       console.error("Error toggling like:", error);
+      setLiked((prev) => ({ ...prev, [short.id]: wasLiked }));
+    } finally {
+      setPendingLike((prev) => ({ ...prev, [short.id]: false }));
     }
   };
 
@@ -286,14 +307,18 @@ export default function Shorts() {
 
               {/* Right side buttons */}
               <div className="absolute right-5 bottom-32 z-10 flex flex-col items-center gap-6 text-white">
-                <button onClick={() => toggleLike(short)}>
+                <button
+                  onClick={() => toggleLike(short)}
+                  disabled={Boolean(pendingLike[short.id])}
+                  className={Boolean(pendingLike[short.id]) ? "opacity-70" : ""}
+                >
                   <Heart
                     size={32}
-                    className={liked[short.id] ? "text-red-500 fill-red-500" : ""}
+                    className={
+                      liked[short.id] ? "text-red-500 fill-red-500" : ""
+                    }
                   />
-                  <p className="text-sm mt-1">
-                    {formatCount(liked[short.id] ? short.likes + 1 : short.likes)}
-                  </p>
+                  <p className="text-sm mt-1">{formatCount(short.likes)}</p>
                 </button>
 
                 <button>
