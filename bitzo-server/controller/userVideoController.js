@@ -1433,7 +1433,7 @@ const WatchLaterVideos = async (req, res) => {
 // Remove a video from Watch Later
 const RemoveFromWatchLater = async (req, res) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user?.id || req.user?.userId || req.user?._id;
     const { videoId } = req.params;
 
     if (!userId) {
@@ -1450,13 +1450,35 @@ const RemoveFromWatchLater = async (req, res) => {
       });
     }
 
-    await User.findByIdAndUpdate(userId, {
-      $pull: { watchLater: videoId },
-    });
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const existingWatchLater = Array.isArray(user.watchLater)
+      ? user.watchLater
+      : [];
+    const existingWatchLaterVideos = Array.isArray(user.watchLaterVideos)
+      ? user.watchLaterVideos
+      : [];
+
+    user.watchLater = existingWatchLater.filter(
+      (id) => id.toString() !== videoId.toString(),
+    );
+    user.watchLaterVideos = existingWatchLaterVideos.filter(
+      (id) => id.toString() !== videoId.toString(),
+    );
+
+    await user.save();
 
     res.status(200).json({
       success: true,
       message: "Video removed from Watch Later",
+      removed: true,
+      watchLaterCount: user.watchLater.length,
     });
   } catch (error) {
     console.error("Error in RemoveFromWatchLater:", error);

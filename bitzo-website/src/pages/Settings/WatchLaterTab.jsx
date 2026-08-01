@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Bookmark, Clock, X } from "lucide-react";
 
+const API_BASE = "http://localhost:8000/api/uservideo";
+
 export default function WatchLaterTab({ openDetail }) {
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -13,7 +15,7 @@ export default function WatchLaterTab({ openDetail }) {
       return;
     }
 
-    fetch("http://localhost:8000/api/uservideo/watch-later", {
+    fetch(`${API_BASE}/watch-later`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())
@@ -42,17 +44,17 @@ export default function WatchLaterTab({ openDetail }) {
     if (!token) return;
 
     try {
-      const res = await fetch(
-        `http://localhost:8000/api/uservideo/watch-later/${videoId}`,
-        {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+      const res = await fetch(`${API_BASE}/watch-later/${videoId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       const data = await res.json();
       if (data.success) {
-        setVideos((prev) => prev.filter((v) => (v._id || v.id) !== videoId));
+        const targetId = String(videoId);
+        setVideos((prev) =>
+          prev.filter((v) => String(v._id || v.id) !== targetId),
+        );
       }
     } catch (error) {
       console.error("Failed to remove from Watch Later:", error);
