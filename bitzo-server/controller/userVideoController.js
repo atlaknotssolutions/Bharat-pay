@@ -1345,11 +1345,24 @@ const getSubscribedVideos = async (req, res) => {
     }
 
     const user = await User.findById(userId).select("subscribedChannels");
-    const subscribedChannelIds = user?.subscribedChannels || [];
+    const subscribedChannels = user?.subscribedChannels || [];
+
+    const channelDocs = await Channel.find({ subscribedBy: userId }).select(
+      "_id",
+    );
+    const channelIds = [
+      ...new Set([
+        ...subscribedChannels.map((id) => id.toString()),
+        ...channelDocs.map((channel) => channel._id.toString()),
+      ]),
+    ];
+
+    const channelObjectIds = channelIds
+      .filter((id) => mongoose.Types.ObjectId.isValid(id))
+      .map((id) => new mongoose.Types.ObjectId(id));
 
     const videos = await Video.find({
-      channel: { $in: subscribedChannelIds },
-      videoType: "long",
+      channel: { $in: channelObjectIds },
     })
       .sort({ createdAt: -1 })
       .populate("channel", "name channelImage")
@@ -1358,6 +1371,8 @@ const getSubscribedVideos = async (req, res) => {
     res.status(200).json({
       success: true,
       videos,
+      count: videos.length,
+      subscribedChannelIds: channelIds,
     });
   } catch (error) {
     console.error("Error in getSubscribedVideos:", error);
