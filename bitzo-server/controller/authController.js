@@ -243,15 +243,42 @@ exports.getUserDetail = async (req, res) => {
 exports.getMyProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user.id)
-      .populate("channels", "name")
-      .populate("videos", "title")
+      .populate({
+        path: "channels",
+        select: "name channelImage subscribers subscribedBy",
+      })
+      .populate({
+        path: "videos",
+        select: "title thumbnail views likesCount createdAt videoType duration",
+      })
       .select("-password");
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+
+    const populatedUser = user.toObject();
+    populatedUser.totalVideos = populatedUser.videos?.length || 0;
+    populatedUser.totalViews = (populatedUser.videos || []).reduce(
+      (sum, video) => sum + Number(video.views || 0),
+      0,
+    );
+    populatedUser.totalEarnings = 0;
+    populatedUser.avgRPM = 0;
+    populatedUser.subscribers =
+      populatedUser.channels?.reduce(
+        (count, channel) => count + Number(channel.subscribers || 0),
+        0,
+      ) || 0;
 
     res.status(200).json({
       success: true,
-      user,
+      user: populatedUser,
     });
   } catch (error) {
+    console.error("getMyProfile Error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };

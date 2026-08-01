@@ -1,5 +1,3 @@
-
-
 // import React, { useState, useEffect } from "react";
 // import { useNavigate } from "react-router-dom";
 // import {
@@ -950,6 +948,24 @@ export default function Profile() {
 
         const profile = data.user;
 
+        const profileVideos = Array.isArray(profile.videos)
+          ? profile.videos.map((video) => ({
+              id: video._id || video.id,
+              title: video.title || "Untitled video",
+              thumbnail:
+                video.thumbnail ||
+                "https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=400",
+              views: Number(video.views || 0),
+              likesCount: Number(video.likesCount || 0),
+              duration: video.duration || "—",
+              uploadDate: video.createdAt
+                ? new Date(video.createdAt).toLocaleDateString("en-IN")
+                : "Recently uploaded",
+              status: "Public",
+              raw: video,
+            }))
+          : [];
+
         setUser({
           _id: profile._id,
           name: profile.name || "User",
@@ -965,11 +981,14 @@ export default function Profile() {
               })
             : "Unknown date",
           subscribers: profile.subscribers || 0,
-          totalVideos: profile.videos?.length || 0,
+          totalVideos: profile.totalVideos || profile.videos?.length || 0,
           totalViews: profile.totalViews || 0,
           totalEarnings: profile.totalEarnings || 0,
           avgRPM: profile.avgRPM || "0.0",
+          videos: profileVideos,
         });
+
+        setMyVideos(profileVideos);
 
         setEditForm({
           name: profile.name || "",
@@ -1115,14 +1134,17 @@ export default function Profile() {
       const token = localStorage.getItem("token");
       if (!token || !user?._id) throw new Error("Authentication required");
 
-      const res = await fetch(`http://localhost:8000/api/user/password/${user._id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+      const res = await fetch(
+        `http://localhost:8000/api/user/password/${user._id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ oldPassword, newPassword }),
         },
-        body: JSON.stringify({ oldPassword, newPassword }),
-      });
+      );
 
       const data = await res.json();
       if (!res.ok || !data.success) {
@@ -1130,7 +1152,11 @@ export default function Profile() {
       }
 
       setPasswordSuccess(true);
-      setPasswordForm({ oldPassword: "", newPassword: "", confirmPassword: "" });
+      setPasswordForm({
+        oldPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
 
       setTimeout(() => {
         setIsPasswordOpen(false);
@@ -1156,9 +1182,10 @@ export default function Profile() {
     return (
       <span
         className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium
-          ${isActive
-            ? "bg-green-900/40 text-green-400 border border-green-800/50"
-            : "bg-red-900/40 text-red-400 border border-red-800/50"
+          ${
+            isActive
+              ? "bg-green-900/40 text-green-400 border border-green-800/50"
+              : "bg-red-900/40 text-red-400 border border-red-800/50"
           }`}
       >
         {isActive ? "Active" : "Inactive"}
@@ -1173,7 +1200,8 @@ export default function Profile() {
   ];
 
   const sortedVideos = [...myVideos].sort((a, b) => {
-    if (sortBy === "latest") return new Date(b.uploadDate) - new Date(a.uploadDate);
+    if (sortBy === "latest")
+      return new Date(b.uploadDate) - new Date(a.uploadDate);
     if (sortBy === "views") return b.views - a.views;
     if (sortBy === "earnings") return b.earnings - a.earnings;
     return 0;
@@ -1186,12 +1214,24 @@ export default function Profile() {
           <h3 className="text-lg font-semibold">Earnings Overview</h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
-              { label: "This Month", value: `₹${(user?.earningsThisMonth || 0).toLocaleString()}` },
-              { label: "Total Earnings", value: `₹${(user?.totalEarnings || 0).toLocaleString()}` },
-              { label: "Pending", value: `₹${(user?.pendingWithdrawal || 0).toLocaleString()}` },
+              {
+                label: "This Month",
+                value: `₹${(user?.earningsThisMonth || 0).toLocaleString()}`,
+              },
+              {
+                label: "Total Earnings",
+                value: `₹${(user?.totalEarnings || 0).toLocaleString()}`,
+              },
+              {
+                label: "Pending",
+                value: `₹${(user?.pendingWithdrawal || 0).toLocaleString()}`,
+              },
               { label: "Avg. RPM", value: `₹${user?.avgRPM || "0.0"}` },
             ].map((item) => (
-              <div key={item.label} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-center">
+              <div
+                key={item.label}
+                className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-center"
+              >
                 <p className="text-xs text-zinc-400">{item.label}</p>
                 <p className="text-2xl font-bold mt-1">{item.value}</p>
               </div>
@@ -1237,7 +1277,9 @@ export default function Profile() {
         {myVideos.length === 0 ? (
           <div className="text-center py-20 text-zinc-500">
             <p className="text-xl">No videos yet</p>
-            <p className="mt-2 text-sm">Upload your first video to get started</p>
+            <p className="mt-2 text-sm">
+              Upload your first video to get started
+            </p>
           </div>
         ) : (
           sortedVideos.map((video) => (
@@ -1264,14 +1306,15 @@ export default function Profile() {
   if (error || !user) {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <div className="text-red-400 text-xl">Error: {error || "Profile not loaded"}</div>
+        <div className="text-red-400 text-xl">
+          Error: {error || "Profile not loaded"}
+        </div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 pb-20">
-
       {/* Profile Header */}
       <div className="bg-zinc-900 border-b border-zinc-800">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
@@ -1333,12 +1376,35 @@ export default function Profile() {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-5 mb-10">
           {[
-            { icon: Eye, color: "blue", value: user.totalViews?.toLocaleString() || "0", label: "Total Views" },
-            { icon: Clock, color: "emerald", value: "0h", label: "Watch Hours" },
-            { icon: DollarSign, color: "red", value: `₹${(user.totalEarnings || 0).toLocaleString()}`, label: "Total Earnings" },
-            { icon: TrendingUp, color: "purple", value: `₹${user.avgRPM}`, label: "Avg. RPM" },
+            {
+              icon: Eye,
+              color: "blue",
+              value: user.totalViews?.toLocaleString() || "0",
+              label: "Total Views",
+            },
+            {
+              icon: Clock,
+              color: "emerald",
+              value: "0h",
+              label: "Watch Hours",
+            },
+            {
+              icon: DollarSign,
+              color: "red",
+              value: `₹${(user.totalEarnings || 0).toLocaleString()}`,
+              label: "Total Earnings",
+            },
+            {
+              icon: TrendingUp,
+              color: "purple",
+              value: `₹${user.avgRPM}`,
+              label: "Avg. RPM",
+            },
           ].map(({ icon: Icon, color, value, label }) => (
-            <div key={label} className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 text-center">
+            <div
+              key={label}
+              className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 text-center"
+            >
               <Icon size={24} className={`mx-auto mb-3 text-${color}-500`} />
               <p className="text-2xl font-bold">{value}</p>
               <p className="text-xs text-zinc-500 mt-1">{label}</p>
@@ -1382,7 +1448,10 @@ export default function Profile() {
           <div className="bg-zinc-900 rounded-2xl max-w-lg w-full border border-zinc-800 shadow-2xl">
             <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-zinc-800">
               <h2 className="text-xl font-semibold">Edit Profile</h2>
-              <button onClick={closeEdit} className="p-2 hover:bg-zinc-800 rounded-full transition-colors">
+              <button
+                onClick={closeEdit}
+                className="p-2 hover:bg-zinc-800 rounded-full transition-colors"
+              >
                 <X size={22} />
               </button>
             </div>
@@ -1405,7 +1474,9 @@ export default function Profile() {
                   />
                   <label className="cursor-pointer flex-1 flex items-center gap-2 px-5 py-3 bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 text-sm transition-colors">
                     <Upload size={18} />
-                    <span className="truncate">{avatarFile ? avatarFile.name : "Choose new image"}</span>
+                    <span className="truncate">
+                      {avatarFile ? avatarFile.name : "Choose new image"}
+                    </span>
                     <input
                       type="file"
                       accept="image/*"
@@ -1414,7 +1485,9 @@ export default function Profile() {
                     />
                   </label>
                 </div>
-                <p className="text-xs text-zinc-500 mt-1">Max 5MB • JPG, PNG, WebP supported</p>
+                <p className="text-xs text-zinc-500 mt-1">
+                  Max 5MB • JPG, PNG, WebP supported
+                </p>
               </div>
 
               {/* Name */}
@@ -1423,7 +1496,9 @@ export default function Profile() {
                 <input
                   type="text"
                   value={editForm.name}
-                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, name: e.target.value })
+                  }
                   className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-4 py-3 focus:outline-none focus:border-red-600"
                   placeholder="Your name"
                 />
@@ -1435,7 +1510,9 @@ export default function Profile() {
                 <input
                   type="email"
                   value={editForm.email}
-                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, email: e.target.value })
+                  }
                   className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-4 py-3 focus:outline-none focus:border-red-600"
                   placeholder="your@email.com"
                 />
@@ -1471,7 +1548,10 @@ export default function Profile() {
                 <Lock size={18} className="text-red-500" />
                 <h2 className="text-xl font-semibold">Change Password</h2>
               </div>
-              <button onClick={closePasswordModal} className="p-2 hover:bg-zinc-800 rounded-full">
+              <button
+                onClick={closePasswordModal}
+                className="p-2 hover:bg-zinc-800 rounded-full"
+              >
                 <X size={22} />
               </button>
             </div>
@@ -1490,60 +1570,99 @@ export default function Profile() {
 
               {/* Old Password */}
               <div>
-                <span className="text-xs text-zinc-400 block mb-1">Current Password</span>
+                <span className="text-xs text-zinc-400 block mb-1">
+                  Current Password
+                </span>
                 <div className="relative">
                   <input
                     type={showPasswords.old ? "text" : "password"}
                     value={passwordForm.oldPassword}
-                    onChange={(e) => setPasswordForm({ ...passwordForm, oldPassword: e.target.value })}
+                    onChange={(e) =>
+                      setPasswordForm({
+                        ...passwordForm,
+                        oldPassword: e.target.value,
+                      })
+                    }
                     className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-4 py-3 pr-10 focus:outline-none focus:border-red-600"
                   />
                   <button
                     type="button"
-                    onClick={() => setShowPasswords((p) => ({ ...p, old: !p.old }))}
+                    onClick={() =>
+                      setShowPasswords((p) => ({ ...p, old: !p.old }))
+                    }
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500"
                   >
-                    {showPasswords.old ? <EyeOff size={18} /> : <EyeIcon size={18} />}
+                    {showPasswords.old ? (
+                      <EyeOff size={18} />
+                    ) : (
+                      <EyeIcon size={18} />
+                    )}
                   </button>
                 </div>
               </div>
 
               {/* New Password */}
               <div>
-                <span className="text-xs text-zinc-400 block mb-1">New Password</span>
+                <span className="text-xs text-zinc-400 block mb-1">
+                  New Password
+                </span>
                 <div className="relative">
                   <input
                     type={showPasswords.new ? "text" : "password"}
                     value={passwordForm.newPassword}
-                    onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                    onChange={(e) =>
+                      setPasswordForm({
+                        ...passwordForm,
+                        newPassword: e.target.value,
+                      })
+                    }
                     className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-4 py-3 pr-10 focus:outline-none focus:border-red-600"
                   />
                   <button
                     type="button"
-                    onClick={() => setShowPasswords((p) => ({ ...p, new: !p.new }))}
+                    onClick={() =>
+                      setShowPasswords((p) => ({ ...p, new: !p.new }))
+                    }
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500"
                   >
-                    {showPasswords.new ? <EyeOff size={18} /> : <EyeIcon size={18} />}
+                    {showPasswords.new ? (
+                      <EyeOff size={18} />
+                    ) : (
+                      <EyeIcon size={18} />
+                    )}
                   </button>
                 </div>
               </div>
 
               {/* Confirm Password */}
               <div>
-                <span className="text-xs text-zinc-400 block mb-1">Confirm New Password</span>
+                <span className="text-xs text-zinc-400 block mb-1">
+                  Confirm New Password
+                </span>
                 <div className="relative">
                   <input
                     type={showPasswords.confirm ? "text" : "password"}
                     value={passwordForm.confirmPassword}
-                    onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                    onChange={(e) =>
+                      setPasswordForm({
+                        ...passwordForm,
+                        confirmPassword: e.target.value,
+                      })
+                    }
                     className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-4 py-3 pr-10 focus:outline-none focus:border-red-600"
                   />
                   <button
                     type="button"
-                    onClick={() => setShowPasswords((p) => ({ ...p, confirm: !p.confirm }))}
+                    onClick={() =>
+                      setShowPasswords((p) => ({ ...p, confirm: !p.confirm }))
+                    }
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500"
                   >
-                    {showPasswords.confirm ? <EyeOff size={18} /> : <EyeIcon size={18} />}
+                    {showPasswords.confirm ? (
+                      <EyeOff size={18} />
+                    ) : (
+                      <EyeIcon size={18} />
+                    )}
                   </button>
                 </div>
               </div>
@@ -1575,7 +1694,10 @@ export default function Profile() {
           <div className="bg-zinc-900 rounded-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto border border-zinc-800">
             <div className="sticky top-0 bg-zinc-900 px-6 py-4 border-b border-zinc-800 flex justify-between items-center">
               <h2 className="text-xl font-semibold">Video Details</h2>
-              <button onClick={() => setSelectedVideo(null)} className="p-2 hover:bg-zinc-800 rounded-full">
+              <button
+                onClick={() => setSelectedVideo(null)}
+                className="p-2 hover:bg-zinc-800 rounded-full"
+              >
                 <X size={22} />
               </button>
             </div>
@@ -1585,7 +1707,9 @@ export default function Profile() {
                 alt={selectedVideo.title}
                 className="w-full h-56 object-cover rounded-xl"
               />
-              <h3 className="mt-5 text-2xl font-semibold">{selectedVideo.title}</h3>
+              <h3 className="mt-5 text-2xl font-semibold">
+                {selectedVideo.title}
+              </h3>
               {/* Add more details as needed */}
             </div>
           </div>
@@ -1611,14 +1735,17 @@ function VideoCard({ video, onOpen, getStatusBadge }) {
           />
         </div>
         <div className="flex-1 p-4 flex flex-col">
-          <h3 className="font-medium leading-tight line-clamp-2 mb-3">{video.title}</h3>
+          <h3 className="font-medium leading-tight line-clamp-2 mb-3">
+            {video.title}
+          </h3>
           <div className="flex items-center justify-between text-sm text-zinc-400 mt-auto">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-1">
                 <Eye size={15} /> {video.views?.toLocaleString() || 0}
               </div>
               <div className="flex items-center gap-1">
-                <DollarSign size={15} className="text-red-500" /> ₹{(video.earnings || 0).toFixed(2)}
+                <DollarSign size={15} className="text-red-500" /> ₹
+                {(video.earnings || 0).toFixed(2)}
               </div>
             </div>
             {getStatusBadge(video.status)}
