@@ -1,8 +1,7 @@
-
-
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Clock, Trash2, MoreVertical } from "lucide-react";
+import { toast } from "react-toastify";
 
 const BACKEND_URL = "http://localhost:8000";
 
@@ -58,7 +57,6 @@ export default function WatchHistoryTab({ openDetail }) {
     navigate(`/video/${video._id || video.id}`);
   };
 
-  // Remove from history
   const handleRemove = async (e, videoId) => {
     e.stopPropagation();
     const token = localStorage.getItem("token");
@@ -70,16 +68,40 @@ export default function WatchHistoryTab({ openDetail }) {
         {
           method: "DELETE",
           headers: { Authorization: `Bearer ${token}` },
-        }
+        },
       );
       const data = await res.json();
       if (data.success) {
-        setVideos((prev) =>
-          prev.filter((v) => (v._id || v.id) !== videoId)
-        );
+        setVideos((prev) => prev.filter((v) => (v._id || v.id) !== videoId));
+        toast.success("Removed from watch history");
+      } else {
+        toast.error(data.message || "Failed to remove from history");
       }
     } catch (err) {
       console.error("Error removing from history:", err);
+      toast.error("Something went wrong");
+    }
+  };
+
+  const handleClearAll = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/uservideo/history`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setVideos([]);
+        toast.success("Watch history cleared");
+      } else {
+        toast.error(data.message || "Failed to clear history");
+      }
+    } catch (err) {
+      console.error("Error clearing watch history:", err);
+      toast.error("Something went wrong");
     }
   };
 
@@ -97,6 +119,14 @@ export default function WatchHistoryTab({ openDetail }) {
           <Clock size={22} />
           Watch History
         </h3>
+        {videos.length > 0 && (
+          <button
+            onClick={handleClearAll}
+            className="text-sm text-zinc-400 hover:text-red-400 transition"
+          >
+            Clear all
+          </button>
+        )}
       </div>
 
       {loading ? (

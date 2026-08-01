@@ -16,6 +16,8 @@ const {
   getChannels,
   getSubscribedChannels,
   getUserWatchHistory,
+  removeFromWatchHistory,
+  clearWatchHistory,
   getUserLikedVideos,
   getUserWatchLaterVideos,
   getUserUploadedVideos,
@@ -49,8 +51,6 @@ router.post(
   createChannel,
 );
 
-
-
 router.post(
   "/upload/:channelId",
   isAuthenticated,
@@ -63,6 +63,8 @@ router.post(
 router.get("/channel", isAuthenticated, getChannels);
 router.get("/subscribed-channels", isAuthenticated, getSubscribedChannels);
 router.get("/history", isAuthenticated, getUserWatchHistory);
+router.delete("/history", isAuthenticated, clearWatchHistory);
+router.delete("/history/:videoId", isAuthenticated, removeFromWatchHistory);
 router.get("/liked-videos", isAuthenticated, getUserLikedVideos);
 router.get("/watch-later", isAuthenticated, getUserWatchLaterVideos);
 router.get("/my-videos", isAuthenticated, getUserUploadedVideos);
@@ -81,9 +83,7 @@ router.get("/", isAuthenticated, getAllVideos);
 router.get("/liked", isAuthenticated, LikedVideos);
 router.post("/subscribe/:channelId", isAuthenticated, subscribeChannel);
 
-
 router.get("/history", isAuthenticated, WatchLaterVideos);
-router.delete("/history/:videoId", isAuthenticated, RemoveFromWatchLater);
 router.get("/search/hints", getSearchHints);
 // Watch Later (jo aapne diya tha)
 router.delete("/watch-later/:videoId", isAuthenticated, RemoveFromWatchLater);

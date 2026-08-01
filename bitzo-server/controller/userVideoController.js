@@ -387,6 +387,75 @@ const getUserWatchHistory = async (req, res) => {
   }
 };
 
+const removeFromWatchHistory = async (req, res) => {
+  try {
+    const userId = req.user?.id || req.user?.userId || req.user?._id;
+    const { videoId } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    if (!videoId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Video ID is required" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+
+    user.viewedVideos = (user.viewedVideos || []).filter(
+      (id) => id.toString() !== videoId.toString(),
+    );
+
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Removed from watch history",
+      removed: true,
+      historyCount: user.viewedVideos.length,
+    });
+  } catch (error) {
+    console.error("Error in removeFromWatchHistory:", error.message);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+const clearWatchHistory = async (req, res) => {
+  try {
+    const userId = req.user?.id || req.user?.userId || req.user?._id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+
+    user.viewedVideos = [];
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Watch history cleared",
+      historyCount: 0,
+    });
+  } catch (error) {
+    console.error("Error in clearWatchHistory:", error.message);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
 const getUserLikedVideos = async (req, res) => {
   try {
     const userId = req.user?.id || req.user?.userId || req.user?._id;
@@ -1619,6 +1688,8 @@ module.exports = {
   getSubscribedChannels,
   getChannelById,
   getUserWatchHistory,
+  removeFromWatchHistory,
+  clearWatchHistory,
   getUserLikedVideos,
   getUserWatchLaterVideos,
   getUserUploadedVideos,
