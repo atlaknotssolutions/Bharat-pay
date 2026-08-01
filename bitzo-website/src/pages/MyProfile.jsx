@@ -876,6 +876,21 @@ import {
   EyeOff,
 } from "lucide-react";
 
+const BACKEND_URL = "http://localhost:8000";
+
+const resolveMediaUrl = (value) => {
+  if (!value) return "";
+  if (/^https?:\/\//i.test(value)) return value;
+
+  const normalized = String(value).replace(/\\/g, "/");
+  if (normalized.startsWith("uploads/")) return `${BACKEND_URL}/${normalized}`;
+  if (normalized.startsWith("/uploads/")) return `${BACKEND_URL}${normalized}`;
+  if (normalized.includes("uploads/")) {
+    return `${BACKEND_URL}/${normalized.split("uploads/").pop()}`;
+  }
+  return `${BACKEND_URL}/${normalized}`;
+};
+
 export default function Profile() {
   const navigate = useNavigate();
 
@@ -966,6 +981,40 @@ export default function Profile() {
             }))
           : [];
 
+        let historyItems = [];
+        try {
+          const historyRes = await fetch(
+            `${BACKEND_URL}/api/uservideo/history`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            },
+          );
+
+          if (historyRes.ok) {
+            const historyData = await historyRes.json();
+            historyItems = Array.isArray(historyData.videos)
+              ? historyData.videos.map((video) => ({
+                  id: video._id || video.id,
+                  title: video.title || "Untitled video",
+                  thumbnail:
+                    video.thumbnail ||
+                    "https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=400",
+                  channel:
+                    video.channel?.name ||
+                    video.channelName ||
+                    "Unknown channel",
+                  views: Number(video.views || 0),
+                  duration: video.duration || "—",
+                  watchedAt:
+                    video.watchedAt || video.updatedAt || video.createdAt,
+                  raw: video,
+                }))
+              : [];
+          }
+        } catch (historyErr) {
+          console.error("Failed to load watch history:", historyErr);
+        }
+
         setUser({
           _id: profile._id,
           name: profile.name || "User",
@@ -989,6 +1038,7 @@ export default function Profile() {
         });
 
         setMyVideos(profileVideos);
+        setHistoryVideos(historyItems);
 
         setEditForm({
           name: profile.name || "",
@@ -1248,9 +1298,53 @@ export default function Profile() {
       return (
         <div className="space-y-6">
           <h3 className="text-lg font-semibold">Watch History</h3>
-          <div className="text-center text-zinc-500 py-20">
-            Your watch history will appear here
-          </div>
+          {historyVideos.length === 0 ? (
+            <div className="text-center text-zinc-500 py-20">
+              <p className="text-xl">No watch history yet</p>
+              <p className="mt-2 text-sm">Videos you watch will appear here</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {historyVideos.map((video) => (
+                <div
+                  key={video.id}
+                  onClick={() => navigate(`/video/${video.id}`)}
+                  className="flex flex-col sm:flex-row items-start gap-3 rounded-xl border border-zinc-800 bg-zinc-900/80 p-3 hover:border-zinc-600 hover:bg-zinc-900 transition cursor-pointer"
+                >
+                  <div className="relative aspect-video w-full sm:w-40 md:w-48 flex-shrink-0 overflow-hidden rounded-lg bg-zinc-800">
+                    <img
+                      src={resolveMediaUrl(video.thumbnail)}
+                      alt={video.title}
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        e.target.src =
+                          "https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=400";
+                      }}
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-medium text-base line-clamp-2">
+                      {video.title}
+                    </h4>
+                    <p className="mt-1 text-sm text-zinc-400">
+                      {video.channel}
+                    </p>
+                    <p className="mt-2 text-sm text-zinc-500">
+                      {Number(video.views || 0).toLocaleString()} views
+                      {video.watchedAt && (
+                        <>
+                          {" • "}
+                          {new Date(video.watchedAt).toLocaleDateString(
+                            "en-IN",
+                          )}
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       );
     }
