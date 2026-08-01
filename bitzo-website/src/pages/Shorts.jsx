@@ -8,6 +8,7 @@ import {
   VolumeX,
   MoreHorizontal,
   Music2,
+  X,
 } from "lucide-react";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -61,6 +62,10 @@ export default function Shorts() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [liked, setLiked] = useState({});
   const [pendingLike, setPendingLike] = useState({});
+  const [commentOpenForId, setCommentOpenForId] = useState(null);
+  const [commentsById, setCommentsById] = useState({});
+  const [commentTextById, setCommentTextById] = useState({});
+  const [commentLoading, setCommentLoading] = useState(false);
   const [muted, setMuted] = useState(true);
 
   const containerRef = useRef(null);
@@ -231,6 +236,83 @@ export default function Shorts() {
     }
   };
 
+  const fetchComments = async (short) => {
+    const token = localStorage.getItem("token");
+    try {
+      const response = await fetch(`${API_BASE}/${short.id}/comments`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const data = await response.json();
+      if (data.success) {
+        setCommentsById((prev) => ({
+          ...prev,
+          [short.id]: Array.isArray(data.comments) ? data.comments : [],
+        }));
+      }
+    } catch (error) {
+      console.error("Error fetching comments:", error);
+    }
+  };
+
+  const handleCommentOpen = async (short) => {
+    if (commentOpenForId === short.id) {
+      setCommentOpenForId(null);
+      return;
+    }
+
+    setCommentOpenForId(short.id);
+    if (!commentsById[short.id]) {
+      await fetchComments(short);
+    }
+  };
+
+  const handleCommentSubmit = async (e, short) => {
+    e.preventDefault();
+    const token = localStorage.getItem("token");
+    const text = (commentTextById[short.id] || "").trim();
+
+    if (!text || !token) return;
+
+    setCommentLoading(true);
+    try {
+      const response = await fetch(`${API_BASE}/${short.id}/comment`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ commentText: text }),
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        const newComment = data.comment || {
+          _id: Date.now().toString(),
+          text,
+          createdAt: new Date().toISOString(),
+          userName: "You",
+        };
+
+        setCommentsById((prev) => ({
+          ...prev,
+          [short.id]: [newComment, ...(prev[short.id] || [])],
+        }));
+        setCommentTextById((prev) => ({ ...prev, [short.id]: "" }));
+        setShorts((prev) =>
+          prev.map((s) =>
+            s.id === short.id
+              ? { ...s, comments: (Number(s.comments) || 0) + 1 }
+              : s,
+          ),
+        );
+      }
+    } catch (error) {
+      console.error("Error posting comment:", error);
+    } finally {
+      setCommentLoading(false);
+    }
+  };
+
   // Toast reminder (runs once per video change)
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -321,7 +403,7 @@ export default function Shorts() {
                   <p className="text-sm mt-1">{formatCount(short.likes)}</p>
                 </button>
 
-                <button>
+                <button onClick={() => handleCommentOpen(short)}>
                   <MessageCircle size={32} />
                   <p className="text-sm mt-1">{formatCount(short.comments)}</p>
                 </button>
@@ -336,6 +418,69 @@ export default function Shorts() {
 
                 <MoreHorizontal size={28} />
               </div>
+
+              {commentOpenForId === short.id && (
+                <div className="absolute inset-x-0 bottom-0 z-20 bg-black/90 backdrop-blur-md border-t border-white/10 p-4 text-white">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold">Comments</h3>
+                    <button onClick={() => setCommentOpenForId(null)}>
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  <form
+                    onSubmit={(e) => handleCommentSubmit(e, short)}
+                    className="mb-3"
+                  >
+                    <textarea
+                      value={commentTextById[short.id] || ""}
+                      onChange={(e) =>
+                        setCommentTextById((prev) => ({
+                          ...prev,
+                          [short.id]: e.target.value,
+                        }))
+                      }
+                      rows={2}
+                      placeholder="Write a comment..."
+                      className="w-full rounded-lg bg-white/10 px-3 py-2 text-sm outline-none"
+                    />
+                    <div className="mt-2 flex justify-end">
+                      <button
+                        type="submit"
+                        disabled={
+                          commentLoading || !commentTextById[short.id]?.trim()
+                        }
+                        className="rounded-full bg-white px-4 py-1.5 text-sm font-medium text-black disabled:opacity-60"
+                      >
+                        {commentLoading ? "Posting..." : "Comment"}
+                      </button>
+                    </div>
+                  </form>
+
+                  <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
+                    {(commentsById[short.id] || []).length > 0 ? (
+                      commentsById[short.id].map((comment) => (
+                        <div
+                          key={comment._id}
+                          className="rounded-lg bg-white/10 p-2 text-sm"
+                        >
+                          <p className="font-medium text-white/90">
+                            {comment.userName || "User"}
+                          </p>
+                          <p className="mt-1 text-white/80">{comment.text}</p>
+                          <p className="mt-1 text-[11px] text-white/50">
+                            {comment.createdAt
+                              ? new Date(comment.createdAt).toLocaleString()
+                              : "Just now"}
+                          </p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-white/70">No comments yet.</p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           ))
         )}

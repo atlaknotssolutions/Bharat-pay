@@ -1069,8 +1069,10 @@ const addComment = async (req, res) => {
   try {
     const { videoId } = req.params;
     const { commentText } = req.body;
+    const userId = req.user?.id || req.user?.userId || req.user?._id;
+    const userName = req.user?.name || req.user?.email || "User";
 
-    if (!commentText) {
+    if (!commentText || !commentText.trim()) {
       return res.status(400).json({
         success: false,
         message: "Comment text required",
@@ -1085,16 +1087,20 @@ const addComment = async (req, res) => {
       });
     }
 
-    video.comments.push({
-      text: commentText,
+    const newComment = {
+      text: commentText.trim(),
       createdAt: new Date(),
-    });
+      user: userId || null,
+      userName,
+    };
 
+    video.comments.push(newComment);
     await video.save();
 
     res.status(200).json({
       success: true,
       message: "Comment added",
+      comment: newComment,
     });
   } catch (error) {
     console.error("Error in addComment:", error);
@@ -1127,7 +1133,7 @@ const getComments = async (req, res) => {
 const deleteComment = async (req, res) => {
   try {
     const { videoId, commentId } = req.params;
-    const userId = req.user._id;
+    const userId = req.user?.id || req.user?.userId || req.user?._id;
     const video = await Video.findById(videoId);
     if (!video) {
       return res
@@ -1142,7 +1148,8 @@ const deleteComment = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Comment not found" });
     }
-    if (video.comments[commentIndex].user.toString() !== userId.toString()) {
+    const commentOwner = video.comments[commentIndex].user?.toString();
+    if (userId && commentOwner && commentOwner !== userId.toString()) {
       return res.status(403).json({
         success: false,
         message: "You are not authorized to delete this comment",
