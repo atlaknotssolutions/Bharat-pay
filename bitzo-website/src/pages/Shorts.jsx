@@ -70,6 +70,42 @@ export default function Shorts() {
 
   const containerRef = useRef(null);
   const videoRefs = useRef([]);
+  const trackedShortsRef = useRef(new Set());
+
+  const trackShortProgress = async (short, videoEl) => {
+    if (!short?.id || !videoEl || trackedShortsRef.current.has(short.id))
+      return;
+
+    const duration = Number(videoEl.duration);
+    if (!duration || !Number.isFinite(duration) || duration <= 0) return;
+
+    const percent = Math.min(
+      100,
+      Math.round((videoEl.currentTime / duration) * 100),
+    );
+    if (percent < 25) return;
+
+    trackedShortsRef.current.add(short.id);
+
+    const token = localStorage.getItem("token");
+    const rawUser = localStorage.getItem("user");
+    const parsedUser = rawUser ? JSON.parse(rawUser) : null;
+    const userId = parsedUser?._id || parsedUser?.id || null;
+
+    try {
+      await fetch(`${API_BASE}/${short.id}/view`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ watchedPercent: percent, userId }),
+      });
+    } catch (error) {
+      console.error("Error tracking short view:", error);
+      trackedShortsRef.current.delete(short.id);
+    }
+  };
 
   // ─── Load real shorts from backend ───
   useEffect(() => {
@@ -368,6 +404,10 @@ export default function Shorts() {
                 muted={muted}
                 playsInline
                 preload="auto"
+                onLoadedMetadata={(e) =>
+                  trackShortProgress(short, e.currentTarget)
+                }
+                onTimeUpdate={(e) => trackShortProgress(short, e.currentTarget)}
               />
 
               {/* Dark overlay for better text readability */}

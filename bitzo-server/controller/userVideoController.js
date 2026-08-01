@@ -378,7 +378,15 @@ const getUserWatchHistory = async (req, res) => {
       options: { sort: { updatedAt: -1 } },
     });
 
-    const videos = (user?.viewedVideos || []).map(mapVideoToListItem);
+    const seenIds = new Set();
+    const videos = (user?.viewedVideos || [])
+      .filter((video) => {
+        const key = video?._id?.toString();
+        if (!key || seenIds.has(key)) return false;
+        seenIds.add(key);
+        return true;
+      })
+      .map(mapVideoToListItem);
 
     return res.status(200).json({ success: true, videos });
   } catch (error) {
@@ -838,6 +846,10 @@ const addView = async (req, res) => {
     const normalizedUserId = userId || req.user?.userId || req.user?.id;
     const percent = Math.min(100, Math.max(0, Number(watchedPercent) || 0));
     const watchedEnough = percent >= 80;
+    const isShortVideo = Array.isArray(video.videoType)
+      ? video.videoType.includes("short")
+      : video.videoType === "short";
+    const shouldRecordHistory = percent >= (isShortVideo ? 25 : 50);
 
     let newlyCounted = false;
 
@@ -871,14 +883,19 @@ const addView = async (req, res) => {
       }
 
       const user = await User.findById(normalizedUserId);
-      if (
-        user &&
-        watchedEnough &&
-        !user.viewedVideos?.some((i) => i.toString() === videoId)
-      ) {
-        user.viewedVideos = user.viewedVideos || [];
-        user.viewedVideos.push(video._id);
-        await user.save();
+      if (user && shouldRecordHistory) {
+        const normalizedHistory = (user.viewedVideos || []).map((item) =>
+          item?.toString(),
+        );
+        const targetId = video._id?.toString();
+
+        if (!normalizedHistory.includes(targetId)) {
+          const updatedHistory = Array.from(
+            new Set([...normalizedHistory, targetId]),
+          );
+          user.viewedVideos = updatedHistory;
+          await user.save();
+        }
       }
     }
 
@@ -890,6 +907,7 @@ const addView = async (req, res) => {
       views: video.views,
       watchedPercent: percent,
       counted: newlyCounted,
+      historyRecorded: shouldRecordHistory,
     });
   } catch (error) {
     console.error("Error in addView:", error);
