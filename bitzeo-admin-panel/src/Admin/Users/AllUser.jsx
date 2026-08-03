@@ -901,7 +901,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -918,9 +918,37 @@ import {
   ChevronRight,
   User,
   Eye,
+  Check,
+  Clapperboard,
 } from "lucide-react";
 
 const BASE_URL = "http://localhost:8000/api";
+
+const isShortVideo = (v) => {
+  const t = v?.videoType;
+  return Array.isArray(t) ? t.includes("short") : t === "short";
+};
+
+function VideoListItem({ video }) {
+  return (
+    <div className="flex items-center gap-3 p-3 bg-gray-800/50 border border-gray-700/50 rounded-xl">
+      <div className="w-16 h-10 rounded-lg bg-gray-800 overflow-hidden flex-shrink-0">
+        {video.thumbnail && (
+          <img
+            src={video.thumbnail}
+            className="w-full h-full object-cover"
+            alt={video.title}
+          />
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-sm text-gray-200 truncate">{video.title}</p>
+        <p className="text-xs text-amber-400">{video.channelName}</p>
+      </div>
+      <span className="text-xs text-gray-500">{video.views || 0} views</span>
+    </div>
+  );
+}
 
 export default function Users() {
   const [users, setUsers] = useState([]);
@@ -929,6 +957,8 @@ export default function Users() {
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, pages: 1, limit: 15 });
   const [selectedUser, setSelectedUser] = useState(null);
+  const [selectedChannel, setSelectedChannel] = useState(null);
+  const [activeMediaTab, setActiveMediaTab] = useState("videos");
   const [editModal, setEditModal] = useState(false);
   const [detailModal, setDetailModal] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -978,9 +1008,13 @@ export default function Users() {
       setDetailLoading(true);
       setDetailModal(true);
       setSelectedUser(null);
+      setSelectedChannel(null);
+      setActiveMediaTab("videos");
 
       const res = await axios.get(`${BASE_URL}/admin/users/${userId}`);
-      setSelectedUser(res.data?.data || null);
+      const data = res.data?.data || null;
+      setSelectedUser(data);
+      setSelectedChannel(data?.channels?.[0] || null);
     } catch (err) {
       console.error(err);
       toast.error(err.response?.data?.message || "Failed to load user details");
@@ -1036,6 +1070,15 @@ export default function Users() {
       toast.error(err.response?.data?.message || "Delete failed");
     }
   };
+
+  // ========== SELECTED CHANNEL CONTENT ==========
+  const { channelVideos, channelShorts } = useMemo(() => {
+    const list = selectedChannel?.videos || [];
+    return {
+      channelVideos: list.filter((v) => !isShortVideo(v)),
+      channelShorts: list.filter((v) => isShortVideo(v)),
+    };
+  }, [selectedChannel]);
 
   const roleColor = (role) => {
     if (role === "admin")
@@ -1307,70 +1350,104 @@ export default function Users() {
                     <Tv size={18} className="text-amber-400" />
                     Channels ({selectedUser.totalChannels})
                   </h4>
-                  {selectedUser.channels?.length === 0 ? (
-                    <p className="text-sm text-gray-500">No channels yet</p>
+                  {!selectedUser.channels?.length ? (
+                    <p className="text-sm text-gray-500">No channels found</p>
                   ) : (
                     <div className="space-y-2">
-                      {selectedUser.channels.map((ch) => (
-                        <div
-                          key={ch._id}
-                          className="flex items-center gap-3 p-3 bg-gray-800/50 border border-gray-700/50 rounded-xl"
-                        >
-                          <div className="w-10 h-10 rounded-lg bg-amber-500/15 flex items-center justify-center">
-                            {ch.channelImage ? (
-                              <img
-                                src={ch.channelImage}
-                                className="w-10 h-10 rounded-lg object-cover"
-                                alt={ch.name}
+                      {selectedUser.channels.map((ch) => {
+                        const isActive = selectedChannel?._id === ch._id;
+                        return (
+                          <button
+                            key={ch._id}
+                            type="button"
+                            onClick={() => setSelectedChannel(ch)}
+                            className={`w-full flex items-center gap-3 p-3 rounded-xl border transition ${
+                              isActive
+                                ? "bg-amber-500/10 border-amber-500/30"
+                                : "bg-gray-800/50 border-gray-700/50 hover:bg-gray-800 hover:border-gray-600"
+                            }`}
+                          >
+                            <div className="w-10 h-10 rounded-lg bg-amber-500/15 flex items-center justify-center flex-shrink-0">
+                              {ch.channelImage ? (
+                                <img
+                                  src={ch.channelImage}
+                                  className="w-10 h-10 rounded-lg object-cover"
+                                  alt={ch.name}
+                                />
+                              ) : (
+                                <Tv size={18} className="text-amber-400" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0 text-left">
+                              <p
+                                className={`font-medium truncate ${
+                                  isActive ? "text-amber-200" : "text-gray-200"
+                                }`}
+                              >
+                                {ch.name}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {ch.totalVideos} videos
+                              </p>
+                            </div>
+                            {isActive && (
+                              <Check
+                                size={18}
+                                className="text-amber-400 flex-shrink-0"
                               />
-                            ) : (
-                              <Tv size={18} className="text-amber-400" />
                             )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-gray-200 truncate">{ch.name}</p>
-                            <p className="text-xs text-gray-500">
-                              {ch.totalVideos} videos
-                            </p>
-                          </div>
-                        </div>
-                      ))}
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
 
-                {/* Videos */}
+                {/* Media Tabs */}
                 <div>
-                  <h4 className="font-semibold text-gray-200 mb-3 flex items-center gap-2">
-                    <Video size={18} className="text-blue-400" />
-                    All Videos ({selectedUser.totalVideos})
-                  </h4>
-                  {selectedUser.videos?.length === 0 ? (
-                    <p className="text-sm text-gray-500">No videos yet</p>
+                  <div className="flex gap-2 mb-3">
+                    <button
+                      type="button"
+                      onClick={() => setActiveMediaTab("videos")}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg border font-medium text-sm transition ${
+                        activeMediaTab === "videos"
+                          ? "bg-blue-500/15 border-blue-500/30 text-blue-300"
+                          : "bg-gray-800/50 border-gray-700/50 text-gray-400 hover:bg-gray-800 hover:text-gray-200"
+                      }`}
+                    >
+                      <Video size={16} />
+                      Videos ({channelVideos.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveMediaTab("shorts")}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg border font-medium text-sm transition ${
+                        activeMediaTab === "shorts"
+                          ? "bg-amber-500/15 border-amber-500/30 text-amber-300"
+                          : "bg-gray-800/50 border-gray-700/50 text-gray-400 hover:bg-gray-800 hover:text-gray-200"
+                      }`}
+                    >
+                      <Clapperboard size={16} />
+                      Shorts ({channelShorts.length})
+                    </button>
+                  </div>
+
+                  {activeMediaTab === "videos" ? (
+                    channelVideos.length === 0 ? (
+                      <p className="text-sm text-gray-500">No videos found</p>
+                    ) : (
+                      <div className="space-y-2 max-h-60 overflow-y-auto">
+                        {channelVideos.map((v) => (
+                          <VideoListItem key={v._id} video={v} />
+                        ))}
+                      </div>
+                    )
+                  ) : channelShorts.length === 0 ? (
+                    <p className="text-sm text-gray-500">No shorts found</p>
                   ) : (
                     <div className="space-y-2 max-h-60 overflow-y-auto">
-                      {selectedUser.videos.map((v) => (
-                        <div
-                          key={v._id}
-                          className="flex items-center gap-3 p-3 bg-gray-800/50 border border-gray-700/50 rounded-xl"
-                        >
-                          <div className="w-16 h-10 rounded-lg bg-gray-800 overflow-hidden flex-shrink-0">
-                            {v.thumbnail && (
-                              <img
-                                src={v.thumbnail}
-                                className="w-full h-full object-cover"
-                                alt={v.title}
-                              />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm text-gray-200 truncate">{v.title}</p>
-                            <p className="text-xs text-amber-400">{v.channelName}</p>
-                          </div>
-                          <span className="text-xs text-gray-500">
-                            {v.views || 0} views
-                          </span>
-                        </div>
+                      {channelShorts.map((v) => (
+                        <VideoListItem key={v._id} video={v} />
                       ))}
                     </div>
                   )}

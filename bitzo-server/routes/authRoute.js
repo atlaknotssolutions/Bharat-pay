@@ -159,8 +159,11 @@ router.post("/auth/google", async (req, res) => {
         name: name || email.split("@")[0],
         email,
         googleId,
-        picture,
+        avatar: picture,
       });
+    } else if (!user.avatar && picture) {
+      user.avatar = picture;
+      await user.save();
     }
 
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
@@ -174,7 +177,7 @@ router.post("/auth/google", async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        picture: user.picture,
+        avatar: user.avatar,
       },
     });
   } catch (error) {

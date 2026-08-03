@@ -345,7 +345,7 @@ exports.getUserById = async (req, res) => {
         select: "name handle channelImage createdAt",
         populate: {
           path: "videos",
-          select: "title thumbnail likesCount views createdAt",
+          select: "title thumbnail likesCount views createdAt videoType",
           options: { sort: { createdAt: -1 } }, // full list (no limit)
         },
       })

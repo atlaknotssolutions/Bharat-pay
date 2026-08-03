@@ -14,7 +14,6 @@ const videoSchema = new mongoose.Schema(
     channel: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Channel",
-      required: true,
     },
 
     videoType: [
@@ -27,7 +26,6 @@ const videoSchema = new mongoose.Schema(
     uploadedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
     },
 
     title: {

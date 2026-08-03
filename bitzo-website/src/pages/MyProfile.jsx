@@ -161,16 +161,8 @@ export default function Profile() {
         throw new Error(data.message || "Failed to update profile");
       }
 
-      // Update local user state
-      setUser((prev) => ({
-        ...prev,
-        name: data.user.name || prev.name,
-        email: data.user.email || prev.email,
-        avatar: data.user.avatar || prev.avatar,
-        handle: data.user.name
-          ? `@${data.user.name.toLowerCase().replace(/\s+/g, "")}`
-          : prev.handle,
-      }));
+      // Refresh profile from the backend so Redux holds the latest data
+      await dispatch(fetchProfileData());
 
       setEditForm({
         name: data.user.name || editForm.name,

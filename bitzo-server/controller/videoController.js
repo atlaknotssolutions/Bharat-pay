@@ -28,7 +28,7 @@ exports.updateVideoupdated = async (req, res) => {
 
     if (title) video.title = title;
     if (description !== undefined) video.description = description;
-    if (type) video.type = type;
+    if (type) video.videoType = [type];
     if (duration) video.duration = Number(duration);
     if (category) video.category = category;         // ✅ update category
     if (subCategory) video.subCategory = subCategory; // ✅ update subCategory
@@ -82,12 +82,15 @@ exports.uploadVideo = async (req, res) => {
       // subCategory removed
     } = req.body;
 
+    // Normalize content type (short/long). Defaults to long for backward compatibility.
+    const videoType = type === "short" || type === "long" ? [type] : ["long"];
+
     const filePath = req.file.path.replace(/\\/g, "/");
 
     const video = await Video.create({
       title,
       description: description || "",
-      type,
+      videoType,
       duration: duration ? Number(duration) : undefined,
       category,            // only category is saved now
       videoUrl: filePath,
@@ -117,9 +120,18 @@ exports.uploadVideo = async (req, res) => {
 
 exports.getAllVideos = async (req, res) => {
   try {
+    // Optional videoType filter: ?videoType=short | ?videoType=long
+    // No query param preserves the previous behaviour (all videos).
+    const filter = {};
+    if (req.query.videoType && ["short", "long"].includes(req.query.videoType)) {
+      filter.videoType = req.query.videoType;
+    }
+
     // Fetch all videos, populate only category name, newest first
-    const videos = await Video.find()
+    const videos = await Video.find(filter)
       .populate("category", "name")        // only category name
+      .populate("uploadedBy", "name email")
+      .populate("channel", "name handle")
       .sort({ createdAt: -1 });
 
     // Get the base URL for the server

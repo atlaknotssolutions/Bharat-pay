@@ -246,7 +246,7 @@ exports.getMyProfile = async (req, res) => {
     const user = await User.findById(req.user.id)
       .populate({
         path: "channels",
-        select: "name channelImage subscribers subscribedBy",
+        select: "name channelImage subscribedBy",
       })
       .populate({
         path: "videos",
@@ -270,7 +270,7 @@ exports.getMyProfile = async (req, res) => {
     populatedUser.avgRPM = 0;
     populatedUser.subscribers =
       populatedUser.channels?.reduce(
-        (count, channel) => count + Number(channel.subscribers || 0),
+        (count, channel) => count + Number(channel.subscribedBy?.length || 0),
         0,
       ) || 0;
 

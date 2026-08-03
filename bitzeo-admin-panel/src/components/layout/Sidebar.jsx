@@ -8,6 +8,7 @@ import {
   FolderOpen,
   Video,
   Box,
+  Clapperboard,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -16,6 +17,7 @@ const navItems = [
   { to: "/category", icon: FolderOpen, label: "Category" },
   { to: "/alluser", icon: Users, label: "Users" },
   { to: "/video", icon: Video, label: "Video" },
+  { to: "/shorts", icon: Clapperboard, label: "Shorts" },
   { to: "/orders", icon: ShoppingBag, label: "Orders" },
   { to: "/products", icon: Box, label: "Products" },
 ];

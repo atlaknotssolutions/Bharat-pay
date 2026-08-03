@@ -11,6 +11,7 @@ import Orders from "./Admin/pages/Orders";
 import Products from "./Admin/pages/Products";
 import NotFound from "./Admin/pages/NotFound";
 import VideoUpload from "./Admin/pages/VideoUpload";
+import Shorts from "./Admin/pages/Shorts";
 import CategoryManagement from "./Admin/CategoryManagement/Category";
 import AllUsers from "./Admin/Users/AllUser";
 
@@ -71,6 +72,7 @@ function App() {
             <Route index element={<Dashboard />} />
             <Route path="/" element={<Dashboard />} />
             <Route path="video" element={<VideoUpload />} />
+            <Route path="shorts" element={<Shorts />} />
             <Route path="orders" element={<Orders />} />
             <Route path="products" element={<Products />} />
             <Route path="category" element={<CategoryManagement />} />
