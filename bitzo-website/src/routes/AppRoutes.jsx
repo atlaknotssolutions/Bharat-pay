@@ -32,6 +32,7 @@ export default function AppRoutes() {
         <Route element={<MainLayout />}>
           <Route index element={<Home />} />
           <Route path="shorts" element={<Shorts />} />
+          <Route path="shorts/:id" element={<Shorts />} />
           <Route path="trending" element={<Trending />} />
           <Route path="watch/:id" element={<WatchPage />} />
           <Route path="withdraw" element={<WithdrawPage />} />

@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import React, { useState, useRef, useEffect, useLayoutEffect, useMemo } from "react";
+import { useParams, useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchHomeVideos } from "../features/videos/videosSlice";
 import {
@@ -38,8 +38,8 @@ const normalizeShort = (v) => ({
   comments: Array.isArray(v.comments)
     ? v.comments.length
     : Number(v.comments) || 0,
-  isLiked: v.userReaction === "like",
-  reaction: v.userReaction || null,
+  isLiked: v.userReaction === "like" || v.isLiked === true,
+  reaction: v.userReaction || v.reaction || null,
   thumbnail: toMediaUrl(v.thumbnail || v.thumb || ""),
 });
 
@@ -58,10 +58,30 @@ const formatCount = (n) => {
 };
 
 export default function Shorts() {
+  const { id: urlId } = useParams();
   const location = useLocation();
   const dispatch = useDispatch();
-  const initialShort = location.state?.video || null;
+  const stateShort = location.state?.video || null;
   const { shorts: reduxShorts, loading } = useSelector((state) => state.videos);
+  const [fetchedShort, setFetchedShort] = useState(null);
+  const [urlShortLoading, setUrlShortLoading] = useState(false);
+
+  // URL id is the source of truth. Prefer location.state (optimization),
+  // then Redux, then the by-id fetch result.
+  const primaryShort = useMemo(() => {
+    if (!urlId) return stateShort;
+
+    if (stateShort && String(stateShort.id || stateShort._id) === urlId) {
+      return stateShort;
+    }
+
+    const inRedux = (reduxShorts || []).find(
+      (short) => String(short.id || short._id) === urlId,
+    );
+    if (inRedux) return inRedux;
+
+    return fetchedShort;
+  }, [urlId, stateShort, reduxShorts, fetchedShort]);
 
   const [shorts, setShorts] = useState([]);
   const [loadingState, setLoadingState] = useState(true);
@@ -76,11 +96,12 @@ export default function Shorts() {
 
   const containerRef = useRef(null);
   const videoRefs = useRef([]);
-  const trackedShortsRef = useRef(new Set());
+  const reportedPercentRef = useRef({});
+  const isProgrammaticScrollRef = useRef(false);
+  const pendingInitialScrollRef = useRef(null);
 
   const trackShortProgress = async (short, videoEl) => {
-    if (!short?.id || !videoEl || trackedShortsRef.current.has(short.id))
-      return;
+    if (!short?.id || !videoEl) return;
 
     getWatchSession(videoEl, { id: short.id, videoType: "short" })?.tick();
 
@@ -93,7 +114,14 @@ export default function Shorts() {
     );
     if (percent < 25) return;
 
-    trackedShortsRef.current.add(short.id);
+    const reported = reportedPercentRef.current[short.id] || 0;
+    if (reported >= 80 || percent <= reported) return;
+
+    const isHistoryCheckpoint = reported < 25 && percent >= 25;
+    const isViewCheckpoint = percent >= 80;
+    if (!isHistoryCheckpoint && !isViewCheckpoint) return;
+
+    reportedPercentRef.current[short.id] = percent;
 
     const token = localStorage.getItem("token");
     const rawUser = localStorage.getItem("user");
@@ -101,7 +129,7 @@ export default function Shorts() {
     const userId = parsedUser?._id || parsedUser?.id || null;
 
     try {
-      await fetch(`${API_BASE}/${short.id}/view`, {
+      const response = await fetch(`${API_BASE}/${short.id}/view`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -109,9 +137,19 @@ export default function Shorts() {
         },
         body: JSON.stringify({ watchedPercent: percent, userId }),
       });
+      const data = await response.json().catch(() => ({}));
+      if (data.success && typeof data.views === "number") {
+        setShorts((prev) =>
+          prev.map((s) =>
+            s.id === short.id ? { ...s, views: data.views } : s,
+          ),
+        );
+      }
     } catch (error) {
       console.error("Error tracking short view:", error);
-      trackedShortsRef.current.delete(short.id);
+      if (reportedPercentRef.current[short.id] === percent) {
+        delete reportedPercentRef.current[short.id];
+      }
     }
   };
 
@@ -120,14 +158,62 @@ export default function Shorts() {
     dispatch(fetchHomeVideos());
   }, [dispatch]);
 
+  // ─── Resolve the URL short by id when not already in state/Redux ───
+  useEffect(() => {
+    if (!urlId) return;
+
+    const alreadyKnown =
+      (stateShort && String(stateShort.id || stateShort._id) === urlId) ||
+      (reduxShorts || []).some(
+        (short) => String(short.id || short._id) === urlId,
+      );
+    if (alreadyKnown) {
+      setUrlShortLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const token = localStorage.getItem("token");
+
+    setUrlShortLoading(true);
+    setFetchedShort(null);
+
+    fetch(`${API_BASE}/${urlId}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        if (cancelled) return;
+        if (data?.success && data.video) {
+          setFetchedShort(data.video);
+        }
+        setUrlShortLoading(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setUrlShortLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [urlId, stateShort, reduxShorts]);
+
   useEffect(() => {
     let cancelled = false;
+
+    if (urlShortLoading) {
+      return;
+    }
 
     const list = (reduxShorts || [])
       .map(normalizeShort)
       .filter((short) => short.videoUrl);
 
-    if (!list.length) {
+    if (!list.length && !primaryShort) {
       setLoadingState(false);
       return;
     }
@@ -135,21 +221,22 @@ export default function Shorts() {
     let queue = list;
     let startIndex = 0;
 
-    if (initialShort) {
+    if (primaryShort) {
+      const primaryId = String(primaryShort.id || primaryShort._id);
       const existingIdx = list.findIndex(
-        (short) => short.id === initialShort.id,
+        (short) => String(short.id) === primaryId,
       );
       if (existingIdx >= 0) {
         startIndex = existingIdx;
       } else {
-        const clicked = normalizeShort(initialShort);
-        queue = [clicked, ...list.filter((short) => short.id !== clicked.id)];
+        const clicked = normalizeShort(primaryShort);
+        queue = [clicked, ...list.filter((short) => String(short.id) !== primaryId)];
         startIndex = 0;
       }
     }
 
-    if (queue.length === 0 && initialShort) {
-      const clicked = normalizeShort(initialShort);
+    if (queue.length === 0 && primaryShort) {
+      const clicked = normalizeShort(primaryShort);
       if (clicked.videoUrl) {
         queue = [clicked];
         startIndex = 0;
@@ -165,12 +252,26 @@ export default function Shorts() {
       setLiked(likedMap);
       setCurrentIndex(startIndex);
       setLoadingState(false);
+
+      if (startIndex > 0) {
+        pendingInitialScrollRef.current = startIndex;
+      }
     }
 
     return () => {
       cancelled = true;
     };
-  }, [reduxShorts, initialShort]);
+  }, [reduxShorts, primaryShort, urlShortLoading]);
+
+  // ─── Sync scroll container to the deep-linked short ───
+  useLayoutEffect(() => {
+    const index = pendingInitialScrollRef.current;
+    if (index == null || !containerRef.current) return;
+
+    pendingInitialScrollRef.current = null;
+    isProgrammaticScrollRef.current = true;
+    containerRef.current.scrollTop = index * window.innerHeight;
+  }, [shorts]);
 
   // ─── Change video with bounds check ───
   const goToVideo = (newIndex) => {
@@ -214,6 +315,10 @@ export default function Shorts() {
   // Update current index when user scrolls vertically
   const handleScroll = () => {
     if (!containerRef.current) return;
+    if (isProgrammaticScrollRef.current) {
+      isProgrammaticScrollRef.current = false;
+      return;
+    }
     const scrollTop = containerRef.current.scrollTop;
     const height = window.innerHeight;
     const newIndex = Math.round(scrollTop / height);

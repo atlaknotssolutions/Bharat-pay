@@ -208,7 +208,7 @@ export default function NetflixStylePage() {
 
   const handleItemClick = (item) => {
     if (isShortContent(item)) {
-      navigate("/shorts", { state: { video: item } });
+      navigate(`/shorts/${item.id}`, { state: { video: item } });
       return;
     }
 
