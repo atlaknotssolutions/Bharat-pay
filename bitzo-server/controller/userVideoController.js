@@ -848,7 +848,9 @@ const recordWatchSession = async (video, userId, body) => {
     const storedDuration = Number(video.duration) > 0 ? Number(video.duration) : 0;
     const authoritativeDuration = storedDuration > 0 ? storedDuration : reportedDuration;
     const cap =
-      authoritativeDuration > 0 ? authoritativeDuration : ABS_WATCH_SECONDS_CAP;
+      authoritativeDuration > 0
+        ? Math.min(authoritativeDuration, ABS_WATCH_SECONDS_CAP)
+        : ABS_WATCH_SECONDS_CAP;
 
     const clampedSeconds = Math.max(0, Math.min(watchSecondsNum, cap));
     if (clampedSeconds <= 0) return null;
