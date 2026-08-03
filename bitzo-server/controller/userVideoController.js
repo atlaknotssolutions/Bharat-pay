@@ -6,6 +6,9 @@ const imagekit = require("../utils/imagekit");
 const categoryModel = require("../models/CategoryModel/category.model");
 const ChannelModel = require("../models/Channel/ChannelModel");
 const User = require("../models/usermodel"); // ✅ Import User model
+const WatchSession = require("../models/WatchSession");
+
+const ABS_WATCH_SECONDS_CAP = 12 * 60 * 60; // 43200s hard cap per session
 
 const createChannel = async (req, res) => {
   try {
@@ -831,6 +834,68 @@ const getVideoById = async (req, res) => {
   }
 };
 
+const recordWatchSession = async (video, userId, body) => {
+  try {
+    const { duration, watchSeconds, sessionId, watchedPercent } = body || {};
+    const durationNum = Number(duration);
+    const watchSecondsNum = Number(watchSeconds);
+
+    if (!Number.isFinite(watchSecondsNum) || watchSecondsNum <= 0) return null;
+
+    const reportedDuration =
+      Number.isFinite(durationNum) && durationNum > 0 ? durationNum : 0;
+    const storedDuration = Number(video.duration) > 0 ? Number(video.duration) : 0;
+    const authoritativeDuration = storedDuration > 0 ? storedDuration : reportedDuration;
+    const cap =
+      authoritativeDuration > 0 ? authoritativeDuration : ABS_WATCH_SECONDS_CAP;
+
+    const clampedSeconds = Math.max(0, Math.min(watchSecondsNum, cap));
+    if (clampedSeconds <= 0) return null;
+
+    const normalizedUserId = userId?.toString();
+    const videoIdString = video._id?.toString();
+
+    const finalSessionId =
+      typeof sessionId === "string" &&
+      sessionId.length >= 8 &&
+      sessionId.length <= 64
+        ? sessionId
+        : `${normalizedUserId}:${videoIdString}:${Math.floor(Date.now() / 60000)}`;
+
+    const videoType = Array.isArray(video.videoType)
+      ? video.videoType.includes("short")
+        ? "short"
+        : "long"
+      : video.videoType === "short"
+        ? "short"
+        : "long";
+
+    await WatchSession.findOneAndUpdate(
+      {
+        userId: normalizedUserId,
+        videoId: videoIdString,
+        sessionId: finalSessionId,
+      },
+      {
+        $max: { watchedSeconds: clampedSeconds },
+        $set: {
+          duration: authoritativeDuration,
+          watchedPercent: Math.min(100, Math.max(0, Number(watchedPercent) || 0)),
+          videoType,
+          lastActiveAt: new Date(),
+        },
+        $setOnInsert: { startedAt: new Date() },
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
+    );
+
+    return true;
+  } catch (error) {
+    console.error("Error in recordWatchSession:", error);
+    return null;
+  }
+};
+
 const addView = async (req, res) => {
   try {
     const { videoId } = req.params;
@@ -900,6 +965,11 @@ const addView = async (req, res) => {
     }
 
     await video.save();
+
+    const watchUserId = req.user?.userId || req.user?.id || normalizedUserId;
+    if (watchUserId) {
+      await recordWatchSession(video, watchUserId, req.body);
+    }
 
     res.status(200).json({
       success: true,
