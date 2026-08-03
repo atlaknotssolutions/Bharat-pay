@@ -83,7 +83,6 @@ router.get("/", isAuthenticated, getAllVideos);
 router.get("/liked", isAuthenticated, LikedVideos);
 router.post("/subscribe/:channelId", isAuthenticated, subscribeChannel);
 
-router.get("/history", isAuthenticated, WatchLaterVideos);
 router.get("/search/hints", getSearchHints);
 // Watch Later (jo aapne diya tha)
 router.delete("/watch-later/:videoId", isAuthenticated, RemoveFromWatchLater);

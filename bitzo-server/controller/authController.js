@@ -1,4 +1,5 @@
 const User = require("../models/usermodel");
+const WatchSession = require("../models/WatchSession");
 const generateToken = require("../utils/generateToken");
 const bcrypt = require("bcryptjs"); // ← make sure this is installed
 const mongoose = require("mongoose");
@@ -272,6 +273,29 @@ exports.getMyProfile = async (req, res) => {
         (count, channel) => count + Number(channel.subscribers || 0),
         0,
       ) || 0;
+
+    const tzOffset = Math.min(
+      840,
+      Math.max(-840, Number(req.query.tzOffsetMinutes) || 0),
+    );
+    const localNow = new Date(Date.now() - tzOffset * 60000);
+    const localDayStart = new Date(localNow);
+    localDayStart.setUTCHours(0, 0, 0, 0);
+    const dayStartUtc = new Date(localDayStart.getTime() + tzOffset * 60000);
+
+    const [todayResult] = await WatchSession.aggregate([
+      { $match: { userId: user._id, startedAt: { $gte: dayStartUtc } } },
+      { $group: { _id: null, seconds: { $sum: "$watchedSeconds" } } },
+    ]);
+    const [totalResult] = await WatchSession.aggregate([
+      { $match: { userId: user._id } },
+      { $group: { _id: null, seconds: { $sum: "$watchedSeconds" } } },
+    ]);
+
+    populatedUser.watchTimeTodaySeconds =
+      todayResult?.seconds || 0;
+    populatedUser.watchTimeTotalSeconds =
+      totalResult?.seconds || 0;
 
     res.status(200).json({
       success: true,
