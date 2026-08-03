@@ -15,6 +15,7 @@ import {
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useSwipeable } from "react-swipeable"; // ← install: npm install react-swipeable
+import { getWatchSession } from "../utils/watchSession";
 
 const BACKEND_URL = "http://localhost:8000";
 const API_BASE = `${BACKEND_URL}/api/uservideo`;
@@ -80,6 +81,8 @@ export default function Shorts() {
   const trackShortProgress = async (short, videoEl) => {
     if (!short?.id || !videoEl || trackedShortsRef.current.has(short.id))
       return;
+
+    getWatchSession(videoEl, { id: short.id, videoType: "short" })?.tick();
 
     const duration = Number(videoEl.duration);
     if (!duration || !Number.isFinite(duration) || duration <= 0) return;

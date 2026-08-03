@@ -1,6 +1,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
+import { getWatchSession } from "../../utils/watchSession";
 import {
   ThumbsUp,
   ThumbsDown,
@@ -161,7 +162,10 @@ export default function YouTubeLikeVideoPage() {
     if (playing) v.play().catch(() => {});
     else v.pause();
 
-    const onTime = () => setCurrentTime(v.currentTime);
+    const onTime = () => {
+      setCurrentTime(v.currentTime);
+      getWatchSession(v, { id, videoType: "long" })?.tick();
+    };
     const onMeta = () => setDuration(v.duration || 0);
 
     v.addEventListener("timeupdate", onTime);
@@ -171,7 +175,20 @@ export default function YouTubeLikeVideoPage() {
       v.removeEventListener("timeupdate", onTime);
       v.removeEventListener("loadedmetadata", onMeta);
     };
-  }, [playing, resolvedVideoUrl]);
+  }, [playing, resolvedVideoUrl, id]);
+
+  // Watch-time session lifecycle (unique seconds, flush on unmount/video change)
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !id) return;
+    getWatchSession(v, { id, videoType: "long" });
+    const onEnded = () => getWatchSession(v, { id, videoType: "long" })?.onEnded();
+    v.addEventListener("ended", onEnded);
+    return () => {
+      v.removeEventListener("ended", onEnded);
+      getWatchSession(v, { id, videoType: "long" })?.destroy();
+    };
+  }, [id, resolvedVideoUrl]);
 
   // Fetch video details + comments
   useEffect(() => {
