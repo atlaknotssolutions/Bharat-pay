@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useMemo } from "react";
-import { useParams, useLocation } from "react-router-dom";
+import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchHomeVideos } from "../features/videos/videosSlice";
 import {
@@ -60,6 +60,7 @@ const formatCount = (n) => {
 export default function Shorts() {
   const { id: urlId } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const dispatch = useDispatch();
   const stateShort = location.state?.video || null;
   const { shorts: reduxShorts, loading } = useSelector((state) => state.videos);
@@ -99,6 +100,7 @@ export default function Shorts() {
   const reportedPercentRef = useRef({});
   const isProgrammaticScrollRef = useRef(false);
   const pendingInitialScrollRef = useRef(null);
+  const lastSyncedUrlIdRef = useRef(null);
 
   const trackShortProgress = async (short, videoEl) => {
     if (!short?.id || !videoEl) return;
@@ -209,6 +211,10 @@ export default function Shorts() {
       return;
     }
 
+    if (urlId && lastSyncedUrlIdRef.current === urlId) {
+      return;
+    }
+
     const list = (reduxShorts || [])
       .map(normalizeShort)
       .filter((short) => short.videoUrl);
@@ -261,7 +267,15 @@ export default function Shorts() {
     return () => {
       cancelled = true;
     };
-  }, [reduxShorts, primaryShort, urlShortLoading]);
+  }, [reduxShorts, primaryShort, urlShortLoading, urlId]);
+
+  useEffect(() => {
+    const activeShort = shorts[currentIndex];
+    const activeId = activeShort?.id;
+    if (!activeId || String(activeId) === urlId) return;
+    lastSyncedUrlIdRef.current = String(activeId);
+    navigate(`/shorts/${activeId}`, { replace: true });
+  }, [currentIndex, shorts, urlId, navigate]);
 
   // ─── Sync scroll container to the deep-linked short ───
   useLayoutEffect(() => {
@@ -471,13 +485,12 @@ export default function Shorts() {
           h-screen w-full max-w-125
           overflow-y-scroll
           snap-y snap-mandatory
-          scroll-smooth
           overscroll-contain
           touch-pan-y
           scrollbar-hide
         "
       >
-        {loading ? (
+        {loading || loadingState ? (
           <div className="h-screen w-full flex items-center justify-center">
             <p className="text-white/70 text-sm">Loading shorts...</p>
           </div>
