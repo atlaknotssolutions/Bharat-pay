@@ -50,6 +50,11 @@ const videoSchema = new mongoose.Schema(
       required: true,
     },
 
+    duration: {
+      type: Number,
+      min: 0,
+    },
+
     likesCount: {
       type: Number,
       default: 0,
