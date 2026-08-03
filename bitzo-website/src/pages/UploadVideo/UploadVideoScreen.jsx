@@ -64,6 +64,23 @@ export default function UploadVideo() {
     videoFile &&
     !loading;
 
+  const getVideoDuration = (file) => {
+    return new Promise((resolve) => {
+      const url = URL.createObjectURL(file);
+      const video = document.createElement("video");
+      video.preload = "metadata";
+      video.onloadedmetadata = () => {
+        URL.revokeObjectURL(url);
+        resolve(Number.isFinite(video.duration) ? video.duration : 0);
+      };
+      video.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(0);
+      };
+      video.src = url;
+    });
+  };
+
   // Generate thumbnail from video if user didn't upload one
   const generateVideoThumbnail = (file) => {
     return new Promise((resolve) => {
@@ -101,6 +118,9 @@ export default function UploadVideo() {
       formData.append("category", category);
       formData.append("videoType", videoType);
       formData.append("video", videoFile);
+
+      const duration = await getVideoDuration(videoFile);
+      if (duration > 0) formData.append("duration", String(duration));
 
       // Thumbnail: use uploaded or generate
       if (thumbnailFile) {

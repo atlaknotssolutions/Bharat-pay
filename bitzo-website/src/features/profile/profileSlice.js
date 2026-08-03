@@ -1,4 +1,5 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import { formatWatchTime } from "../../utils/watchTime";
 
 const BACKEND_URL = "http://localhost:8000";
 
@@ -44,12 +45,15 @@ export const fetchProfileData = createAsyncThunk(
       const token = localStorage.getItem("token");
       if (!token) throw new Error("No token found. Please login first.");
 
-      const profileRes = await fetch(`${BACKEND_URL}/api/me`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
+      const profileRes = await fetch(
+        `${BACKEND_URL}/api/me?tzOffsetMinutes=${new Date().getTimezoneOffset()}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
-      });
+      );
 
       if (!profileRes.ok) {
         if (profileRes.status === 401) {
@@ -101,6 +105,10 @@ export const fetchProfileData = createAsyncThunk(
           totalViews: profile.totalViews || 0,
           totalEarnings: profile.totalEarnings || 0,
           avgRPM: profile.avgRPM || "0.0",
+          watchTimeToday: formatWatchTime(profile.watchTimeTodaySeconds),
+          watchTimeTotal: formatWatchTime(profile.watchTimeTotalSeconds),
+          watchTimeTodaySeconds: profile.watchTimeTodaySeconds || 0,
+          watchTimeTotalSeconds: profile.watchTimeTotalSeconds || 0,
           videos: profileVideos,
         },
         myVideos: profileVideos,

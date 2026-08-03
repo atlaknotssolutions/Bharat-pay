@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchProfileData } from "../features/profile/profileSlice";
+import { formatWatchTime, formatWatchMinutes } from "../utils/watchTime";
 import {
   Eye,
   Clock,
@@ -507,7 +508,7 @@ export default function Profile() {
 
       {/* Stats Cards */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-5 mb-10">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-5 mb-10">
           {[
             {
               icon: Eye,
@@ -518,8 +519,16 @@ export default function Profile() {
             {
               icon: Clock,
               color: "emerald",
-              value: "0h",
-              label: "Watch Hours",
+              value: formatWatchTime(user.watchTimeTodaySeconds),
+              sub: formatWatchMinutes(user.watchTimeTodaySeconds),
+              label: "Today's Watch Time",
+            },
+            {
+              icon: Clock,
+              color: "teal",
+              value: formatWatchTime(user.watchTimeTotalSeconds),
+              sub: formatWatchMinutes(user.watchTimeTotalSeconds),
+              label: "Total Watch Time",
             },
             {
               icon: DollarSign,
@@ -533,14 +542,17 @@ export default function Profile() {
               value: `₹${user.avgRPM}`,
               label: "Avg. RPM",
             },
-          ].map(({ icon: Icon, color, value, label }) => (
+          ].map(({ icon: Icon, color, value, label, sub }) => (
             <div
               key={label}
               className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 text-center"
             >
               <Icon size={24} className={`mx-auto mb-3 text-${color}-500`} />
               <p className="text-2xl font-bold">{value}</p>
-              <p className="text-xs text-zinc-500 mt-1">{label}</p>
+              {sub ? (
+                <p className="text-xs text-zinc-500 mt-0.5">{sub}</p>
+              ) : null}
+              <p className="text-xs text-zinc-600 mt-1">{label}</p>
             </div>
           ))}
         </div>

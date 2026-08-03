@@ -125,7 +125,7 @@ const createChannel = async (req, res) => {
 const uploadVideo = async (req, res) => {
   try {
     const { channelId } = req.params;
-    const { name, description, category, videoType } = req.body;
+    const { name, description, category, videoType, duration } = req.body;
 
     const channel = await ChannelModel.findById(channelId);
     if (!channel) {
@@ -173,6 +173,7 @@ const uploadVideo = async (req, res) => {
       videoUrl: videoPath,
       thumbnail: thumbnailPath,
       videoType: videoType,
+      duration: Number(duration) > 0 ? Number(duration) : undefined,
       uploadedBy: req.user?.userId,
     });
 
