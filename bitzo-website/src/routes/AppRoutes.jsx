@@ -24,6 +24,7 @@ import ChannelCustomization from "../components/channels/ChannelCustomization";
 import Leaderboard from "../pages/Settings/Leaderboard";
 import SubscribedChannels from "../pages/UploadVideo/SubscribedChannels";
 import ViewAll from "../pages/ViewAll";
+import SearchPage from "../pages/SearchPage";
 
 function ViewAllRoute() {
   const { type } = useParams();
@@ -49,6 +50,7 @@ export default function AppRoutes() {
           <Route path="uploadvideo" element={<UploadVideo />} />
           <Route path="reel" element={<ReelPlayerPage />} />
           <Route path="videos/:type" element={<ViewAllRoute />} />
+          <Route path="search" element={<SearchPage />} />
           <Route path="video/:id" element={<FullVideo />} />
           <Route path="profile" element={<Profile />} />
           <Route path="subscribechannel/:id" element={<SubscribedChannels />} />

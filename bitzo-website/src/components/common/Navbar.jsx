@@ -133,21 +133,27 @@ export default function Navbar({ toggleSidebar }) {
       return;
     }
 
+    const controller = new AbortController();
     const timer = setTimeout(async () => {
       try {
         const res = await axios.get(HINTS_URL, {
           params: { q },
+          signal: controller.signal,
         });
         const data = res.data?.data || res.data?.hints || res.data || [];
         setHints(Array.isArray(data) ? data : []);
         setShowHints(true);
       } catch (err) {
+        if (axios.isCancel(err) || err?.code === "ERR_CANCELED") return;
         console.error("Hints fetch error:", err);
         setHints([]);
       }
     }, 300);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [searchQuery]);
 
   // Mic click

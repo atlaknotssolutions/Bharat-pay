@@ -9,6 +9,15 @@ import ShortCard from "./ShortCard";
 const BACKEND_URL = "http://localhost:8000";
 const API_BASE = `${BACKEND_URL}/api/uservideo`;
 
+const HOMEPAGE_SECTION_LIMITS = {
+  recommended: 5,
+  trending: 5,
+  trendingShorts: 10,
+  latest: 5,
+  subscriptions: 5,
+  topShorts: 10,
+};
+
 const romanticShows = [
   {
     id: 1,
@@ -282,7 +291,9 @@ export default function NetflixStylePage() {
                 Loading recommended videos...
               </p>
             ) : recommended.length > 0 ? (
-              recommended.map((item) => (
+              recommended
+                .slice(0, HOMEPAGE_SECTION_LIMITS.recommended)
+                .map((item) => (
                 <div key={item.id} className="shrink-0 w-60 md:w-70">
                   <div className="relative">
                     <MovieCard
@@ -321,7 +332,9 @@ export default function NetflixStylePage() {
                 Loading trending videos...
               </p>
             ) : trending.length > 0 ? (
-              trending.map((item) => (
+              trending
+                .slice(0, HOMEPAGE_SECTION_LIMITS.trending)
+                .map((item) => (
                 <div key={item.id} className="shrink-0 w-60 md:w-70">
                   <div className="relative">
                     <MovieCard
@@ -360,13 +373,15 @@ export default function NetflixStylePage() {
                 Loading trending shorts...
               </p>
             ) : shorts.length > 0 ? (
-              shorts.map((item) => (
-                <ShortCard
-                  key={item.id}
-                  item={item}
-                  onClick={handleItemClick}
-                />
-              ))
+              shorts
+                .slice(0, HOMEPAGE_SECTION_LIMITS.trendingShorts)
+                .map((item) => (
+                  <ShortCard
+                    key={item.id}
+                    item={item}
+                    onClick={handleItemClick}
+                  />
+                ))
             ) : (
               <p className="text-sm text-gray-400">
                 No trending shorts available right now.
@@ -385,7 +400,9 @@ export default function NetflixStylePage() {
             {loading && latest.length === 0 ? (
               <p className="text-sm text-gray-400">Loading latest videos...</p>
             ) : latest.length > 0 ? (
-              latest.map((item) => (
+              latest
+                .slice(0, HOMEPAGE_SECTION_LIMITS.latest)
+                .map((item) => (
                 <div key={item.id} className="shrink-0 w-60 md:w-70">
                   <div className="relative">
                     <MovieCard
@@ -424,7 +441,9 @@ export default function NetflixStylePage() {
                 Loading subscription videos...
               </p>
             ) : subscriptions.length > 0 ? (
-              subscriptions.map((item) => (
+              subscriptions
+                .slice(0, HOMEPAGE_SECTION_LIMITS.subscriptions)
+                .map((item) => (
                 <div key={item.id} className="shrink-0 w-60 md:w-70">
                   <MovieCard
                     item={item}
@@ -451,13 +470,15 @@ export default function NetflixStylePage() {
             {loading && shorts.length === 0 ? (
               <p className="text-sm text-gray-400">Loading top shorts...</p>
             ) : shorts.length > 0 ? (
-              shorts.map((item) => (
-                <ShortCard
-                  key={item.id}
-                  item={item}
-                  onClick={handleItemClick}
-                />
-              ))
+              shorts
+                .slice(0, HOMEPAGE_SECTION_LIMITS.topShorts)
+                .map((item) => (
+                  <ShortCard
+                    key={item.id}
+                    item={item}
+                    onClick={handleItemClick}
+                  />
+                ))
             ) : (
               <p className="text-sm text-gray-400">
                 No top shorts available right now.

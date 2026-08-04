@@ -642,6 +642,8 @@ const getCategoryFilter = (req) => {
   return raw;
 };
 
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 const recommendedVideos = async (req, res) => {
   try {
     const category = getCategoryFilter(req);
@@ -1770,6 +1772,187 @@ const addToWatchLater = async (req, res) => {
   }
 };
 
+const GENERIC_SEARCH_WORDS = new Set([
+  "video",
+  "videos",
+  "short",
+  "shorts",
+  "watch",
+  "watching",
+  "latest",
+  "new",
+  "trending",
+  "viral",
+  "the",
+  "a",
+  "an",
+  "and",
+  "or",
+  "for",
+  "with",
+  "in",
+  "on",
+  "to",
+  "of",
+  "how",
+  "what",
+  "why",
+]);
+
+const buildSearchTokenPattern = (token) => {
+  if (token.length > 3 && token.endsWith("s")) {
+    return escapeRegex(token.slice(0, -1)) + "s?";
+  }
+  return escapeRegex(token);
+};
+
+const searchVideos = async (req, res) => {
+  try {
+    const q = (req.query.q || "").trim();
+    const { page, limit, skip } = getPagination(req);
+
+    if (!q) {
+      return res.status(400).json({
+        success: false,
+        message: "Search query is required",
+      });
+    }
+
+    const normalized = q.replace(/\s+/g, " ").toLowerCase();
+
+    let tokens = normalized.split(" ").filter(Boolean);
+    const meaningfulTokens = tokens.filter((t) => !GENERIC_SEARCH_WORDS.has(t));
+    if (meaningfulTokens.length) tokens = meaningfulTokens;
+
+    const tokensWithRegex = tokens.map((token) => ({
+      token,
+      regex: new RegExp(buildSearchTokenPattern(token), "i"),
+    }));
+
+    const [categoryDocs, channelDocs] = await Promise.all([
+      categoryModel
+        .find({ name: { $in: tokensWithRegex.map((t) => t.regex) } })
+        .select("_id name")
+        .lean(),
+      Channel.find({ name: { $in: tokensWithRegex.map((t) => t.regex) } })
+        .select("_id name")
+        .lean(),
+    ]);
+
+    const orConditions = [];
+    const scoreExpressions = [
+      {
+        $cond: [
+          { $eq: [{ $ifNull: [{ $toLower: "$title" }, ""] }, normalized] },
+          100,
+          0,
+        ],
+      },
+    ];
+
+    for (const { token, regex } of tokensWithRegex) {
+      const regexStr = buildSearchTokenPattern(token);
+      orConditions.push({ title: regex }, { description: regex });
+
+      scoreExpressions.push({
+        $cond: [
+          {
+            $regexMatch: {
+              input: { $ifNull: [{ $toLower: "$title" }, ""] },
+              regex: regexStr,
+              options: "i",
+            },
+          },
+          10,
+          0,
+        ],
+      });
+      scoreExpressions.push({
+        $cond: [
+          {
+            $regexMatch: {
+              input: { $ifNull: [{ $toLower: "$description" }, ""] },
+              regex: regexStr,
+              options: "i",
+            },
+          },
+          4,
+          0,
+        ],
+      });
+
+      const catIds = categoryDocs
+        .filter((c) => regex.test(c.name))
+        .map((c) => c._id);
+      if (catIds.length) {
+        orConditions.push({ category: { $in: catIds } });
+        scoreExpressions.push({ $cond: [{ $in: ["$category", catIds] }, 3, 0] });
+      }
+
+      const chIds = channelDocs
+        .filter((c) => regex.test(c.name))
+        .map((c) => c._id);
+      if (chIds.length) {
+        orConditions.push({ channel: { $in: chIds } });
+        scoreExpressions.push({ $cond: [{ $in: ["$channel", chIds] }, 2, 0] });
+      }
+    }
+
+    const filter = { $or: orConditions };
+
+    const [videos, total] = await Promise.all([
+      Video.aggregate([
+        { $match: filter },
+        { $addFields: { _score: { $add: scoreExpressions } } },
+        { $sort: { _score: -1, views: -1, createdAt: -1 } },
+        {
+          $lookup: {
+            from: Channel.collection.name,
+            let: { chId: "$channel" },
+            pipeline: [
+              { $match: { $expr: { $eq: ["$_id", "$$chId"] } } },
+              { $project: { name: 1, channelImage: 1 } },
+            ],
+            as: "channel",
+          },
+        },
+        { $unwind: { path: "$channel", preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: User.collection.name,
+            let: { userId: "$uploadedBy" },
+            pipeline: [
+              { $match: { $expr: { $eq: ["$_id", "$$userId"] } } },
+              { $project: { name: 1, email: 1 } },
+            ],
+            as: "uploadedBy",
+          },
+        },
+        { $unwind: { path: "$uploadedBy", preserveNullAndEmptyArrays: true } },
+        { $project: { _score: 0 } },
+        { $skip: skip },
+        { $limit: limit },
+      ]),
+      Video.countDocuments(filter),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      videos,
+      page,
+      limit,
+      total,
+      query: q,
+    });
+  } catch (error) {
+    console.error("Error in searchVideos:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
 const getSearchHints = async (req, res) => {
   try {
     const q = (req.query.q || "").trim();
@@ -1781,7 +1964,7 @@ const getSearchHints = async (req, res) => {
       });
     }
 
-    const regex = new RegExp(q, "i");
+    const regex = new RegExp(escapeRegex(q), "i");
 
     // Videos titles se hints
     const videoHints = await Video.find({ title: regex })
@@ -1868,5 +2051,6 @@ module.exports = {
   WatchLaterVideos,
   RemoveFromWatchLater,
   addToWatchLater,
+  searchVideos,
   getSearchHints,
 };

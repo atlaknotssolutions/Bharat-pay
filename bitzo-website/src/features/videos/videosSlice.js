@@ -159,6 +159,62 @@ export const fetchMyVideos = createAsyncThunk(
   },
 );
 
+let searchRequestId = 0;
+
+export const searchVideos = createAsyncThunk(
+  "videos/searchVideos",
+  async ({ query, page = 1, limit = 20 }, { rejectWithValue }) => {
+    const requestId = ++searchRequestId;
+    const token = localStorage.getItem("token");
+    if (!token) return rejectWithValue("Please login to search videos");
+    const q = String(query || "").trim();
+    if (!q) return { cancelled: true };
+
+    try {
+      const res = await fetch(
+        `${API_BASE}/search?q=${encodeURIComponent(q)}&page=${page}&limit=${limit}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+
+      if (requestId !== searchRequestId) return { cancelled: true };
+
+      const data = await res.json().catch(() => ({ videos: [] }));
+
+      if (requestId !== searchRequestId) return { cancelled: true };
+
+      if (!res.ok) {
+        return rejectWithValue(data.message || "Failed to load search results");
+      }
+
+      const list = getVideosArray(data);
+      const videos = [];
+      const shorts = [];
+
+      list.forEach((video) => {
+        const rawTypes = Array.isArray(video.videoType)
+          ? video.videoType
+          : [video.videoType];
+        const isShort = rawTypes.some((type) =>
+          String(type || "").toLowerCase().includes("short"),
+        );
+        if (isShort) shorts.push(normalizeShort(video));
+        else videos.push(normalizeVideoListItem(video));
+      });
+
+      return {
+        query: q,
+        page,
+        limit,
+        videos,
+        shorts,
+        total: Number(data.total || list.length),
+      };
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to search videos");
+    }
+  },
+);
+
 const initialState = {
   recommended: [],
   trending: [],
@@ -170,6 +226,12 @@ const initialState = {
   loading: false,
   myVideosLoading: false,
   error: null,
+  searchVideos: [],
+  searchShorts: [],
+  searchTotal: 0,
+  searchQuery: null,
+  searchLoading: false,
+  searchError: null,
 };
 
 const videosSlice = createSlice({
@@ -178,6 +240,14 @@ const videosSlice = createSlice({
   reducers: {
     clearVideosError: (state) => {
       state.error = null;
+    },
+    clearSearch: (state) => {
+      state.searchVideos = [];
+      state.searchShorts = [];
+      state.searchTotal = 0;
+      state.searchQuery = null;
+      state.searchLoading = false;
+      state.searchError = null;
     },
     setSelectedCategory: (state, action) => {
       if (state.selectedCategory === action.payload) return;
@@ -221,9 +291,27 @@ const videosSlice = createSlice({
       .addCase(fetchMyVideos.rejected, (state, action) => {
         state.myVideosLoading = false;
         state.error = action.payload || "Failed to load My Videos";
+      })
+      .addCase(searchVideos.pending, (state) => {
+        state.searchLoading = true;
+        state.searchError = null;
+      })
+      .addCase(searchVideos.fulfilled, (state, action) => {
+        if (action.payload?.cancelled) return;
+        state.searchLoading = false;
+        state.searchError = null;
+        state.searchQuery = action.payload.query;
+        state.searchVideos = action.payload.videos;
+        state.searchShorts = action.payload.shorts;
+        state.searchTotal = action.payload.total;
+      })
+      .addCase(searchVideos.rejected, (state, action) => {
+        state.searchLoading = false;
+        state.searchError = action.payload || "Failed to search videos";
       });
   },
 });
 
-export const { clearVideosError, setSelectedCategory } = videosSlice.actions;
+export const { clearVideosError, setSelectedCategory, clearSearch } =
+  videosSlice.actions;
 export default videosSlice.reducer;
