@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { ChevronRight, Play, Plus, Info } from "lucide-react";
 import { toast } from "react-toastify";
 import { fetchHomeVideos } from "../../features/videos/videosSlice";
+import ShortCard from "./ShortCard";
 
 const BACKEND_URL = "http://localhost:8000";
 const API_BASE = `${BACKEND_URL}/api/uservideo`;
@@ -96,10 +97,13 @@ function useWidth() {
   return width;
 }
 
-function SectionHeader({ title }) {
+function SectionHeader({ title, onClick }) {
   return (
     <div className="mb-3 flex items-center justify-between">
-      <h2 className="text-white text-xl font-semibold flex items-center gap-2 hover:text-white/80 transition-colors cursor-pointer">
+      <h2
+        onClick={onClick}
+        className="text-white text-xl font-semibold flex items-center gap-2 hover:text-white/80 transition-colors cursor-pointer"
+      >
         {title}
         <ChevronRight size={20} className="text-zinc-400" />
       </h2>
@@ -107,7 +111,7 @@ function SectionHeader({ title }) {
   );
 }
 
-function MovieCard({ item, onClick, onAddToWatchLater }) {
+export function MovieCard({ item, onClick, onAddToWatchLater }) {
   const [isHovered, setIsHovered] = useState(false);
   const [adding, setAdding] = useState(false);
 
@@ -184,12 +188,19 @@ export default function NetflixStylePage() {
   const navigate = useNavigate();
   const isMobile = useWidth() < 768;
   const dispatch = useDispatch();
-  const { recommended, trending, latest, subscriptions, shorts, loading } =
-    useSelector((state) => state.videos);
+  const {
+    recommended,
+    trending,
+    latest,
+    subscriptions,
+    shorts,
+    loading,
+    selectedCategory,
+  } = useSelector((state) => state.videos);
 
   useEffect(() => {
-    dispatch(fetchHomeVideos());
-  }, [dispatch]);
+    dispatch(fetchHomeVideos(selectedCategory));
+  }, [dispatch, selectedCategory]);
 
   const isShortContent = (item) => {
     const rawTypes = item?.videoType ?? item?.raw?.videoType ?? [];
@@ -245,6 +256,8 @@ export default function NetflixStylePage() {
     }
   };
 
+  const goToViewAll = (type) => navigate(`/videos/${type}`);
+
   return (
     <div className="min-h-screen bg-black text-white">
       <style>{`
@@ -259,7 +272,10 @@ export default function NetflixStylePage() {
       <div className="mx-auto max-w-screen-2xl px-4 pt-20 md:px-12 lg:px-16 -mt-24 relative z-10 pb-10">
         {/* Recommended Videos */}
         <div className="mb-8 pt-8">
-          <SectionHeader title="Recommended Videos" />
+          <SectionHeader
+            title="Recommended Videos"
+            onClick={() => goToViewAll("recommended")}
+          />
           <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-hide hover:scrollbar-show">
             {loading && recommended.length === 0 ? (
               <p className="text-sm text-gray-400">
@@ -295,7 +311,10 @@ export default function NetflixStylePage() {
 
         {/* Trending Videos */}
         <div className="mb-8">
-          <SectionHeader title="Trending Videos" />
+          <SectionHeader
+            title="Trending Videos"
+            onClick={() => goToViewAll("trending")}
+          />
           <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-hide hover:scrollbar-show">
             {loading && trending.length === 0 ? (
               <p className="text-sm text-gray-400">
@@ -331,7 +350,10 @@ export default function NetflixStylePage() {
 
         {/* Trending Shorts */}
         <div className="mb-12">
-          <SectionHeader title="Trending Shorts" />
+          <SectionHeader
+            title="Trending Shorts"
+            onClick={() => goToViewAll("shorts")}
+          />
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
             {loading && shorts.length === 0 ? (
               <p className="text-sm text-gray-400">
@@ -339,37 +361,11 @@ export default function NetflixStylePage() {
               </p>
             ) : shorts.length > 0 ? (
               shorts.map((item) => (
-                <div
+                <ShortCard
                   key={item.id}
-                  onClick={() => handleItemClick(item)}
-                  className="cursor-pointer group"
-                >
-                  <div className="relative aspect-video rounded-md overflow-hidden mb-2">
-                    <img
-                      src={
-                        item.thumbnail ||
-                        item.thumb ||
-                        "https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=400&h=225&fit=crop"
-                      }
-                      alt={item.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                    <div className="absolute top-2 right-2 bg-black/70 rounded px-2 py-1 text-xs">
-                      #{item.id % 10 || 1}
-                    </div>
-                  </div>
-                  <h3 className="text-white text-sm font-medium truncate">
-                    {item.title}
-                  </h3>
-                  <div className="mt-1 flex items-center gap-3 text-[11px] text-gray-400">
-                    <span>
-                      {Number(item.views || 0).toLocaleString()} views
-                    </span>
-                    <span>
-                      {Number(item.likes || 0).toLocaleString()} likes
-                    </span>
-                  </div>
-                </div>
+                  item={item}
+                  onClick={handleItemClick}
+                />
               ))
             ) : (
               <p className="text-sm text-gray-400">
@@ -381,7 +377,10 @@ export default function NetflixStylePage() {
 
         {/* Latest Videos */}
         <div className="mb-8">
-          <SectionHeader title="Latest Videos" />
+          <SectionHeader
+            title="Latest Videos"
+            onClick={() => goToViewAll("latest")}
+          />
           <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-hide hover:scrollbar-show">
             {loading && latest.length === 0 ? (
               <p className="text-sm text-gray-400">Loading latest videos...</p>
@@ -415,7 +414,10 @@ export default function NetflixStylePage() {
 
         {/* Subscription Videos */}
         <div className="mb-8">
-          <SectionHeader title="Subscription Videos" />
+          <SectionHeader
+            title="Subscription Videos"
+            onClick={() => goToViewAll("subscriptions")}
+          />
           <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-hide hover:scrollbar-show">
             {loading && subscriptions.length === 0 ? (
               <p className="text-sm text-gray-400">
@@ -441,43 +443,20 @@ export default function NetflixStylePage() {
 
         {/* Top Shorts */}
         <div className="mb-12">
-          <SectionHeader title="Top Shorts" />
+          <SectionHeader
+            title="Top Shorts"
+            onClick={() => goToViewAll("top-shorts")}
+          />
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
             {loading && shorts.length === 0 ? (
               <p className="text-sm text-gray-400">Loading top shorts...</p>
             ) : shorts.length > 0 ? (
               shorts.map((item) => (
-                <div
+                <ShortCard
                   key={item.id}
-                  onClick={() => handleItemClick(item)}
-                  className="cursor-pointer group"
-                >
-                  <div className="relative aspect-video rounded-md overflow-hidden mb-2">
-                    <img
-                      src={
-                        item.thumbnail ||
-                        item.thumb ||
-                        "https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=400&h=225&fit=crop"
-                      }
-                      alt={item.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                    <div className="absolute top-2 right-2 bg-black/70 rounded px-2 py-1 text-xs">
-                      #{item.id % 10 || 1}
-                    </div>
-                  </div>
-                  <h3 className="text-white text-sm font-medium truncate">
-                    {item.title}
-                  </h3>
-                  <div className="mt-1 flex items-center gap-3 text-[11px] text-gray-400">
-                    <span>
-                      {Number(item.views || 0).toLocaleString()} views
-                    </span>
-                    <span>
-                      {Number(item.likes || 0).toLocaleString()} likes
-                    </span>
-                  </div>
-                </div>
+                  item={item}
+                  onClick={handleItemClick}
+                />
               ))
             ) : (
               <p className="text-sm text-gray-400">

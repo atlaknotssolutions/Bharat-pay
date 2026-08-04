@@ -1,4 +1,5 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, useParams } from "react-router-dom";
+import { useSelector } from "react-redux";
 
 import MainLayout from "../components/layout/MainLayout";
 import ProtectedLayout from "../pages/Login.jsx/ProtectiveRoute/ProtectedRoute";
@@ -22,6 +23,15 @@ import ChannelPage from "../components/channels/ChannelPage";
 import ChannelCustomization from "../components/channels/ChannelCustomization";
 import Leaderboard from "../pages/Settings/Leaderboard";
 import SubscribedChannels from "../pages/UploadVideo/SubscribedChannels";
+import ViewAll from "../pages/ViewAll";
+
+function ViewAllRoute() {
+  const { type } = useParams();
+  const selectedCategory = useSelector(
+    (state) => state.videos.selectedCategory,
+  );
+  return <ViewAll key={`${type}-${selectedCategory || "all"}`} />;
+}
 
 export default function AppRoutes() {
   return (
@@ -38,6 +48,7 @@ export default function AppRoutes() {
           <Route path="withdraw" element={<WithdrawPage />} />
           <Route path="uploadvideo" element={<UploadVideo />} />
           <Route path="reel" element={<ReelPlayerPage />} />
+          <Route path="videos/:type" element={<ViewAllRoute />} />
           <Route path="video/:id" element={<FullVideo />} />
           <Route path="profile" element={<Profile />} />
           <Route path="subscribechannel/:id" element={<SubscribedChannels />} />

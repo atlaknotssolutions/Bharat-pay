@@ -629,40 +629,40 @@ const getAllVideos = async (req, res) => {
   }
 };
 
+const getPagination = (req) => {
+  const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
+  return { page, limit, skip: (page - 1) * limit };
+};
+
+const getCategoryFilter = (req) => {
+  const raw = req.query.category;
+  if (!raw || typeof raw !== "string") return null;
+  if (!mongoose.Types.ObjectId.isValid(raw)) return null;
+  return raw;
+};
+
 const recommendedVideos = async (req, res) => {
   try {
-    const userCategory = req.user?.category; // user ki category
+    const category = getCategoryFilter(req);
+    const { page, limit, skip } = getPagination(req);
 
-    let videos = [];
+    const filter = { videoType: "long" };
+    if (category) filter.category = category;
 
-    if (userCategory) {
-      const categoryVideos = await Video.find({
-        category: userCategory,
-        videoType: "long",
-      })
-        .sort({ createdAt: -1 }) // recent first
-        .limit(10);
+    const videos = await Video.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
 
-      videos = categoryVideos;
-    }
-
-    // 2️⃣ Agar 10 se kam mile toh baaki recent videos add karo
-    if (videos.length < 10) {
-      const remaining = 10 - videos.length;
-
-      const otherVideos = await Video.find({
-        category: { $ne: userCategory },
-        videoType: "long",
-      })
-        .sort({ createdAt: -1 })
-        .limit(remaining);
-
-      videos = [...videos, ...otherVideos];
-    }
+    const total = await Video.countDocuments(filter);
 
     res.status(200).json({
       success: true,
       videos,
+      page,
+      limit,
+      total,
     });
   } catch (error) {
     console.error("Error in recommendedVideos:", error);
@@ -674,13 +674,24 @@ const recommendedVideos = async (req, res) => {
 };
 const trendingVideos = async (req, res) => {
   try {
-    const videos = await Video.find({ videoType: "long" })
+    const filter = { videoType: "long" };
+    const category = getCategoryFilter(req);
+    if (category) filter.category = category;
+    const { page, limit, skip } = getPagination(req);
+
+    const videos = await Video.find(filter)
       .sort({ views: -1, createdAt: -1 })
-      .limit(10);
+      .skip(skip)
+      .limit(limit);
+
+    const total = await Video.countDocuments(filter);
 
     res.status(200).json({
       success: true,
       videos,
+      page,
+      limit,
+      total,
     });
   } catch (error) {
     console.error("Error in trendingVideos:", error);
@@ -693,13 +704,24 @@ const trendingVideos = async (req, res) => {
 
 const LatestVideos = async (req, res) => {
   try {
-    const videos = await Video.find({ videoType: "long" })
+    const filter = { videoType: "long" };
+    const category = getCategoryFilter(req);
+    if (category) filter.category = category;
+    const { page, limit, skip } = getPagination(req);
+
+    const videos = await Video.find(filter)
       .sort({ createdAt: -1 })
-      .limit(10);
+      .skip(skip)
+      .limit(limit);
+
+    const total = await Video.countDocuments(filter);
 
     res.status(200).json({
       success: true,
       videos,
+      page,
+      limit,
+      total,
     });
   } catch (error) {
     console.error("Error in LatestVideos:", error);
@@ -712,9 +734,17 @@ const LatestVideos = async (req, res) => {
 
 const trendingShorts = async (req, res) => {
   try {
-    const videos = await Video.find({ videoType: "short" })
+    const filter = { videoType: "short" };
+    const category = getCategoryFilter(req);
+    if (category) filter.category = category;
+    const { page, limit, skip } = getPagination(req);
+
+    const videos = await Video.find(filter)
       .sort({ views: -1, createdAt: -1 })
-      .limit(10);
+      .skip(skip)
+      .limit(limit);
+
+    const total = await Video.countDocuments(filter);
 
     const userId = req.user?.id || req.user?.userId || req.user?._id;
     let user = null;
@@ -749,6 +779,9 @@ const trendingShorts = async (req, res) => {
     res.status(200).json({
       success: true,
       videos: videosWithReaction,
+      page,
+      limit,
+      total,
     });
   } catch (error) {
     console.error("Error in trendingShorts:", error);
@@ -761,13 +794,24 @@ const trendingShorts = async (req, res) => {
 
 const topShorts = async (req, res) => {
   try {
-    const videos = await Video.find({ videoType: "short" })
+    const filter = { videoType: "short" };
+    const category = getCategoryFilter(req);
+    if (category) filter.category = category;
+    const { page, limit, skip } = getPagination(req);
+
+    const videos = await Video.find(filter)
       .sort({ views: -1, createdAt: -1 })
-      .limit(10);
+      .skip(skip)
+      .limit(limit);
+
+    const total = await Video.countDocuments(filter);
 
     res.status(200).json({
       success: true,
       videos,
+      page,
+      limit,
+      total,
     });
   } catch (error) {
     console.error("Error in topShorts:", error);
@@ -1434,10 +1478,17 @@ const getSubscribedVideos = async (req, res) => {
       .filter((id) => mongoose.Types.ObjectId.isValid(id))
       .map((id) => new mongoose.Types.ObjectId(id));
 
-    const videos = await Video.find({
-      channel: { $in: channelObjectIds },
-    })
+    const filter = { channel: { $in: channelObjectIds } };
+    const category = getCategoryFilter(req);
+    if (category) filter.category = category;
+    const { page, limit, skip } = getPagination(req);
+
+    const total = await Video.countDocuments(filter);
+
+    const videos = await Video.find(filter)
       .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
       .populate("channel", "name channelImage")
       .populate("uploadedBy", "name email");
 
@@ -1445,6 +1496,9 @@ const getSubscribedVideos = async (req, res) => {
       success: true,
       videos,
       count: videos.length,
+      total,
+      page,
+      limit,
       subscribedChannelIds: channelIds,
     });
   } catch (error) {

@@ -1,9 +1,9 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 
 const BACKEND_URL = "http://localhost:8000";
-const API_BASE = `${BACKEND_URL}/api/uservideo`;
+export const API_BASE = `${BACKEND_URL}/api/uservideo`;
 
-const normalizeVideoListItem = (video) => ({
+export const normalizeVideoListItem = (video) => ({
   id: video._id || video.id,
   title: video.title || "Untitled video",
   thumb: video.thumbnail
@@ -31,7 +31,7 @@ const normalizeVideoListItem = (video) => ({
   raw: video,
 });
 
-const normalizeShort = (video) => ({
+export const normalizeShort = (video) => ({
   id: video._id || video.id,
   title: video.title || "Untitled Short",
   videoUrl: video.videoUrl
@@ -61,9 +61,12 @@ const getVideosArray = (payload) => {
   return [];
 };
 
+let homeFetchRequestId = 0;
+
 export const fetchHomeVideos = createAsyncThunk(
   "videos/fetchHomeVideos",
-  async (_, { rejectWithValue }) => {
+  async (category, { rejectWithValue }) => {
+    const requestId = ++homeFetchRequestId;
     try {
       const token = localStorage.getItem("token");
       if (!token)
@@ -75,6 +78,8 @@ export const fetchHomeVideos = createAsyncThunk(
           shorts: [],
         };
 
+      const categoryParam = category ? `?category=${category}` : "";
+
       const [
         recommendedRes,
         trendingRes,
@@ -82,22 +87,24 @@ export const fetchHomeVideos = createAsyncThunk(
         subscriptionsRes,
         shortsRes,
       ] = await Promise.all([
-        fetch(`${API_BASE}/recommended`, {
+        fetch(`${API_BASE}/recommended${categoryParam}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        fetch(`${API_BASE}/trending`, {
+        fetch(`${API_BASE}/trending${categoryParam}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        fetch(`${API_BASE}/latest`, {
+        fetch(`${API_BASE}/latest${categoryParam}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        fetch(`${API_BASE}/subscriptions`, {
+        fetch(`${API_BASE}/subscriptions${categoryParam}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        fetch(`${API_BASE}/trending-shorts`, {
+        fetch(`${API_BASE}/trending-shorts${categoryParam}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
+
+      if (requestId !== homeFetchRequestId) return { cancelled: true };
 
       const [
         recommendedData,
@@ -112,6 +119,8 @@ export const fetchHomeVideos = createAsyncThunk(
         subscriptionsRes.json().catch(() => ({ videos: [] })),
         shortsRes.json().catch(() => ({ videos: [] })),
       ]);
+
+      if (requestId !== homeFetchRequestId) return { cancelled: true };
 
       return {
         recommended: getVideosArray(recommendedData).map(
@@ -157,6 +166,7 @@ const initialState = {
   subscriptions: [],
   shorts: [],
   myVideos: [],
+  selectedCategory: null,
   loading: false,
   myVideosLoading: false,
   error: null,
@@ -169,6 +179,17 @@ const videosSlice = createSlice({
     clearVideosError: (state) => {
       state.error = null;
     },
+    setSelectedCategory: (state, action) => {
+      if (state.selectedCategory === action.payload) return;
+      state.selectedCategory = action.payload;
+      state.recommended = [];
+      state.trending = [];
+      state.latest = [];
+      state.subscriptions = [];
+      state.shorts = [];
+      state.loading = true;
+      state.error = null;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -177,7 +198,9 @@ const videosSlice = createSlice({
         state.error = null;
       })
       .addCase(fetchHomeVideos.fulfilled, (state, action) => {
+        if (action.payload?.cancelled) return;
         state.loading = false;
+        state.error = null;
         state.recommended = action.payload.recommended;
         state.trending = action.payload.trending;
         state.latest = action.payload.latest;
@@ -202,5 +225,5 @@ const videosSlice = createSlice({
   },
 });
 
-export const { clearVideosError } = videosSlice.actions;
+export const { clearVideosError, setSelectedCategory } = videosSlice.actions;
 export default videosSlice.reducer;

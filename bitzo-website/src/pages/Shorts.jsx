@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useLayoutEffect, useMemo } from "react";
+import React, { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchHomeVideos } from "../features/videos/videosSlice";
@@ -8,7 +8,6 @@ import {
   Share2,
   Volume2,
   VolumeX,
-  MoreHorizontal,
   Music2,
   X,
 } from "lucide-react";
@@ -101,6 +100,24 @@ export default function Shorts() {
   const isProgrammaticScrollRef = useRef(false);
   const pendingInitialScrollRef = useRef(null);
   const lastSyncedUrlIdRef = useRef(null);
+  const currentIndexRef = useRef(0);
+  const lastActiveIndexRef = useRef(-1);
+  const playAttemptsRef = useRef({});
+  const pendingReadyRetriesRef = useRef({});
+  const commentsOpenRef = useRef(false);
+  const wasPlayingBeforeCommentsRef = useRef(false);
+  const mountedRef = useRef(false);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    currentIndexRef.current = currentIndex;
+  }, [currentIndex]);
 
   const trackShortProgress = async (short, videoEl) => {
     if (!short?.id || !videoEl) return;
@@ -289,6 +306,7 @@ export default function Shorts() {
 
   // ─── Change video with bounds check ───
   const goToVideo = (newIndex) => {
+    if (commentsOpenRef.current) return;
     if (newIndex < 0 || newIndex >= shorts.length) return;
     setCurrentIndex(newIndex);
 
@@ -311,24 +329,83 @@ export default function Shorts() {
     swipeDuration: 400,
   });
 
+  const attemptPlay = useCallback(
+    (index, video) => {
+      if (!video || !mountedRef.current) return;
+      if (index !== currentIndexRef.current) return;
+      if (commentsOpenRef.current) return;
+
+      const short = shorts[index];
+      if (!short) return;
+      const key = short.id;
+
+      const tryPlay = () => {
+        const promise = video.play();
+        if (promise && typeof promise.catch === "function") {
+          promise.catch(() => {
+            if (!mountedRef.current) return;
+            const attempts = (playAttemptsRef.current[key] || 0) + 1;
+            playAttemptsRef.current[key] = attempts;
+            if (attempts < 4) {
+              window.setTimeout(() => attemptPlay(index, video), 400);
+            } else {
+              console.error(
+                `Shorts: autoplay failed for "${short.title || key}" after 4 attempts`,
+              );
+            }
+          });
+        }
+      };
+
+      if (video.readyState >= 2) {
+        tryPlay();
+      } else if (!pendingReadyRetriesRef.current[index]) {
+        pendingReadyRetriesRef.current[index] = true;
+        window.setTimeout(() => {
+          pendingReadyRetriesRef.current[index] = false;
+          if (
+            mountedRef.current &&
+            index === currentIndexRef.current &&
+            video.readyState >= 2
+          ) {
+            attemptPlay(index, video);
+          }
+        }, 600);
+      }
+    },
+    [shorts],
+  );
+
+  const handleVideoReady = (index, video) => {
+    if (index === currentIndexRef.current && video.readyState >= 2) {
+      attemptPlay(index, video);
+    }
+  };
+
   // Play only current video
   useEffect(() => {
     videoRefs.current.forEach((video, i) => {
       if (!video) return;
 
       if (i === currentIndex) {
-        video.currentTime = 0; // restart from beginning (optional)
-        video.muted = muted; // respect global mute
-        video.play().catch(() => {});
+        video.muted = muted;
+        if (lastActiveIndexRef.current !== i) {
+          lastActiveIndexRef.current = i;
+          const key = shorts[i]?.id;
+          if (key) playAttemptsRef.current[key] = 0;
+          video.currentTime = 0;
+        }
+        attemptPlay(i, video);
       } else {
         video.pause();
       }
     });
-  }, [currentIndex, muted, shorts]);
+  }, [currentIndex, muted, shorts, attemptPlay]);
 
   // Update current index when user scrolls vertically
   const handleScroll = () => {
     if (!containerRef.current) return;
+    if (commentsOpenRef.current) return;
     if (isProgrammaticScrollRef.current) {
       isProgrammaticScrollRef.current = false;
       return;
@@ -459,6 +536,78 @@ export default function Shorts() {
     }
   };
 
+  const handleShare = async (short) => {
+    if (!short?.id) return;
+    const shareUrl = `${window.location.origin}/shorts/${short.id}`;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: short.title || "Bitzo Short",
+          text: short.title ? `${short.title} - Watch on Bitzo` : "Watch on Bitzo",
+          url: shareUrl,
+        });
+        return;
+      }
+    } catch (error) {
+      if (!error || error.name !== "AbortError") {
+        console.warn("Shorts: Web Share API unavailable, falling back to clipboard");
+      }
+    }
+
+    let copied = false;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+        copied = true;
+      }
+    } catch {
+      copied = false;
+    }
+
+    if (!copied) {
+      try {
+        const textarea = document.createElement("textarea");
+        textarea.value = shareUrl;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        copied = document.execCommand("copy");
+        document.body.removeChild(textarea);
+      } catch {
+        copied = false;
+      }
+    }
+
+    if (copied) {
+      toast.success("Link copied to clipboard");
+    } else {
+      toast.error("Could not copy the link");
+    }
+  };
+
+  useEffect(() => {
+    const wasOpen = Boolean(commentOpenForId);
+    commentsOpenRef.current = wasOpen;
+    const video = videoRefs.current[currentIndexRef.current];
+    if (!video) return;
+
+    if (wasOpen) {
+      wasPlayingBeforeCommentsRef.current = !video.paused;
+      video.pause();
+    } else if (wasPlayingBeforeCommentsRef.current) {
+      wasPlayingBeforeCommentsRef.current = false;
+      const promise = video.play();
+      if (promise && typeof promise.catch === "function") {
+        promise.catch(() => {
+          console.error("Shorts: failed to resume playback after closing comments");
+        });
+      }
+    }
+  }, [commentOpenForId]);
+
   // Toast reminder (runs once per video change)
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -516,6 +665,8 @@ export default function Shorts() {
                 onLoadedMetadata={(e) =>
                   trackShortProgress(short, e.currentTarget)
                 }
+                onLoadedData={(e) => handleVideoReady(index, e.currentTarget)}
+                onCanPlay={(e) => handleVideoReady(index, e.currentTarget)}
                 onTimeUpdate={(e) => trackShortProgress(short, e.currentTarget)}
               />
 
@@ -523,7 +674,7 @@ export default function Shorts() {
               <div className="absolute inset-0 bg-black/15 pointer-events-none" />
 
               {/* Bottom left – info */}
-              <div className="absolute bottom-28 left-5 z-10 text-white">
+              <div className="absolute bottom-24 left-5 z-10 text-white">
                 <h2 className="font-semibold text-xl drop-shadow-md">
                   {short.title}
                 </h2>
@@ -541,7 +692,7 @@ export default function Shorts() {
                 <button
                   onClick={() => toggleLike(short)}
                   disabled={Boolean(pendingLike[short.id])}
-                  className={Boolean(pendingLike[short.id]) ? "opacity-70" : ""}
+                  className={pendingLike[short.id] ? "opacity-70" : ""}
                 >
                   <Heart
                     size={32}
@@ -557,15 +708,13 @@ export default function Shorts() {
                   <p className="text-sm mt-1">{formatCount(short.comments)}</p>
                 </button>
 
-                <button>
+                <button onClick={() => handleShare(short)}>
                   <Share2 size={32} />
                 </button>
 
                 <button onClick={() => setMuted(!muted)}>
                   {muted ? <VolumeX size={32} /> : <Volume2 size={32} />}
                 </button>
-
-                <MoreHorizontal size={28} />
               </div>
 
               {commentOpenForId === short.id && (

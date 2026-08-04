@@ -139,26 +139,76 @@
 
 // export default Leaderboard;
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
-const leaderboardData = {
-  topCreators: [
-    { rank: 1, name: "TechWithAdi", username: "@adiTech07", avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400", followers: "1.2M", points: 9420 },
-    { rank: 2, name: "CodeWithRohit", username: "@rohitcodes", avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400", followers: "874K", points: 8150 },
-    { rank: 3, name: "UIQueen", username: "@uiqueen", avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400", followers: "652K", points: 7630 },
-    { rank: 4, name: "DevVibes", username: "@devvibesonly", avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400", followers: "421K", points: 5980 },
-    { rank: 5, name: "PixelWizard", username: "@pixelwizard", avatar: "https://images.unsplash.com/photo-1552058544-f2b08422138a?w=400", followers: "298K", points: 5120 },
-  ],
-  topViews: [
-    { rank: 1, title: "React 19 – Everything New", views: "2.4M", thumbnail: "https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=800", creator: "@adiTech07" },
-    { rank: 2, title: "Tailwind in 100 Seconds", views: "1.8M", thumbnail: "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800", creator: "@tailwindfan" },
-    { rank: 3, title: "Build Netflix Clone in 4 Hours", views: "1.5M", thumbnail: "https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=800", creator: "@codewithrohit" },
-    { rank: 4, title: "Framer Motion Magic", views: "987K", thumbnail: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=800", creator: "@motionmaster" },
-    { rank: 5, title: "Next.js 15 Deep Dive", views: "842K", thumbnail: "https://images.unsplash.com/photo-1627398242454-45a1465c2479?w=800", creator: "@nextjsguru" },
-  ]
+const BACKEND_URL = "http://localhost:8000";
+
+// Thumbnail / media URL fix
+const resolveMediaUrl = (value) => {
+  if (!value) return "";
+  if (/^https?:\/\//i.test(value)) return value;
+
+  const normalized = value.replace(/\\/g, "/");
+  if (normalized.startsWith("uploads/")) {
+    return `${BACKEND_URL}/${normalized}`;
+  }
+  if (normalized.includes("uploads/")) {
+    return `${BACKEND_URL}/${normalized.split("uploads/").pop()}`;
+  }
+  if (normalized.startsWith("/uploads/")) {
+    return `${BACKEND_URL}${normalized}`;
+  }
+  return `${BACKEND_URL}/${normalized}`;
 };
 
 const Leaderboard = () => {
+  const [topCreators, setTopCreators] = useState([]);
+  const [topVideos, setTopVideos] = useState([]);
+  const [videoType, setVideoType] = useState("long");
+  const [loading, setLoading] = useState(
+    () => !localStorage.getItem("token"),
+  );
+  const [error, setError] = useState(() =>
+    localStorage.getItem("token")
+      ? null
+      : "Please login to view the leaderboard.",
+  );
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    let active = true;
+
+    fetch(`${BACKEND_URL}/api/leaderboard?videoType=${videoType}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`Failed to load leaderboard (${res.status})`);
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (!active) return;
+        if (!data.success) {
+          throw new Error(data.message || "Failed to load leaderboard");
+        }
+        setTopCreators(data.data?.topCreators || []);
+        setTopVideos(data.data?.topVideos || []);
+      })
+      .catch((err) => {
+        if (active) setError(err.message || "Failed to load leaderboard data.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [videoType]);
+
   return (
     <div className="min-h-screen bg-black text-white py-10 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
@@ -173,6 +223,11 @@ const Leaderboard = () => {
           </p>
         </div>
 
+        {loading ? (
+          <div className="text-center text-gray-400 py-20">Loading leaderboard...</div>
+        ) : error ? (
+          <div className="text-center text-red-400 py-20">{error}</div>
+        ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 xl:gap-12">
 
           {/* TOP CREATORS */}
@@ -184,9 +239,14 @@ const Leaderboard = () => {
             </div>
 
             <div className="divide-y divide-gray-800">
-              {leaderboardData.topCreators.map((creator) => (
+              {topCreators.length === 0 ? (
+                <div className="px-6 py-8 text-center text-gray-400">
+                  No creators yet.
+                </div>
+              ) : (
+                topCreators.map((creator) => (
                 <div
-                  key={creator.rank}
+                  key={creator.id}
                   className="px-6 py-5 flex items-center gap-5 hover:bg-gray-900 transition-colors"
                 >
                   <div className={`w-12 h-12 flex items-center justify-center text-xl font-bold rounded-full min-w-[48px] ${
@@ -198,43 +258,70 @@ const Leaderboard = () => {
                     {creator.rank}
                   </div>
 
-                  <img
-                    src={creator.avatar}
-                    alt={creator.name}
-                    className="w-14 h-14 rounded-full object-cover border-2 border-gray-700"
-                  />
+                  {creator.avatar ? (
+                    <img
+                      src={resolveMediaUrl(creator.avatar)}
+                      alt={creator.name}
+                      className="w-14 h-14 rounded-full object-cover border-2 border-gray-700"
+                    />
+                  ) : (
+                    <div className="w-14 h-14 rounded-full border-2 border-gray-700 bg-gray-800 flex items-center justify-center text-gray-400 text-lg font-semibold">
+                      {(creator.name || "?").charAt(0).toUpperCase()}
+                    </div>
+                  )}
 
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-lg text-white truncate">{creator.name}</p>
-                    <p className="text-gray-400 text-sm">{creator.username}</p>
+                    <p className="font-semibold text-lg text-white truncate">{creator.name || "Unknown"}</p>
+                    <p className="text-gray-400 text-sm">{creator.channelName}</p>
                   </div>
 
                   <div className="text-right">
-                    <p className="text-white font-bold">{creator.followers}</p>
+                    <p className="text-white font-bold">{Number(creator.totalSubscribers || 0).toLocaleString()}</p>
                     <p className="text-xs text-gray-500">followers</p>
                   </div>
 
                   <div className="text-right min-w-[80px]">
-                    <p className="text-red-400 font-bold">{creator.points.toLocaleString()}</p>
+                    <p className="text-red-400 font-bold">{Number(creator.rewardPoints || 0).toLocaleString()}</p>
                     <p className="text-xs text-gray-500">points</p>
                   </div>
                 </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
 
           {/* TOP VIEWS */}
           <div className="bg-gray-950 border border-gray-800 rounded-2xl overflow-hidden shadow-2xl shadow-red-950/30">
-            <div className="bg-red-950/60 px-6 py-5 border-b border-red-900/50">
+            <div className="bg-red-950/60 px-6 py-5 border-b border-red-900/50 flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-2xl font-bold text-red-500 flex items-center gap-3">
                 <span className="text-3xl">🔥</span> TOP VIEWS
               </h2>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400">Select Video Type</span>
+                <select
+                  value={videoType}
+                  onChange={(e) => {
+                    setVideoType(e.target.value);
+                    setLoading(true);
+                    setError(null);
+                  }}
+                  className="bg-gray-900 text-white text-sm rounded-lg border border-gray-700 px-3 py-1.5 focus:outline-none focus:border-red-500"
+                >
+                  <option value="long">Top Videos</option>
+                  <option value="short">Top Shorts</option>
+                </select>
+              </div>
             </div>
 
             <div className="divide-y divide-gray-800">
-              {leaderboardData.topViews.map((item) => (
+              {topVideos.length === 0 ? (
+                <div className="px-6 py-8 text-center text-gray-400">
+                  No videos yet.
+                </div>
+              ) : (
+                topVideos.map((item) => (
                 <div
-                  key={item.rank}
+                  key={item.id}
                   className="px-6 py-5 flex items-center gap-5 hover:bg-gray-900 transition-colors"
                 >
                   <div className={`w-12 h-12 flex items-center justify-center text-xl font-bold rounded-full min-w-[48px] ${
@@ -246,27 +333,35 @@ const Leaderboard = () => {
                     {item.rank}
                   </div>
 
-                  <img
-                    src={item.thumbnail}
-                    alt={item.title}
-                    className="w-20 h-12 object-cover rounded-md border border-gray-700"
-                  />
+                  {item.thumbnail ? (
+                    <img
+                      src={resolveMediaUrl(item.thumbnail)}
+                      alt={item.title}
+                      className="w-20 h-12 object-cover rounded-md border border-gray-700"
+                    />
+                  ) : (
+                    <div className="w-20 h-12 rounded-md border border-gray-700 bg-gray-800 flex items-center justify-center text-gray-500">
+                      No thumb
+                    </div>
+                  )}
 
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-base text-white line-clamp-1">{item.title}</p>
-                    <p className="text-gray-400 text-sm">{item.creator}</p>
+                    <p className="text-gray-400 text-sm">{item.creatorName}</p>
                   </div>
 
                   <div className="text-right">
-                    <p className="text-white font-bold text-lg">{item.views}</p>
+                    <p className="text-white font-bold text-lg">{Number(item.views || 0).toLocaleString()}</p>
                     <p className="text-xs text-gray-500">views</p>
                   </div>
                 </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
 
         </div>
+        )}
 
         <div className="text-center mt-12 text-gray-500 text-sm">
           Keep creating fire content to reach the top! 🔥

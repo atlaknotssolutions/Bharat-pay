@@ -81,10 +81,13 @@
 
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import { useDispatch } from "react-redux";
+import { setSelectedCategory } from "../../features/videos/videosSlice";
 
 const API_URL = "http://localhost:8000/api/category";
 
 export default function TopicChips() {
+  const dispatch = useDispatch();
   const [topics, setTopics] = useState([]);
   const [selectedTopic, setSelectedTopic] = useState("For you");
 
@@ -99,7 +102,6 @@ export default function TopicChips() {
 
         if (!hasForYou && res.data.length > 0) {
           setSelectedTopic(res.data[0].name);
-          setIsForYouSubmenuOpen(false);
         }
       } catch (err) {
         console.error("Category fetch error:", err);
@@ -113,9 +115,10 @@ export default function TopicChips() {
     setSelectedTopic(topic);
 
     if (topic === "For you") {
-      setIsForYouSubmenuOpen((prev) => !prev);
+      dispatch(setSelectedCategory(null));
     } else {
-      setIsForYouSubmenuOpen(false);
+      const selected = topics.find((t) => t.name === topic);
+      dispatch(setSelectedCategory(selected?._id || null));
     }
   };
 
