@@ -2,12 +2,12 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { toast } from "react-toastify";
 import {
   API_BASE,
   normalizeVideoListItem,
   normalizeShort,
 } from "../features/videos/videosSlice";
+import { addToWatchLater, removeFromWatchLater } from "../api/watchLater";
 import { MovieCard } from "../components/common/VideoGrid";
 import ShortCard from "../components/common/ShortCard";
 
@@ -124,34 +124,7 @@ const ViewAll = () => {
     navigate(`/video/${item.id}`, { state: { video: item } });
   };
 
-  const handleAddToWatchLater = async (item) => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      toast.error("Please login first");
-      return;
-    }
-
-    try {
-      const res = await fetch(`${API_BASE}/watch-later/${item.id}`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        toast.success(data.message || "Added to Watch Later");
-      } else {
-        toast.error(data.message || "Failed to add");
-      }
-    } catch (err) {
-      console.error("Add to Watch Later error:", err);
-      toast.error("Something went wrong");
-    }
-  };
+  const handleAddToWatchLater = addToWatchLater;
 
   if (!section) {
     return (
@@ -190,13 +163,14 @@ const ViewAll = () => {
                 ))}
               </div>
             ) : (
-              <div className="flex flex-wrap gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {items.map((item) => (
                   <MovieCard
                     key={item.id}
                     item={item}
                     onClick={handleItemClick}
                     onAddToWatchLater={handleAddToWatchLater}
+                    onRemoveFromWatchLater={removeFromWatchLater}
                   />
                 ))}
               </div>

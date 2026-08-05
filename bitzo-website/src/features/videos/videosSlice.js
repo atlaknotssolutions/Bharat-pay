@@ -22,6 +22,9 @@ export const normalizeVideoListItem = (video) => ({
       : `${BACKEND_URL}/${video.videoUrl.replace(/\\/g, "/")}`
     : "",
   channel: video.channel || null,
+  uploadedBy: video.uploadedBy || null,
+  creator: video.creator || null,
+  channelName: video.channelName || video.channel?.name || null,
   uploadDate: video.createdAt || video.uploadDate || null,
   status: video.status || (video.isPublic === false ? "Private" : "Public"),
   likesCount: Number(video.likesCount || video.likes || 0),

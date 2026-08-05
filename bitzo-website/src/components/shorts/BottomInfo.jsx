@@ -1,12 +1,44 @@
 import { BadgeCheck, Music2 } from "lucide-react";
 
+const BACKEND_URL = "http://localhost:8000";
+
+const resolveImage = (value) => {
+  if (!value) return "";
+  if (/^https?:\/\//i.test(value)) return value;
+  return `${BACKEND_URL}/${String(value).replace(/^\/+/, "").replace(/\\/g, "/")}`;
+};
+
 export default function BottomInfo({ short, formattedViews, onSubscribe }) {
   const raw = short.raw || {};
-  const channel = raw.channel;
-  const channelName =
-    typeof channel === "string" ? null : channel?.name || null;
-  const verified = raw.verified === true || channel?.verified === true;
-  const displayName = channelName || "Bitzo Creator";
+  const channel = typeof raw.channel === "string" ? null : raw.channel || null;
+  const uploadedBy =
+    typeof raw.uploadedBy === "string" ? null : raw.uploadedBy || null;
+  const creator = typeof raw.creator === "string" ? null : raw.creator || null;
+
+  const displayName =
+    channel?.name ||
+    raw.channelName ||
+    uploadedBy?.name ||
+    creator?.name ||
+    "Bitzo Creator";
+
+  const avatar = resolveImage(
+    channel?.channelImage ||
+      uploadedBy?.avatar ||
+      creator?.avatar ||
+      creator?.profileImage ||
+      raw.avatar ||
+      raw.channelImage ||
+      "",
+  );
+
+  const verified = Boolean(
+    raw.verified === true ||
+      channel?.verified === true ||
+      uploadedBy?.verified === true ||
+      creator?.verified === true,
+  );
+
   const description = raw.description || "";
   const hashtags = Array.isArray(raw.hashtags) ? raw.hashtags : [];
 
@@ -14,11 +46,19 @@ export default function BottomInfo({ short, formattedViews, onSubscribe }) {
     <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-4 pb-6 pr-24">
       {/* Channel row */}
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-pink-500 to-purple-600 ring-2 ring-white/20">
-          <span className="text-sm font-bold text-white">
-            {displayName.charAt(0).toUpperCase()}
-          </span>
-        </div>
+        {avatar ? (
+          <img
+            src={avatar}
+            alt={displayName}
+            className="h-10 w-10 shrink-0 rounded-full object-cover ring-2 ring-white/20"
+          />
+        ) : (
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-pink-500 to-purple-600 ring-2 ring-white/20">
+            <span className="text-sm font-bold text-white">
+              {displayName.charAt(0).toUpperCase()}
+            </span>
+          </div>
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <span className="truncate text-sm font-semibold text-white">

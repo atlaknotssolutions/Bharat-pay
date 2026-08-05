@@ -187,3 +187,20 @@
 .shorts-hint-in {
   animation: shorts-hint-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
+
+@layer components {
+  .card-hover {
+    border-radius: 1rem;
+    padding: 10px;
+    transition:
+      background-color 200ms ease,
+      box-shadow 200ms ease,
+      transform 200ms ease,
+      translate 200ms ease;
+  }
+
+  .card-hover:hover {
+    background-color: rgba(120, 20, 20, 0.25);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  }
+}

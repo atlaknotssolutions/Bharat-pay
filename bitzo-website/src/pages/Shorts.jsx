@@ -37,7 +37,7 @@ const normalizeShort = (v) => ({
   isLiked: v.userReaction === "like" || v.isLiked === true,
   reaction: v.userReaction || v.reaction || null,
   thumbnail: toMediaUrl(v.thumbnail || v.thumb || ""),
-  raw: v,
+  raw: v.raw || v,
 });
 
 const formatViews = (n) => {

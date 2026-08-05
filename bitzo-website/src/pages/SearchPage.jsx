@@ -2,12 +2,11 @@ import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { toast } from "react-toastify";
 import {
-  API_BASE,
   clearSearch,
   searchVideos,
 } from "../features/videos/videosSlice";
+import { addToWatchLater, removeFromWatchLater } from "../api/watchLater";
 import { MovieCard } from "../components/common/VideoGrid";
 import ShortCard from "../components/common/ShortCard";
 
@@ -48,34 +47,7 @@ export default function SearchPage() {
     navigate(`/shorts/${item.id}`, { state: { video: item } });
   };
 
-  const handleAddToWatchLater = async (item) => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      toast.error("Please login first");
-      return;
-    }
-
-    try {
-      const res = await fetch(`${API_BASE}/watch-later/${item.id}`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        toast.success(data.message || "Added to Watch Later");
-      } else {
-        toast.error(data.message || "Failed to add");
-      }
-    } catch (err) {
-      console.error("Add to Watch Later error:", err);
-      toast.error("Something went wrong");
-    }
-  };
+  const handleAddToWatchLater = addToWatchLater;
 
   if (!q) {
     return (
@@ -118,13 +90,14 @@ export default function SearchPage() {
                 <h2 className="text-white text-xl font-semibold mb-3">
                   Videos
                 </h2>
-                <div className="flex flex-wrap gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {videoResults.map((item) => (
                     <MovieCard
                       key={item.id}
                       item={item}
                       onClick={handleVideoClick}
                       onAddToWatchLater={handleAddToWatchLater}
+                      onRemoveFromWatchLater={removeFromWatchLater}
                     />
                   ))}
                 </div>

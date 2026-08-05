@@ -670,7 +670,9 @@ const recommendedVideos = async (req, res) => {
     const videos = await Video.find(filter)
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .populate("channel", "name channelImage")
+      .populate("uploadedBy", "name avatar");
 
     const total = await Video.countDocuments(filter);
 
@@ -799,7 +801,9 @@ const trendingVideos = async (req, res) => {
     const videos = await Video.find(filter)
       .sort({ views: -1, createdAt: -1 })
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .populate("channel", "name channelImage")
+      .populate("uploadedBy", "name avatar");
 
     const total = await Video.countDocuments(filter);
 
@@ -829,7 +833,9 @@ const LatestVideos = async (req, res) => {
     const videos = await Video.find(filter)
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .populate("channel", "name channelImage")
+      .populate("uploadedBy", "name avatar");
 
     const total = await Video.countDocuments(filter);
 
@@ -859,7 +865,9 @@ const trendingShorts = async (req, res) => {
     const videos = await Video.find(filter)
       .sort({ views: -1, createdAt: -1 })
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .populate("channel", "name channelImage")
+      .populate("uploadedBy", "name avatar");
 
     const total = await Video.countDocuments(filter);
 
@@ -919,7 +927,9 @@ const topShorts = async (req, res) => {
     const videos = await Video.find(filter)
       .sort({ views: -1, createdAt: -1 })
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .populate("channel", "name channelImage")
+      .populate("uploadedBy", "name avatar");
 
     const total = await Video.countDocuments(filter);
 
@@ -942,10 +952,9 @@ const topShorts = async (req, res) => {
 const getVideoById = async (req, res) => {
   try {
     const videoId = req.params.id || req.params.videoId;
-    const video = await Video.findById(videoId).populate(
-      "channel",
-      "name subscribersCount channelImage subscribedBy",
-    );
+    const video = await Video.findById(videoId)
+      .populate("channel", "name subscribersCount channelImage subscribedBy")
+      .populate("uploadedBy", "name avatar");
 
     if (!video) {
       return res
@@ -1607,7 +1616,7 @@ const getSubscribedVideos = async (req, res) => {
       .skip(skip)
       .limit(limit)
       .populate("channel", "name channelImage")
-      .populate("uploadedBy", "name email");
+      .populate("uploadedBy", "name avatar");
 
     res.status(200).json({
       success: true,
@@ -2038,7 +2047,7 @@ const searchVideos = async (req, res) => {
             let: { userId: "$uploadedBy" },
             pipeline: [
               { $match: { $expr: { $eq: ["$_id", "$$userId"] } } },
-              { $project: { name: 1, email: 1 } },
+              { $project: { name: 1, avatar: 1 } },
             ],
             as: "uploadedBy",
           },
