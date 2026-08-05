@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { ChevronRight, Play, Plus, Info } from "lucide-react";
+import { ChevronRight, Play, Plus } from "lucide-react";
 import { toast } from "react-toastify";
 import { fetchHomeVideos } from "../../features/videos/videosSlice";
 import ShortCard from "./ShortCard";
@@ -173,18 +173,10 @@ export function MovieCard({ item, onClick, onAddToWatchLater }) {
                 >
                   <Plus size={16} />
                 </button>
-
-                {/* Info button */}
-                <button
-                  onClick={(e) => e.stopPropagation()}
-                  className="w-8 h-8 rounded-full border border-white/50 flex items-center justify-center hover:border-white"
-                >
-                  <Info size={16} />
-                </button>
               </div>
             </div>
             <div>
-              <h3 className="text-white text-sm font-semibold">{item.title}</h3>
+              <h3 className="text-white text-sm font-semibold line-clamp-2">{item.title}</h3>
             </div>
           </div>
         </div>

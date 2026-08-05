@@ -2,19 +2,16 @@ import React, { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallba
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchHomeVideos } from "../features/videos/videosSlice";
-import {
-  Heart,
-  MessageCircle,
-  Share2,
-  Volume2,
-  VolumeX,
-  Music2,
-  X,
-} from "lucide-react";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useSwipeable } from "react-swipeable"; // ← install: npm install react-swipeable
-import { getWatchSession } from "../utils/watchSession";
+import { getWatchSession, flushAllSessions } from "../utils/watchSession";
+import ShortVideo from "../components/shorts/ShortVideo";
+import ShortOverlay from "../components/shorts/ShortOverlay";
+import ActionRail from "../components/shorts/ActionRail";
+import BottomInfo from "../components/shorts/BottomInfo";
+import CommentsSheet from "../components/shorts/CommentsSheet";
+import SwipeHint from "../components/shorts/SwipeHint";
 
 const BACKEND_URL = "http://localhost:8000";
 const API_BASE = `${BACKEND_URL}/api/uservideo`;
@@ -40,6 +37,7 @@ const normalizeShort = (v) => ({
   isLiked: v.userReaction === "like" || v.isLiked === true,
   reaction: v.userReaction || v.reaction || null,
   thumbnail: toMediaUrl(v.thumbnail || v.thumb || ""),
+  raw: v,
 });
 
 const formatViews = (n) => {
@@ -93,8 +91,12 @@ export default function Shorts() {
   const [commentTextById, setCommentTextById] = useState({});
   const [commentLoading, setCommentLoading] = useState(false);
   const [muted, setMuted] = useState(true);
+  const [showSwipeHint, setShowSwipeHint] = useState(false);
+  const [playerBox, setPlayerBox] = useState({ width: 0, height: 0 });
 
   const containerRef = useRef(null);
+  const playerAreaRef = useRef(null);
+  const rootRef = useRef(null);
   const videoRefs = useRef([]);
   const reportedPercentRef = useRef({});
   const isProgrammaticScrollRef = useRef(false);
@@ -114,6 +116,89 @@ export default function Shorts() {
       mountedRef.current = false;
     };
   }, []);
+
+  // Keep keyboard focus on the player so Space / M / Escape work.
+  useEffect(() => {
+    const node = rootRef.current;
+    if (node && document.activeElement !== node) {
+      node.focus({ preventScroll: true });
+    }
+  }, []);
+
+  const setVideoRef = (el, index) => {
+    if (el) {
+      videoRefs.current[index] = el;
+    } else {
+      delete videoRefs.current[index];
+      // Persist any untracked unique-seconds for the departing video.
+      flushAllSessions(false);
+    }
+  };
+
+  const togglePlayCurrent = () => {
+    if (commentsOpenRef.current) return;
+    const video = videoRefs.current[currentIndexRef.current];
+    if (!video) return;
+    if (video.paused) {
+      const promise = video.play();
+      if (promise && typeof promise.catch === "function") {
+        promise.catch(() => {});
+      }
+    } else {
+      video.pause();
+    }
+  };
+
+  const getChannelId = (short) => {
+    const channel = short?.raw?.channel;
+    return typeof channel === "string"
+      ? channel
+      : channel?._id || channel?.id || null;
+  };
+
+  const handleSubscribe = async (short) => {
+    const channelId = getChannelId(short);
+    const token = localStorage.getItem("token");
+    if (!channelId || !token) return;
+    try {
+      const response = await fetch(`${API_BASE}/subscribe/${channelId}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast.success(data.message || "Subscribed");
+      } else {
+        toast.error(data.message || "Failed to subscribe");
+      }
+    } catch (error) {
+      console.error("Subscribe error:", error);
+      toast.error("Something went wrong");
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    const target = e.target;
+    const isEditable =
+      target instanceof HTMLElement &&
+      (target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable);
+
+    if (e.key === "Escape") {
+      if (commentOpenForId) setCommentOpenForId(null);
+      return;
+    }
+    if (isEditable || (target instanceof HTMLElement && target.tagName === "BUTTON")) {
+      return;
+    }
+    if (e.key === " ") {
+      e.preventDefault();
+      togglePlayCurrent();
+    } else if (e.key === "m" || e.key === "M") {
+      setMuted((m) => !m);
+    }
+  };
 
   useEffect(() => {
     currentIndexRef.current = currentIndex;
@@ -301,8 +386,41 @@ export default function Shorts() {
 
     pendingInitialScrollRef.current = null;
     isProgrammaticScrollRef.current = true;
-    containerRef.current.scrollTop = index * window.innerHeight;
+    containerRef.current.scrollTop =
+      index * containerRef.current.clientHeight;
   }, [shorts]);
+
+  // ─── Size the 9:16 player to fit inside the layout column ───
+  useLayoutEffect(() => {
+    const measure = () => {
+      const el = playerAreaRef.current;
+      if (!el) return;
+      const cw = el.clientWidth || 0;
+      const ch = el.clientHeight || 0;
+      if (!cw || !ch) return;
+      let h = ch;
+      let w = h * (9 / 16);
+      if (w > cw) {
+        w = cw;
+        h = w * (16 / 9);
+      }
+      setPlayerBox({ width: Math.max(1, Math.floor(w)), height: Math.max(1, Math.floor(h)) });
+    };
+
+    measure();
+
+    const ro =
+      typeof ResizeObserver === "function"
+        ? new ResizeObserver(() => measure())
+        : null;
+    if (ro && playerAreaRef.current) ro.observe(playerAreaRef.current);
+    window.addEventListener("resize", measure);
+
+    return () => {
+      if (ro) ro.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, []);
 
   // ─── Change video with bounds check ───
   const goToVideo = (newIndex) => {
@@ -313,7 +431,7 @@ export default function Shorts() {
     // Optional: smooth scroll to make vertical feel natural too
     if (containerRef.current) {
       containerRef.current.scrollTo({
-        top: newIndex * window.innerHeight,
+        top: newIndex * containerRef.current.clientHeight,
         behavior: "smooth",
       });
     }
@@ -411,7 +529,7 @@ export default function Shorts() {
       return;
     }
     const scrollTop = containerRef.current.scrollTop;
-    const height = window.innerHeight;
+    const height = containerRef.current.clientHeight || window.innerHeight;
     const newIndex = Math.round(scrollTop / height);
     if (newIndex !== currentIndex) {
       setCurrentIndex(newIndex);
@@ -608,180 +726,150 @@ export default function Shorts() {
     }
   }, [commentOpenForId]);
 
-  // Toast reminder (runs once per video change)
+  // Swipe hint (appears briefly after settling on a video)
   useEffect(() => {
-    const timer = setTimeout(() => {
-      toast.info("👀 Watch more reels → swipe left", {
-        position: "bottom-center",
-        theme: "dark",
-        autoClose: 2800,
-      });
-    }, 10000);
-
-    return () => clearTimeout(timer);
+    setShowSwipeHint(false);
+    const show = setTimeout(() => setShowSwipeHint(true), 10000);
+    return () => clearTimeout(show);
   }, [currentIndex]);
+
+  useEffect(() => {
+    if (!showSwipeHint) return;
+    const hide = setTimeout(() => setShowSwipeHint(false), 3200);
+    return () => clearTimeout(hide);
+  }, [showSwipeHint]);
+
+  // Virtualization window: only mount previous / current / next.
+  const renderStart = Math.max(0, currentIndex - 1);
+  const renderEnd = Math.min(shorts.length - 1, currentIndex + 1);
 
   return (
     <div
-      className="fixed inset-0 bg-black flex justify-center items-center touch-none"
-      {...handlers} // ← swipe gestures work on whole screen
+      ref={rootRef}
+      tabIndex={-1}
+      aria-label="Shorts player"
+      className="flex h-[calc(100dvh-7.5rem)] w-full touch-none outline-none md:h-[calc(100dvh-3.5rem)]"
+      onKeyDown={handleKeyDown}
+      {...handlers} // ← swipe gestures work on the player area
     >
-      {/* Main scroll container – vertical snap */}
-      <div
-        ref={containerRef}
-        onScroll={handleScroll}
-        className="
-          h-screen w-full max-w-125
-          overflow-y-scroll
-          snap-y snap-mandatory
-          overscroll-contain
-          touch-pan-y
-          scrollbar-hide
-        "
-      >
-        {loading || loadingState ? (
-          <div className="h-screen w-full flex items-center justify-center">
-            <p className="text-white/70 text-sm">Loading shorts...</p>
-          </div>
-        ) : shorts.length === 0 ? (
-          <div className="h-screen w-full flex items-center justify-center">
-            <p className="text-white/70 text-sm">No shorts available yet.</p>
-          </div>
-        ) : (
-          shorts.map((short, index) => (
-            <div
-              key={short.id}
-              className="relative h-screen w-full snap-start snap-always"
-            >
-              {/* VIDEO */}
-              <video
-                ref={(el) => (videoRefs.current[index] = el)}
-                src={short.videoUrl}
-                className="absolute inset-0 w-full h-full object-cover"
-                loop
-                muted={muted}
-                playsInline
-                preload="auto"
-                onLoadedMetadata={(e) =>
-                  trackShortProgress(short, e.currentTarget)
-                }
-                onLoadedData={(e) => handleVideoReady(index, e.currentTarget)}
-                onCanPlay={(e) => handleVideoReady(index, e.currentTarget)}
-                onTimeUpdate={(e) => trackShortProgress(short, e.currentTarget)}
-              />
+      <div className="mx-auto flex h-full w-full max-w-[1200px]">
+        {/* Player column – the Shorts player lives INSIDE the app layout */}
+        <div ref={playerAreaRef} className="relative h-full min-w-0 flex-1">
+          {/* Ambient glow behind the player (desktop) */}
+          <div
+            className="pointer-events-none absolute top-1/2 left-1/2 hidden h-[85%] w-[45%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/[0.03] blur-3xl md:block"
+            aria-hidden="true"
+          />
 
-              {/* Dark overlay for better text readability */}
-              <div className="absolute inset-0 bg-black/15 pointer-events-none" />
-
-              {/* Bottom left – info */}
-              <div className="absolute bottom-24 left-5 z-10 text-white">
-                <h2 className="font-semibold text-xl drop-shadow-md">
-                  {short.title}
-                </h2>
-                <p className="text-white/80 text-base mt-1">
-                  {formatViews(short.views)}
-                </p>
-                <p className="text-white/70 text-sm flex items-center gap-1.5 mt-1">
-                  <Music2 size={16} />
-                  Original Audio
-                </p>
-              </div>
-
-              {/* Right side buttons */}
-              <div className="absolute right-5 bottom-32 z-10 flex flex-col items-center gap-6 text-white">
-                <button
-                  onClick={() => toggleLike(short)}
-                  disabled={Boolean(pendingLike[short.id])}
-                  className={pendingLike[short.id] ? "opacity-70" : ""}
-                >
-                  <Heart
-                    size={32}
-                    className={
-                      liked[short.id] ? "text-red-500 fill-red-500" : ""
-                    }
-                  />
-                  <p className="text-sm mt-1">{formatCount(short.likes)}</p>
-                </button>
-
-                <button onClick={() => handleCommentOpen(short)}>
-                  <MessageCircle size={32} />
-                  <p className="text-sm mt-1">{formatCount(short.comments)}</p>
-                </button>
-
-                <button onClick={() => handleShare(short)}>
-                  <Share2 size={32} />
-                </button>
-
-                <button onClick={() => setMuted(!muted)}>
-                  {muted ? <VolumeX size={32} /> : <Volume2 size={32} />}
-                </button>
-              </div>
-
-              {commentOpenForId === short.id && (
-                <div className="absolute inset-x-0 bottom-0 z-20 bg-black/90 backdrop-blur-md border-t border-white/10 p-4 text-white">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-semibold">Comments</h3>
-                    <button onClick={() => setCommentOpenForId(null)}>
-                      <X size={18} />
-                    </button>
+          {/* 9:16 player sized to fit the column (largest size that preserves ratio) */}
+          <div
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+            style={{
+              width: playerBox.width || undefined,
+              height: playerBox.height || undefined,
+            }}
+          >
+            <div className="relative h-full w-full overflow-hidden rounded-xl bg-black shadow-2xl shadow-black/50 ring-1 ring-white/10">
+              {/* Main scroll container – vertical snap */}
+              <div
+                ref={containerRef}
+                onScroll={handleScroll}
+                className="
+                  relative z-10
+                  h-full w-full
+                  overflow-y-scroll
+                  snap-y snap-mandatory
+                  overscroll-contain
+                  touch-pan-y
+                  scrollbar-hide
+                "
+              >
+                {loading || loadingState ? (
+                  <div className="flex h-full w-full items-center justify-center">
+                    <p className="text-white/70 text-sm">Loading shorts...</p>
                   </div>
-
-                  <form
-                    onSubmit={(e) => handleCommentSubmit(e, short)}
-                    className="mb-3"
-                  >
-                    <textarea
-                      value={commentTextById[short.id] || ""}
-                      onChange={(e) =>
-                        setCommentTextById((prev) => ({
-                          ...prev,
-                          [short.id]: e.target.value,
-                        }))
-                      }
-                      rows={2}
-                      placeholder="Write a comment..."
-                      className="w-full rounded-lg bg-white/10 px-3 py-2 text-sm outline-none"
-                    />
-                    <div className="mt-2 flex justify-end">
-                      <button
-                        type="submit"
-                        disabled={
-                          commentLoading || !commentTextById[short.id]?.trim()
-                        }
-                        className="rounded-full bg-white px-4 py-1.5 text-sm font-medium text-black disabled:opacity-60"
+                ) : shorts.length === 0 ? (
+                  <div className="flex h-full w-full items-center justify-center">
+                    <p className="text-white/70 text-sm">No shorts available yet.</p>
+                  </div>
+                ) : (
+                  shorts.map((short, index) => {
+                    const active = index === currentIndex;
+                    const inWindow = index >= renderStart && index <= renderEnd;
+                    return (
+                      <div
+                        key={short.id}
+                        className="relative h-full w-full snap-start snap-always bg-black"
                       >
-                        {commentLoading ? "Posting..." : "Comment"}
-                      </button>
-                    </div>
-                  </form>
+                        {inWindow && (
+                          <>
+                            <ShortVideo
+                              index={index}
+                              src={short.videoUrl}
+                              poster={short.thumbnail}
+                              title={short.title}
+                              muted={muted}
+                              preload={active ? "auto" : "metadata"}
+                              disabled={Boolean(commentOpenForId)}
+                              onRegister={setVideoRef}
+                              onReady={handleVideoReady}
+                              onMetadata={(el) => trackShortProgress(short, el)}
+                              onTimeUpdate={(el) => trackShortProgress(short, el)}
+                              onTogglePlay={togglePlayCurrent}
+                              onLike={() => toggleLike(short)}
+                            />
 
-                  <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
-                    {(commentsById[short.id] || []).length > 0 ? (
-                      commentsById[short.id].map((comment) => (
-                        <div
-                          key={comment._id}
-                          className="rounded-lg bg-white/10 p-2 text-sm"
-                        >
-                          <p className="font-medium text-white/90">
-                            {comment.userName || "User"}
-                          </p>
-                          <p className="mt-1 text-white/80">{comment.text}</p>
-                          <p className="mt-1 text-[11px] text-white/50">
-                            {comment.createdAt
-                              ? new Date(comment.createdAt).toLocaleString()
-                              : "Just now"}
-                          </p>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-sm text-white/70">No comments yet.</p>
-                    )}
-                  </div>
-                </div>
-              )}
+                            <ShortOverlay />
+
+                            <ActionRail
+                              liked={Boolean(liked[short.id])}
+                              likeLabel={formatCount(short.likes)}
+                              commentLabel={formatCount(short.comments)}
+                              pending={Boolean(pendingLike[short.id])}
+                              onLike={() => toggleLike(short)}
+                              onComment={() => handleCommentOpen(short)}
+                              onShare={() => handleShare(short)}
+                              muted={muted}
+                              onToggleMute={() => setMuted((m) => !m)}
+                            />
+
+                            <BottomInfo
+                              short={short}
+                              formattedViews={formatViews(short.views)}
+                              onSubscribe={
+                                getChannelId(short)
+                                  ? () => handleSubscribe(short)
+                                  : undefined
+                              }
+                            />
+
+                            {commentOpenForId === short.id && (
+                              <CommentsSheet
+                                comments={commentsById[short.id] || []}
+                                text={commentTextById[short.id] || ""}
+                                loading={commentLoading}
+                                onTextChange={(value) =>
+                                  setCommentTextById((prev) => ({
+                                    ...prev,
+                                    [short.id]: value,
+                                  }))
+                                }
+                                onSubmit={(e) => handleCommentSubmit(e, short)}
+                                onClose={() => setCommentOpenForId(null)}
+                              />
+                            )}
+                          </>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {showSwipeHint ? <SwipeHint /> : null}
             </div>
-          ))
-        )}
+          </div>
+        </div>
       </div>
 
       <ToastContainer limit={1} />

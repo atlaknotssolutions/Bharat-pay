@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Eye, Clock, Heart, ArrowUpDown } from "lucide-react";
+import { formatTime } from "../../components/player/utils";
 
 const BACKEND_URL = "http://localhost:8000";
 
@@ -146,7 +147,7 @@ export default function YourVideosTab({ openDetail, sortBy, onSortChange }) {
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Clock size={14} />
-                      <span>{video.duration}</span>
+                      <span>{formatTime(video.duration)}</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-red-400">
                       <Heart size={14} className="fill-red-500" />

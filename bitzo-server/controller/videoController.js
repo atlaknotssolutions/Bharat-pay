@@ -1,4 +1,5 @@
 const Video = require("../models/Videomodel");
+const { getVideoDuration } = require("../utils/mediaDuration");
 
 const fs = require("fs");
 
@@ -36,6 +37,18 @@ exports.updateVideoupdated = async (req, res) => {
     if (req.file) {
       const filePath = req.file.path.replace(/\\/g, "/");
       video.videoUrl = filePath;
+
+      // Authoritative duration for re-uploaded media. Never blocks the update.
+      let authoritativeDuration = null;
+      try {
+        authoritativeDuration = await getVideoDuration(filePath);
+        if (!authoritativeDuration) {
+          console.error("[mediaDuration] Could not determine duration for:", filePath);
+        }
+      } catch (err) {
+        console.error("[mediaDuration] Duration extraction failed:", err.message);
+      }
+      if (authoritativeDuration) video.duration = authoritativeDuration;
     }
 
     await video.save();
@@ -87,11 +100,23 @@ exports.uploadVideo = async (req, res) => {
 
     const filePath = req.file.path.replace(/\\/g, "/");
 
+    // Authoritative duration from the media file; falls back to the client
+    // value. Never throws/fails the upload when extraction is not possible.
+    let authoritativeDuration = null;
+    try {
+      authoritativeDuration = await getVideoDuration(filePath);
+      if (!authoritativeDuration) {
+        console.error("[mediaDuration] Could not determine duration for:", filePath);
+      }
+    } catch (err) {
+      console.error("[mediaDuration] Duration extraction failed:", err.message);
+    }
+
     const video = await Video.create({
       title,
       description: description || "",
       videoType,
-      duration: duration ? Number(duration) : undefined,
+      duration: authoritativeDuration || (duration ? Number(duration) : undefined),
       category,            // only category is saved now
       videoUrl: filePath,
     });

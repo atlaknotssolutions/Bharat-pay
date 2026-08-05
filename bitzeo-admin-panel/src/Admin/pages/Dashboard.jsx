@@ -315,6 +315,7 @@ import {
   ArrowUpRight,
   Play,
 } from "lucide-react"
+import useDashboardData from "../../hooks/useDashboardData"
 
 const StatCard = ({ title, value, change, icon: Icon, color, bg }) => (
   <div className="bg-gray-900 p-5 rounded-2xl border border-gray-800 hover:border-gray-700 transition-all">
@@ -340,35 +341,83 @@ const StatCard = ({ title, value, change, icon: Icon, color, bg }) => (
   </div>
 )
 
-// Dummy data
-const recentUsers = [
-  { id: 1, name: "Rahul Sharma", email: "rahul@email.com", joined: "2h ago", avatar: "RS", status: "online" },
-  { id: 2, name: "Priya Patel", email: "priya@email.com", joined: "5h ago", avatar: "PP", status: "offline" },
-  { id: 3, name: "Amit Kumar", email: "amit@email.com", joined: "1d ago", avatar: "AK", status: "online" },
-  { id: 4, name: "Sneha Gupta", email: "sneha@email.com", joined: "1d ago", avatar: "SG", status: "offline" },
-  { id: 5, name: "Vikram Singh", email: "vikram@email.com", joined: "2d ago", avatar: "VS", status: "online" },
-]
+// Helpers for real data
+const formatRelativeTime = (iso) => {
+  if (!iso) return "just now"
+  const diff = Date.now() - new Date(iso).getTime()
+  const minutes = Math.floor(diff / 60000)
+  if (minutes < 1) return "just now"
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
 
-const recentVideos = [
-  { id: 1, title: "React Advanced Patterns", uploadedBy: "Rahul Sharma", time: "1h ago", views: 1240, duration: "12:40" },
-  { id: 2, title: "JavaScript ES2024 Features", uploadedBy: "Priya Patel", time: "3h ago", views: 890, duration: "18:22" },
-  { id: 3, title: "Node.js Performance Tips", uploadedBy: "Amit Kumar", time: "6h ago", views: 2104, duration: "09:15" },
-  { id: 4, title: "Tailwind CSS Masterclass", uploadedBy: "Sneha Gupta", time: "1d ago", views: 567, duration: "25:08" },
-]
-
-const weeklyData = [
-  { day: "Mon", users: 42, videos: 8 },
-  { day: "Tue", users: 58, videos: 12 },
-  { day: "Wed", users: 35, videos: 6 },
-  { day: "Thu", users: 71, videos: 15 },
-  { day: "Fri", users: 64, videos: 11 },
-  { day: "Sat", users: 89, videos: 19 },
-  { day: "Sun", users: 76, videos: 14 },
-]
-
-const maxUsers = Math.max(...weeklyData.map((d) => d.users))
+const formatCount = (n) => {
+  const value = Number(n) || 0
+  if (value >= 1000) return `${(value / 1000).toFixed(1).replace(/\.0$/, "")}k`
+  return value.toLocaleString()
+}
 
 export default function Dashboard() {
+  const { data, generatedAt, loading, error, refetch } = useDashboardData()
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-4 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-sm text-gray-400">Loading dashboard...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error === "unauthorized") {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center space-y-3">
+          <p className="text-gray-200 font-medium">Session expired or unauthorized</p>
+          <button
+            onClick={() => {
+              localStorage.removeItem("adminToken")
+              localStorage.removeItem("adminUser")
+              window.location.href = "/login"
+            }}
+            className="px-4 py-2 text-sm bg-violet-600 hover:bg-violet-500 text-white rounded-lg"
+          >
+            Go to Login
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center space-y-3">
+          <p className="text-red-400 font-medium">{error}</p>
+          <button
+            onClick={refetch}
+            className="px-4 py-2 text-sm bg-gray-800 hover:bg-gray-700 text-white rounded-lg"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const stats = data?.stats || {}
+  const snapshot = data?.snapshot || {}
+  const weeklyData = data?.weekly || []
+  const recentUsers = data?.recentUsers || []
+  const recentVideos = data?.recentUploads || []
+  const maxUsers = Math.max(...weeklyData.map((d) => d.users), 1)
+  const lastUpdated = generatedAt ? formatRelativeTime(generatedAt) : "just now"
+
   return (
     <div className="space-y-7 p-1">
       {/* Header */}
@@ -381,7 +430,7 @@ export default function Dashboard() {
         </div>
         <div className="flex items-center gap-2 text-sm text-gray-400 bg-gray-900 border border-gray-800 px-3 py-1.5 rounded-lg">
           <Clock className="w-4 h-4" />
-          <span>Last updated: just now</span>
+          <span>Last updated: {lastUpdated}</span>
         </div>
       </div>
 
@@ -405,16 +454,14 @@ export default function Dashboard() {
         />
         <StatCard
           title="Active Users"
-          value="2,847"
-          change="+18.4%"
+          value={(stats.activeUsers ?? 0).toLocaleString()}
           icon={Users}
           color="text-violet-400"
           bg="bg-violet-500/15"
         />
         <StatCard
           title="Videos Uploaded"
-          value="1,284"
-          change="+5.7%"
+          value={(stats.totalVideos ?? 0).toLocaleString()}
           icon={Video}
           color="text-amber-400"
           bg="bg-amber-500/15"
@@ -479,7 +526,7 @@ export default function Dashboard() {
                   <p className="text-xs text-gray-500">Joined today</p>
                 </div>
               </div>
-              <p className="text-xl font-bold text-violet-400">24</p>
+              <p className="text-xl font-bold text-violet-400">{snapshot.newUsers ?? 0}</p>
             </div>
 
             <div className="flex items-center justify-between p-3.5 bg-blue-500/10 border border-blue-500/20 rounded-xl">
@@ -492,7 +539,7 @@ export default function Dashboard() {
                   <p className="text-xs text-gray-500">Uploaded today</p>
                 </div>
               </div>
-              <p className="text-xl font-bold text-blue-400">9</p>
+              <p className="text-xl font-bold text-blue-400">{snapshot.videosUploaded ?? 0}</p>
             </div>
 
             <div className="flex items-center justify-between p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
@@ -505,7 +552,7 @@ export default function Dashboard() {
                   <p className="text-xs text-gray-500">Across all videos</p>
                 </div>
               </div>
-              <p className="text-xl font-bold text-emerald-400">4.8k</p>
+              <p className="text-xl font-bold text-emerald-400">{formatCount(snapshot.totalViews)}</p>
             </div>
 
             <div className="flex items-center justify-between p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl">
@@ -518,7 +565,7 @@ export default function Dashboard() {
                   <p className="text-xs text-gray-500">Hours watched</p>
                 </div>
               </div>
-              <p className="text-xl font-bold text-amber-400">312h</p>
+              <p className="text-xl font-bold text-amber-400">{(snapshot.watchTime ?? 0)}h</p>
             </div>
           </div>
         </div>

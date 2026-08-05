@@ -1,24 +1,24 @@
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { getWatchSession } from "../../utils/watchSession";
+import VideoPlayer from "../../components/player/VideoPlayer";
 import {
   ThumbsUp,
   ThumbsDown,
   MessageSquare,
-  Share2,
-  MoreHorizontal,
-  Play,
-  Pause,
-  Volume2,
-  VolumeX,
-  X,
   Send,
   Check,
+  X,
+  RotateCcw,
+  SkipForward,
 } from "lucide-react";
 
 const BACKEND_URL = "http://localhost:8000";
 const API_BASE = `${BACKEND_URL}/api/uservideo`;
+
+const AUTOPLAY_KEY = "videoo.autoplay";
+const AUTOPLAY_COUNTDOWN_SECONDS = 5;
 
 // Fake data (fallback only)
 const VIDEO_POOL = [
@@ -83,6 +83,54 @@ function getVideoEntry(id) {
   return VIDEO_POOL[idx];
 }
 
+function getChannelName(channel) {
+  if (typeof channel === "string" && channel) return channel;
+  if (channel && typeof channel === "object" && typeof channel.name === "string" && channel.name) {
+    return channel.name;
+  }
+  return null;
+}
+
+function formatCount(value) {
+  const n = Number(value) || 0;
+  if (n >= 1e9) return `${(n / 1e9).toFixed(1).replace(/\.0$/, "")}B`;
+  if (n >= 1e6) return `${(n / 1e6).toFixed(1).replace(/\.0$/, "")}M`;
+  if (n >= 1e3) return `${(n / 1e3).toFixed(1).replace(/\.0$/, "")}K`;
+  return `${n}`;
+}
+
+function timeAgo(value) {
+  if (!value) return "Recently added";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Recently added";
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days} day${days === 1 ? "" : "s"} ago`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `${weeks} week${weeks === 1 ? "" : "s"} ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months} month${months === 1 ? "" : "s"} ago`;
+  const years = Math.floor(days / 365);
+  return `${years} year${years === 1 ? "" : "s"} ago`;
+}
+
+function formatDuration(seconds) {
+  const raw = Number(seconds);
+  if (!Number.isFinite(raw) || raw <= 0) return "--:--";
+  const total = Math.max(0, Math.floor(raw));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const mm = String(m).padStart(2, "0");
+  const ss = String(s).padStart(2, "0");
+  return h > 0 ? `${h}:${mm}:${ss}` : `${m}:${ss}`;
+}
+
 export default function YouTubeLikeVideoPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -97,26 +145,48 @@ export default function YouTubeLikeVideoPage() {
   const [playing, setPlaying] = useState(true);
   const [muted, setMuted] = useState(false);
   const [reaction, setReaction] = useState(null); // "like" | "dislike" | null
-  const [volume, setVolume] = useState(1);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [showControls, setShowControls] = useState(false);
   const [videoDetails, setVideoDetails] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ likes: 0, dislikes: 0 });
   const [reactionLoading, setReactionLoading] = useState(false);
   const [viewCounted, setViewCounted] = useState(false);
-  const [watchPercent, setWatchPercent] = useState(0);
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState("");
   const [commentLoading, setCommentLoading] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [subscribersCount, setSubscribersCount] = useState(0);
   const [subscribeLoading, setSubscribeLoading] = useState(false);
+  const [theaterMode, setTheaterMode] = useState(false);
+  const [autoplay, setAutoplay] = useState(() => {
+    try {
+      return localStorage.getItem(AUTOPLAY_KEY) !== "false";
+    } catch {
+      return true;
+    }
+  });
+  const [upNextOverlay, setUpNextOverlay] = useState(null); // { video }
+  const [countdownLeft, setCountdownLeft] = useState(null); // null => end screen
+  const [upNextVideos, setUpNextVideos] = useState(UP_NEXT_VIDEOS);
 
-  const videoRef = useRef(null);
-  const controlsTimer = useRef(null);
+  const playerRef = useRef(null);
   const viewTracked = useRef(false);
+  const countdownTimerRef = useRef(null);
+  const nextTargetRef = useRef(null);
+  const autoplayNextRef = useRef(false);
+  const playedVideoIdsRef = useRef(new Set());
+
+  // Clear the autoplay countdown from every exit path (Replay, Cancel,
+  // manual navigation, unmount). Idempotent; safe to call repeatedly.
+  const cancelCountdown = useCallback(() => {
+    if (countdownTimerRef.current) {
+      clearInterval(countdownTimerRef.current);
+      countdownTimerRef.current = null;
+    }
+    nextTargetRef.current = null;
+    setUpNextOverlay(null);
+    setCountdownLeft(null);
+  }, []);
 
   const entry = getVideoEntry(videoData.id);
 
@@ -145,50 +215,47 @@ export default function YouTubeLikeVideoPage() {
     ? resolveMediaUrl(videoDetails.thumbnail)
     : entry.poster;
 
-  const formatTime = (seconds) => {
-    const min = Math.floor(seconds / 60);
-    const sec = Math.floor(seconds % 60);
-    return `${min}:${sec.toString().padStart(2, "0")}`;
-  };
-
   // ==================== EFFECTS ====================
 
-  // Video play/pause + timeupdate
+  // Bridge player events to the existing watch tracking. The session attaches
+  // to the native <video> element, so watchSession.js keeps working unchanged.
+  const handlePlayerReady = (videoEl) => {
+    playerRef.current = videoEl;
+    getWatchSession(videoEl, { id, videoType: "long" });
+  };
+
+  const handlePlayerDispose = (videoEl) => {
+    if (playerRef.current === videoEl) playerRef.current = null;
+    getWatchSession(videoEl, { id, videoType: "long" })?.destroy();
+  };
+
+  // Re-bind the watch session whenever the video changes. The <video> element
+  // is never remounted during in-page navigation, so without this the session
+  // stays closed over the previous id: its seconds would be lost (autoplay)
+  // or mis-attributed (manual Play Next). getWatchSession destroys the old
+  // session and creates a fresh one for the new id. Also reset the per-video
+  // view guards so the next video's watch % and view can still be recorded
+  // (the server dedupes counted views, so this can never double-increment).
   useEffect(() => {
-    const v = videoRef.current;
-    if (!v) return;
+    const el = playerRef.current;
+    if (el) getWatchSession(el, { id, videoType: "long" });
+    viewTracked.current = false;
+    setViewCounted(false);
+    // Reset playback metrics so the 80% view effect can't fire with stale
+    // values from the previous video before the new one has loaded.
+    setCurrentTime(0);
+    setDuration(0);
+    return () => cancelCountdown();
+  }, [id, cancelCountdown]);
 
-    v.load();
-    if (playing) v.play().catch(() => {});
-    else v.pause();
-
-    const onTime = () => {
-      setCurrentTime(v.currentTime);
-      getWatchSession(v, { id, videoType: "long" })?.tick();
-    };
-    const onMeta = () => setDuration(v.duration || 0);
-
-    v.addEventListener("timeupdate", onTime);
-    v.addEventListener("loadedmetadata", onMeta);
-
-    return () => {
-      v.removeEventListener("timeupdate", onTime);
-      v.removeEventListener("loadedmetadata", onMeta);
-    };
-  }, [playing, resolvedVideoUrl, id]);
-
-  // Watch-time session lifecycle (unique seconds, flush on unmount/video change)
+  // Persist the autoplay preference.
   useEffect(() => {
-    const v = videoRef.current;
-    if (!v || !id) return;
-    getWatchSession(v, { id, videoType: "long" });
-    const onEnded = () => getWatchSession(v, { id, videoType: "long" })?.onEnded();
-    v.addEventListener("ended", onEnded);
-    return () => {
-      v.removeEventListener("ended", onEnded);
-      getWatchSession(v, { id, videoType: "long" })?.destroy();
-    };
-  }, [id, resolvedVideoUrl]);
+    try {
+      localStorage.setItem(AUTOPLAY_KEY, String(autoplay));
+    } catch {
+      // ignore
+    }
+  }, [autoplay]);
 
   // Fetch video details + comments
   useEffect(() => {
@@ -196,7 +263,6 @@ export default function YouTubeLikeVideoPage() {
       if (!id) return;
 
       try {
-        setLoading(true);
         const token = localStorage.getItem("token");
         const response = await fetch(`${API_BASE}/${id}`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -221,13 +287,10 @@ export default function YouTubeLikeVideoPage() {
 
           // Restore previously watched percentage (agar backend se aaye)
           const prevPercent = video.watchedPercent || 0;
-          setWatchPercent(prevPercent);
           if (prevPercent >= 80) setViewCounted(true);
         }
       } catch (error) {
         console.error("Error fetching video details:", error);
-      } finally {
-        setLoading(false);
       }
     };
 
@@ -250,6 +313,77 @@ export default function YouTubeLikeVideoPage() {
 
     fetchVideo();
     fetchComments();
+  }, [id]);
+
+  // Track every video played in this session so the "Up next" queue never
+  // re-offers one (prevents A→B→A autoplay loops and duplicate cards).
+  // The id is added in the cleanup, i.e. right after we navigate away from it.
+  useEffect(() => {
+    const played = playedVideoIdsRef.current;
+    return () => {
+      if (id) played.add(String(id));
+    };
+  }, [id]);
+
+  // Fetch database-driven related videos for the "Up next" sidebar.
+  // On any failure/empty response the hardcoded UP_NEXT_VIDEOS stays as fallback.
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+
+    const fetchRelated = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const response = await fetch(`${API_BASE}/${id}/related`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.message || "Failed to load related videos");
+        }
+        const related = Array.isArray(data.videos) ? data.videos : [];
+        if (cancelled) return;
+        if (related.length === 0) return;
+
+        // The API only excludes the *current* video, so a just-watched video
+        // can legitimately come back at the top of the next list — which made
+        // autoplay bounce between two videos forever. Drop the current id and
+        // every id played this session. Order stays exactly as the API
+        // returned it; nothing is prepended or reordered.
+        const currentId = String(id);
+        const watched = playedVideoIdsRef.current;
+        const filtered = related.filter((video) => {
+          const vidId = String(video._id || video.id);
+          return vidId !== currentId && !watched.has(vidId);
+        });
+
+        setUpNextVideos(
+          filtered.slice(0, 12).map((video) => {
+            const channel =
+              typeof video.channel === "string"
+                ? video.channel
+                : video.channel?.name || "Channel";
+            return {
+              id: video._id || video.id,
+              title: video.title || "Untitled video",
+              channel,
+              channelImage: video.channel?.channelImage || "",
+              views: formatCount(video.views),
+              time: timeAgo(video.createdAt),
+              duration: formatDuration(video.duration),
+              thumbnail: video.thumbnail || "",
+            };
+          }),
+        );
+      } catch (error) {
+        console.error("Error fetching related videos:", error);
+      }
+    };
+
+    fetchRelated();
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   // View tracking (initial hit — registers a "view attempt", not a counted view)
@@ -284,7 +418,6 @@ export default function YouTubeLikeVideoPage() {
     if (!id || !duration) return;
 
     const percent = Math.min(100, Math.round((currentTime / duration) * 100));
-    setWatchPercent(percent);
 
     if (percent >= 80 && !viewCounted) {
       setViewCounted(true);
@@ -314,35 +447,6 @@ export default function YouTubeLikeVideoPage() {
         .catch(() => {});
     }
   }, [currentTime, duration, id, viewCounted]);
-
-  // ==================== HANDLERS ====================
-
-  // Auto-hide controls
-  const handleMouseMove = () => {
-    setShowControls(true);
-    clearTimeout(controlsTimer.current);
-    controlsTimer.current = setTimeout(() => setShowControls(false), 3000);
-  };
-
-  const handlePlayPause = () => {
-    setPlaying(!playing);
-    setShowControls(true);
-  };
-
-  const handleSeek = (e) => {
-    if (!videoRef.current) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const pos = (e.clientX - rect.left) / rect.width;
-    videoRef.current.currentTime = pos * duration;
-  };
-
-  const handleVolumeChange = (e) => {
-    const val = parseFloat(e.target.value);
-    setVolume(val);
-    if (videoRef.current) videoRef.current.volume = val;
-    if (val === 0) setMuted(true);
-    else setMuted(false);
-  };
 
   // ==================== LIKE / DISLIKE (Correct) ====================
   const handleReaction = async (type) => {
@@ -443,153 +547,220 @@ export default function YouTubeLikeVideoPage() {
     }
   };
 
-  const openVideo = (vid) => {
-    navigate(`/video/${vid.id}`, { state: { video: vid }, replace: true });
-    window.scrollTo(0, 0);
+  const openVideo = useCallback(
+    (vid) => {
+      cancelCountdown();
+      navigate(`/video/${vid.id}`, { state: { video: vid }, replace: true });
+      window.scrollTo(0, 0);
+    },
+    [cancelCountdown, navigate],
+  );
+
+  // Walk the "Up next" queue for the player's previous/next buttons.
+  const stepVideo = useCallback(
+    (step) => {
+      if (upNextVideos.length === 0) return;
+      const idx = upNextVideos.findIndex(
+        (vid) => String(vid.id) === String(videoData.id),
+      );
+      const target =
+        idx >= 0
+          ? upNextVideos[(idx + step + upNextVideos.length) % upNextVideos.length]
+          : upNextVideos[0];
+      openVideo(target);
+    },
+    [upNextVideos, videoData.id, openVideo],
+  );
+
+  // ==================== UP NEXT AUTOPLAY ====================
+
+  // Pick the next video. Self-navigation guard: if the computed next video is
+  // the current one (single-item queue, or current not in the queue and the
+  // fallback is itself), return null so we never auto-navigate in a loop.
+  const getNextUpNext = () => {
+    if (!upNextVideos || upNextVideos.length === 0) return null;
+    const idx = upNextVideos.findIndex(
+      (vid) => String(vid.id) === String(videoData.id),
+    );
+    const next =
+      idx >= 0
+        ? upNextVideos[(idx + 1) % upNextVideos.length]
+        : upNextVideos[0];
+    if (!next || String(next.id) === String(videoData.id)) return null;
+    return next;
   };
+
+  // Start the 5s countdown. Single active timer guard: if a countdown is
+  // already running, ignore the call (covers double "ended" events).
+  const startCountdown = (next) => {
+    if (countdownTimerRef.current) return;
+    nextTargetRef.current = next;
+    setUpNextOverlay(next);
+    setCountdownLeft(AUTOPLAY_COUNTDOWN_SECONDS);
+    countdownTimerRef.current = setInterval(() => {
+      setCountdownLeft((prev) =>
+        Math.max(0, (prev ?? AUTOPLAY_COUNTDOWN_SECONDS) - 1),
+      );
+    }, 1000);
+  };
+
+  // Strictly on native "ended": autoplay ON => countdown, OFF => end screen.
+  // Normal player controls (pause, seek, volume, fullscreen, speed) do NOT
+  // cancel the countdown — only Replay, Cancel, or manual navigation do.
+  const handlePlayerEnded = () => {
+    autoplayNextRef.current = false;
+    const next = getNextUpNext();
+    if (!next) {
+      setUpNextOverlay(null);
+      setCountdownLeft(null);
+      return;
+    }
+    if (autoplay) {
+      startCountdown(next);
+    } else {
+      nextTargetRef.current = next;
+      setUpNextOverlay(next);
+      setCountdownLeft(null);
+    }
+  };
+
+  const handleReplay = () => {
+    const v = playerRef.current;
+    if (v) {
+      v.currentTime = 0;
+      v.play().catch(() => {});
+    }
+    setPlaying(true);
+    cancelCountdown();
+  };
+
+  // Force-play the incoming video once its metadata is actually ready. The
+  // src-change autoplay path (autoplay={playing}) can miss or be blocked when
+  // playback ended, so the countdown / "Play Next" flow sets an explicit
+  // intent and this handler consumes it exactly when the new video can play.
+  const handleLoadedMetadata = (videoDuration) => {
+    setDuration(videoDuration);
+    if (autoplayNextRef.current) {
+      autoplayNextRef.current = false;
+      const v = playerRef.current;
+      if (v && v.paused) v.play().catch(() => {});
+    }
+  };
+
+  // Auto-advance when the countdown reaches zero.
+  useEffect(() => {
+    if (!countdownTimerRef.current) return;
+    if ((countdownLeft ?? AUTOPLAY_COUNTDOWN_SECONDS) <= 0) {
+      const target = nextTargetRef.current;
+      cancelCountdown();
+      if (target) {
+        autoplayNextRef.current = true;
+        openVideo(target);
+      }
+    }
+  }, [countdownLeft, cancelCountdown, openVideo]);
+
+  const upNextTarget = upNextOverlay;
+  const upNextOverlayNode = upNextTarget ? (
+    <div
+      className="bp-upnext-overlay"
+      role="dialog"
+      aria-label={countdownLeft !== null ? "Up next" : "Video ended"}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="bp-upnext-card">
+        {countdownLeft !== null && (
+          <div className="bp-upnext-count">
+            <SkipForward size={14} aria-hidden="true" />
+            Up next in {countdownLeft}s
+          </div>
+        )}
+        <div className="bp-upnext-body">
+          <img
+            className="bp-upnext-thumb"
+            src={
+              upNextTarget.thumbnail
+                ? resolveMediaUrl(upNextTarget.thumbnail)
+                : upNextTarget.poster ||
+                  getVideoEntry(upNextTarget.id)?.poster
+            }
+            alt=""
+          />
+          <div className="bp-upnext-meta">
+            <p className="bp-upnext-title">{upNextTarget.title}</p>
+            <p className="bp-upnext-channel">
+              {getChannelName(upNextTarget.channel) ||
+                upNextTarget.channel ||
+                "Channel"}
+            </p>
+          </div>
+        </div>
+        <div className="bp-upnext-actions">
+          <button
+            type="button"
+            className="bp-upnext-btn"
+            onClick={handleReplay}
+          >
+            <RotateCcw size={16} aria-hidden="true" />
+            Replay
+          </button>
+          {countdownLeft !== null ? (
+            <button
+              type="button"
+              className="bp-upnext-btn"
+              onClick={cancelCountdown}
+            >
+              <X size={16} aria-hidden="true" />
+              Cancel
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="bp-upnext-btn bp-upnext-btn--primary"
+              onClick={() => {
+                autoplayNextRef.current = true;
+                openVideo(upNextTarget);
+              }}
+            >
+              <SkipForward size={16} aria-hidden="true" />
+              Play Next
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  ) : null;
 
   return (
     <div className="bg-[#0f0f0f] text-white min-h-screen">
-      <style jsx global>{`
-        .seek-bar:hover .seek-progress {
-          background: #f00 !important;
-        }
-        .volume-slider::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          width: 12px;
-          height: 12px;
-          background: white;
-          border-radius: 50%;
-          cursor: pointer;
-        }
-      `}</style>
 
       <div className="max-w-[1750px] mx-auto px-4 pt-4 flex flex-col lg:flex-row gap-6">
         {/* Left – Video + Description + Comments */}
-        <div className="flex-1 max-w-[1280px]">
+        <div
+          className={`flex-1 ${theaterMode ? "max-w-none" : "max-w-[1280px]"}`}
+        >
           {/* Video Player */}
-          <div
-            className="relative bg-black rounded-xl overflow-hidden aspect-video group"
-            onMouseMove={handleMouseMove}
-            onClick={handlePlayPause}
-          >
-            <video
-              key={resolvedVideoUrl}
-              ref={videoRef}
+          <div className="relative bg-black rounded-xl overflow-hidden aspect-video group">
+            <VideoPlayer
               src={resolvedVideoUrl}
               poster={resolvedPoster}
+              title={videoDetails?.title || videoData.title}
+              autoplay={playing}
               muted={muted}
-              playsInline
-              className="w-full h-full object-cover"
+              onReady={handlePlayerReady}
+              onDispose={handlePlayerDispose}
+              onPlay={() => setPlaying(true)}
+              onPause={() => setPlaying(false)}
+              onEnded={handlePlayerEnded}
+              onTimeUpdate={setCurrentTime}
+              onLoadedMetadata={handleLoadedMetadata}
+              onVolumeChange={(isMuted) => setMuted(isMuted)}
+              onPrevious={() => stepVideo(-1)}
+              onNext={() => stepVideo(1)}
+              onTheaterModeChange={setTheaterMode}
+              onError={(error) => console.error("Video player error:", error)}
+              overlay={upNextOverlayNode}
             />
-
-            {/* Controls overlay */}
-            <div
-              className={`absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30 transition-opacity duration-300 ${
-                showControls || !playing
-                  ? "opacity-100"
-                  : "opacity-0 pointer-events-none"
-              }`}
-            >
-              {/* Top – Title & Close */}
-              <div className="absolute top-4 left-4 right-4 flex justify-between items-start">
-                <h1 className="text-xl md:text-2xl font-bold line-clamp-2 max-w-[70%] drop-shadow-lg">
-                  {videoDetails?.title || videoData.title}
-                </h1>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate(-1);
-                  }}
-                  className="p-2 bg-black/60 rounded-full hover:bg-black/80"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-
-              {/* Center – Big Play/Pause */}
-              <button
-                onClick={handlePlayPause}
-                className="absolute inset-0 flex items-center justify-center"
-              >
-                <div className="w-20 h-20 rounded-full bg-black/50 flex items-center justify-center backdrop-blur-sm">
-                  {playing ? (
-                    <Pause size={36} />
-                  ) : (
-                    <Play size={36} fill="white" />
-                  )}
-                </div>
-              </button>
-
-              {/* Bottom controls */}
-              <div className="absolute bottom-0 left-0 right-0 p-4 space-y-3">
-                {/* Progress bar */}
-                <div
-                  className="h-1.5 bg-white/30 rounded-full cursor-pointer seek-bar group/seek"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleSeek(e);
-                  }}
-                >
-                  <div
-                    className="h-full bg-red-600 rounded-full relative seek-progress"
-                    style={{
-                      width:
-                        duration > 0
-                          ? `${(currentTime / duration) * 100}%`
-                          : "0%",
-                    }}
-                  >
-                    <div className="absolute -top-2 -right-1.5 w-4 h-4 bg-red-600 rounded-full scale-0 group-hover/seek:scale-100 transition-transform" />
-                  </div>
-                </div>
-
-                {/* Time + Volume */}
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-4">
-                    <span className="font-medium">
-                      {formatTime(currentTime)} / {formatTime(duration)}
-                    </span>
-
-                    <span className="text-xs text-gray-300">
-                      {watchPercent}% watched
-                    </span>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setMuted(!muted);
-                        }}
-                      >
-                        {muted || volume === 0 ? (
-                          <VolumeX size={20} />
-                        ) : (
-                          <Volume2 size={20} />
-                        )}
-                      </button>
-                      <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.01"
-                        value={muted ? 0 : volume}
-                        onChange={handleVolumeChange}
-                        onClick={(e) => e.stopPropagation()}
-                        className="w-24 accent-red-600 volume-slider"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex gap-5">
-                    <ThumbsUp size={20} />
-                    <ThumbsDown size={20} />
-                    <Share2 size={20} />
-                    <MoreHorizontal size={20} />
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* Video Info Card */}
@@ -626,8 +797,8 @@ export default function YouTubeLikeVideoPage() {
                 <div className="flex items-center gap-3 mt-3">
                   <div className="flex items-center gap-2">
                     <span className="font-semibold">
-                      {videoDetails?.channel?.name ||
-                        videoData.channel ||
+                      {getChannelName(videoDetails?.channel) ||
+                        getChannelName(videoData.channel) ||
                         "Channel"}
                     </span>
                     <div className="bg-gray-600 text-xs px-1.5 py-0.5 rounded-full flex items-center gap-1">
@@ -769,35 +940,85 @@ export default function YouTubeLikeVideoPage() {
 
         {/* Right Sidebar – Up Next */}
         <div className="w-full lg:w-96 xl:w-[402px] flex-shrink-0">
-          <h2 className="text-lg font-semibold mb-3 px-1">Up next</h2>
+          <div className="flex items-center justify-between mb-2 px-2">
+            <h2 className="text-lg font-semibold">Up next</h2>
+            <div className="flex items-center gap-2 text-sm text-gray-300">
+              <span className="hidden sm:inline">Autoplay</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={autoplay}
+                onClick={() => setAutoplay((prev) => !prev)}
+                className={`relative w-9 h-5 rounded-full transition-colors ${
+                  autoplay ? "bg-blue-600" : "bg-gray-600"
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                    autoplay ? "translate-x-4" : ""
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
 
-          <div className="space-y-3">
-            {UP_NEXT_VIDEOS.map((vid) => {
-              const e = getVideoEntry(vid.id);
+          <div className="space-y-2">
+            {upNextVideos.map((vid) => {
+              const posterSrc = vid.thumbnail
+                ? resolveMediaUrl(vid.thumbnail)
+                : vid.poster || getVideoEntry(vid.id)?.poster;
+              const isActive = String(vid.id) === String(videoData.id);
               return (
                 <div
                   key={vid.id}
                   onClick={() => openVideo(vid)}
-                  className="flex gap-3 cursor-pointer group"
+                  className={`relative flex gap-4 p-2 -mx-2 rounded-xl cursor-pointer group transition-colors ${
+                    isActive ? "bg-white/10" : "hover:bg-white/[0.06]"
+                  }`}
                 >
-                  <div className="relative w-40 md:w-44 flex-shrink-0 rounded overflow-hidden">
+                  {isActive && (
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-10 rounded-r bg-[#f00]"></span>
+                  )}
+
+                  <div className="relative w-[168px] aspect-video flex-shrink-0 rounded-xl overflow-hidden bg-black">
                     <img
-                      src={e.poster}
+                      src={posterSrc}
                       alt={vid.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                     />
-                    <div className="absolute bottom-1 right-1 bg-black/80 text-xs px-1.5 py-0.5 rounded">
-                      14:23
+                    <div className="absolute bottom-1 right-1 bg-black/80 text-xs px-1.5 py-0.5 rounded font-medium">
+                      {vid.duration || "--:--"}
                     </div>
                   </div>
+
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium line-clamp-2 group-hover:text-white/90">
+                    <p className="text-sm font-medium leading-[1.4] line-clamp-2">
                       {vid.title}
                     </p>
-                    <p className="text-xs text-gray-400 mt-1">{vid.channel}</p>
-                    <p className="text-xs text-gray-400">
-                      {vid.views} views • {vid.time}
-                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <img
+                        src={
+                          vid.channelImage ||
+                          "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=48&h=48&fit=crop"
+                        }
+                        alt={vid.channel}
+                        className="w-6 h-6 rounded-full object-cover flex-shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-gray-400 truncate flex items-center gap-1">
+                          {vid.channel}
+                          {vid.verified && (
+                            <Check
+                              size={12}
+                              className="text-gray-500 flex-shrink-0"
+                            />
+                          )}
+                        </p>
+                        <p className="text-xs text-gray-400 truncate">
+                          {vid.views} views • {vid.time}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               );

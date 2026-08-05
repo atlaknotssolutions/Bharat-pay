@@ -4,6 +4,24 @@ const API = axios.create({
   baseURL: "http://localhost:8000/api",
 });
 
+// Attach admin JWT to every request from this admin panel.
+// Registered on the shared default axios instance so raw axios
+// calls (e.g. AllUser.jsx) are also covered.
+const attachToken = (config) => {
+  const token = localStorage.getItem("adminToken");
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+};
+
+axios.interceptors.request.use(attachToken);
+API.interceptors.request.use(attachToken);
+
+// Admin Dashboard
+export const getAdminDashboard = () => API.get("/admin/dashboard");
+
 // Products
 export const addProduct = (productData) => API.post("/product", productData);
 export const fetchProducts = () => API.get("/product");

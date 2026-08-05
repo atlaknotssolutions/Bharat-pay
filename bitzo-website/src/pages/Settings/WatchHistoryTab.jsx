@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Clock, Trash2, MoreVertical } from "lucide-react";
 import { toast } from "react-toastify";
+import { formatTime } from "../../components/player/utils";
 
 const BACKEND_URL = "http://localhost:8000";
 
@@ -165,7 +166,7 @@ export default function WatchHistoryTab({ openDetail }) {
                     />
                     {video.duration && (
                       <div className="absolute bottom-1.5 right-1.5 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded">
-                        {video.duration}
+                        {formatTime(video.duration)}
                       </div>
                     )}
                   </div>

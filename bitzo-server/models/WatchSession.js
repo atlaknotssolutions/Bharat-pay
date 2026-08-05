@@ -59,6 +59,8 @@ const watchSessionSchema = new mongoose.Schema(
 );
 
 watchSessionSchema.index({ userId: 1, startedAt: -1 });
+watchSessionSchema.index({ startedAt: -1 });
+watchSessionSchema.index({ lastActiveAt: -1 });
 watchSessionSchema.index(
   { userId: 1, videoId: 1, sessionId: 1 },
   { unique: true },

@@ -440,7 +440,12 @@
 // }
 
 import React, { useState, useEffect } from "react";
-import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import {
+  NavLink,
+  matchPath,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import {
   Home,
   Flame,
@@ -480,6 +485,11 @@ const bottomNavItems = [
 export default function Navigation({ isOpen }) {
   const location = useLocation();
   const navigate = useNavigate();
+
+  const isPathActive = (path) => {
+    if (path === "/") return location.pathname === "/";
+    return Boolean(matchPath({ path, end: false }, location.pathname));
+  };
   const [showAllSubs, setShowAllSubs] = useState(false);
   const [isYouDropdownOpen, setIsYouDropdownOpen] = useState(false);
   const [subscriptionData, setSubscriptionData] = useState([]);
@@ -561,11 +571,11 @@ export default function Navigation({ isOpen }) {
           ${isOpen ? "w-64" : "w-16 hover:w-64 group/sidebar"}
         `}
       >
-        <div className="py-2 flex flex-col">
+        <div className="py-2 flex flex-col mr-0.5">
           {/* Main navigation items */}
           {sidebarMainItems.map((item) => {
             const Icon = item.icon;
-            const isActive = location.pathname === item.path;
+            const isActive = isPathActive(item.path);
             const isYouItem = item.label === "You";
 
             if (isYouItem) {
@@ -694,7 +704,7 @@ export default function Navigation({ isOpen }) {
                 </div>
               ) : visibleSubs.length > 0 ? (
                 visibleSubs.map((sub, index) => {
-                  const isActive = location.pathname === sub.path;
+                  const isActive = isPathActive(sub.path);
 
                   return (
                     <NavLink
@@ -786,7 +796,7 @@ export default function Navigation({ isOpen }) {
       >
         {bottomNavItems.map((item) => {
           const Icon = item.icon;
-          const isActive = location.pathname === item.path;
+          const isActive = isPathActive(item.path);
           const isCenter = item.isCenter;
 
           if (item.label === "You") {

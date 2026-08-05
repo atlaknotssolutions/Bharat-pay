@@ -7,6 +7,7 @@ const categoryModel = require("../models/CategoryModel/category.model");
 const ChannelModel = require("../models/Channel/ChannelModel");
 const User = require("../models/usermodel"); // ✅ Import User model
 const WatchSession = require("../models/WatchSession");
+const { getVideoDuration } = require("../utils/mediaDuration");
 
 const ABS_WATCH_SECONDS_CAP = 12 * 60 * 60; // 43200s hard cap per session
 
@@ -165,6 +166,18 @@ const uploadVideo = async (req, res) => {
     const videoPath = normalizeMediaPath(videoFile.path);
     const thumbnailPath = normalizeMediaPath(thumbnailFile?.path || null);
 
+    // Authoritative duration from the media file; falls back to the client
+    // value. Never throws/fails the upload when extraction is not possible.
+    let authoritativeDuration = null;
+    try {
+      authoritativeDuration = await getVideoDuration(videoPath);
+      if (!authoritativeDuration) {
+        console.error("[mediaDuration] Could not determine duration for:", videoPath);
+      }
+    } catch (err) {
+      console.error("[mediaDuration] Duration extraction failed:", err.message);
+    }
+
     const newVideo = new Video({
       channel: channelId,
       category,
@@ -173,7 +186,9 @@ const uploadVideo = async (req, res) => {
       videoUrl: videoPath,
       thumbnail: thumbnailPath,
       videoType: videoType,
-      duration: Number(duration) > 0 ? Number(duration) : undefined,
+      duration:
+        authoritativeDuration ||
+        (Number(duration) > 0 ? Number(duration) : undefined),
       uploadedBy: req.user?.userId,
     });
 
@@ -674,6 +689,106 @@ const recommendedVideos = async (req, res) => {
     });
   }
 };
+const RELATED_VIDEOS_LIMIT = 12;
+const RELATED_CHANNEL_CAP = 3;
+
+const getRelatedVideos = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const currentVideoId = mongoose.Types.ObjectId.isValid(id)
+      ? new mongoose.Types.ObjectId(id)
+      : null;
+    if (!currentVideoId) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid video id",
+      });
+    }
+
+    const currentVideo = await Video.findById(currentVideoId).select(
+      "category channel videoType",
+    );
+
+    const baseFilter = { videoType: "long" };
+    if (currentVideo) {
+      baseFilter._id = { $ne: currentVideoId };
+    }
+
+    const seenIds = new Set();
+    const videos = [];
+    let done = false;
+
+    const collect = (docs) => {
+      for (const doc of docs) {
+        if (videos.length >= RELATED_VIDEOS_LIMIT) break;
+        const docId = doc._id.toString();
+        if (seenIds.has(docId)) continue;
+        if (currentVideoId && docId === currentVideoId.toString()) continue;
+        seenIds.add(docId);
+        videos.push(doc);
+      }
+      done = videos.length >= RELATED_VIDEOS_LIMIT;
+      return done;
+    };
+
+    if (currentVideo) {
+      // Priority 1: same category, most viewed first.
+      if (currentVideo.category) {
+        const categoryVideos = await Video.find({
+          ...baseFilter,
+          category: currentVideo.category,
+        })
+          .sort({ views: -1, createdAt: -1 })
+          .limit(RELATED_VIDEOS_LIMIT)
+          .populate("channel", "name channelImage");
+        collect(categoryVideos);
+      }
+
+      // Priority 2: same channel, capped to avoid a single-channel wall.
+      if (currentVideo.channel && !done) {
+        const channelVideos = await Video.find({
+          ...baseFilter,
+          channel: currentVideo.channel,
+        })
+          .sort({ views: -1, createdAt: -1 })
+          .limit(RELATED_CHANNEL_CAP)
+          .populate("channel", "name channelImage");
+        collect(channelVideos);
+      }
+    }
+
+    // Priority 3: fill remaining with most viewed videos.
+    if (!done) {
+      const viewedVideos = await Video.find(baseFilter)
+        .sort({ views: -1, createdAt: -1 })
+        .limit(RELATED_VIDEOS_LIMIT)
+        .populate("channel", "name channelImage");
+      collect(viewedVideos);
+    }
+
+    // Priority 4: fill remaining with latest uploaded videos.
+    if (!done) {
+      const latestVideos = await Video.find(baseFilter)
+        .sort({ createdAt: -1 })
+        .limit(RELATED_VIDEOS_LIMIT)
+        .populate("channel", "name channelImage");
+      collect(latestVideos);
+    }
+
+    res.status(200).json({
+      success: true,
+      videos: videos.slice(0, RELATED_VIDEOS_LIMIT),
+    });
+  } catch (error) {
+    console.error("Error in getRelatedVideos:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
 const trendingVideos = async (req, res) => {
   try {
     const filter = { videoType: "long" };
@@ -2040,6 +2155,7 @@ module.exports = {
   deleteChannel,
   uploadVideo,
   recommendedVideos,
+  getRelatedVideos,
   trendingVideos,
   LatestVideos,
   trendingShorts,

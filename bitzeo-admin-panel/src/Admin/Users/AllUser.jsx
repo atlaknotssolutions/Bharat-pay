@@ -1048,7 +1048,7 @@ export default function Users() {
 
     try {
       setSubmitting(true);
-      await axios.put(`${BASE_URL}/users/${selectedUser._id}`, formData);
+      await axios.put(`${BASE_URL}/admin/users/${selectedUser._id}`, formData);
       toast.success("User updated successfully");
       setEditModal(false);
       fetchUsers(page, search);
@@ -1063,7 +1063,7 @@ export default function Users() {
     if (!window.confirm("Are you sure you want to delete this user?")) return;
 
     try {
-      await axios.delete(`${BASE_URL}/users/${id}`);
+      await axios.delete(`${BASE_URL}/admin/users/${id}`);
       toast.success("User deleted successfully");
       fetchUsers(page, search);
     } catch (err) {

@@ -25,6 +25,7 @@ const {
   subscribeChannel,
   uploadVideo,
   recommendedVideos,
+  getRelatedVideos,
   trendingVideos,
   LatestVideos,
   trendingShorts,
@@ -89,6 +90,7 @@ router.get("/search/hints", getSearchHints);
 // Watch Later (jo aapne diya tha)
 router.delete("/watch-later/:videoId", isAuthenticated, RemoveFromWatchLater);
 router.post("/watch-later/:videoId", isAuthenticated, addToWatchLater);
+router.get("/:id/related", isAuthenticated, getRelatedVideos);
 router.get("/:id", isAuthenticated, getVideoById);
 router.post("/:videoId/view", addView);
 router.post("/:videoId/like", isAuthenticated, likeVideo);

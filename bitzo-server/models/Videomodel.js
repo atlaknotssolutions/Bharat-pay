@@ -109,4 +109,6 @@ const videoSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+videoSchema.index({ createdAt: -1 });
+
 module.exports = mongoose.model("Video", videoSchema);

@@ -151,7 +151,7 @@ export default function ChannelPage() {
 
   const formatDuration = (value) => {
     const seconds = parseDurationToSeconds(value);
-    if (seconds === null) return "0:00";
+    if (seconds === null) return "--:--";
 
     const hrs = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);

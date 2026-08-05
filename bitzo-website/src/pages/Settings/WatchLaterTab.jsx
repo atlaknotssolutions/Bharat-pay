@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Bookmark, Clock, X } from "lucide-react";
 import { toast } from "react-toastify";
+import { formatTime } from "../../components/player/utils";
 
 const API_BASE = "http://localhost:8000/api/uservideo";
 
@@ -117,7 +118,7 @@ export default function WatchLaterTab({ openDetail }) {
                     {video.duration && (
                       <>
                         <Clock size={14} />
-                        <span>{video.duration}</span>
+                        <span>{formatTime(video.duration)}</span>
                       </>
                     )}
                   </div>
