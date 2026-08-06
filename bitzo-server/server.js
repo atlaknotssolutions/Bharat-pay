@@ -20,6 +20,7 @@ const videoRoutes = require("./routes/VideoRoutes.js");
 const userRoutes = require("./routes/userVideoRoute.js");
 const categoryRouter = require("./routes/categoryRoute/category.route.js");
 const leaderboardRoute = require("./routes/leaderboardRoute.js");
+const notificationRoutes = require("./routes/notificationRoute.js");
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -58,6 +59,7 @@ app.use("/api/admin", adminRoute);
 app.use("/api/adminvideo", videoRoutes);
 app.use("/api/uservideo", userRoutes);
 app.use("/api/leaderboard", leaderboardRoute);
+app.use("/api/notifications", notificationRoutes);
 
 
 // ---------- Health ----------

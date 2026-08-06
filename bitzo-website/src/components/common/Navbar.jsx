@@ -24,8 +24,16 @@ import {
   FileText,
   MessageCircle,
   PhoneCall,
+  ArrowLeft,
+  X,
 } from "lucide-react";
 import { useRewards } from "../../context/RewardContext";
+import { useSelector, useDispatch } from "react-redux";
+import NotificationPanel from "./NotificationPanel";
+import {
+  fetchNotifications,
+  resetNotifications,
+} from "../../features/notifications/notificationsSlice";
 import axios from "axios";
 
 const API_BASE_URL = "http://localhost:8000";
@@ -34,14 +42,18 @@ const HINTS_URL = `${API_BASE_URL}/api/uservideo/search/hints`;
 export default function Navbar({ toggleSidebar }) {
   const { points } = useRewards();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const unreadCount = useSelector((state) => state.notifications.unreadCount);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(
     Boolean(localStorage.getItem("token"))
   );
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef(null);
+  const notifRef = useRef(null);
 
   // ===== SEARCH + VOICE =====
   const [searchQuery, setSearchQuery] = useState("");
@@ -49,8 +61,11 @@ export default function Navbar({ toggleSidebar }) {
   const [voiceSupported, setVoiceSupported] = useState(true);
   const [hints, setHints] = useState([]);
   const [showHints, setShowHints] = useState(false);
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const recognitionRef = useRef(null);
   const searchBoxRef = useRef(null);
+  const mobileSearchRef = useRef(null);
+  const mobileSearchBoxRef = useRef(null);
 
   // Search navigate
   const handleSearch = useCallback(
@@ -187,11 +202,22 @@ export default function Navbar({ toggleSidebar }) {
         setIsDropdownOpen(false);
         setIsSettingsOpen(false);
       }
-      if (
-        searchBoxRef.current &&
-        !searchBoxRef.current.contains(event.target)
-      ) {
+      if (notifRef.current && !notifRef.current.contains(event.target)) {
+        setIsNotificationsOpen(false);
+      }
+      const insideSearch =
+        (searchBoxRef.current &&
+          searchBoxRef.current.contains(event.target)) ||
+        (mobileSearchBoxRef.current &&
+          mobileSearchBoxRef.current.contains(event.target));
+      if (!insideSearch) {
         setShowHints(false);
+      }
+      if (
+        mobileSearchRef.current &&
+        !mobileSearchRef.current.contains(event.target)
+      ) {
+        setIsMobileSearchOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -232,8 +258,22 @@ export default function Navbar({ toggleSidebar }) {
     };
   }, [isLoggedIn]);
 
+  // ===== Notification unread count =====
+  useEffect(() => {
+    if (isLoggedIn) {
+      dispatch(fetchNotifications());
+    }
+  }, [isLoggedIn, dispatch]);
+
   const toggleDropdown = () => {
     setIsDropdownOpen((prev) => !prev);
+    setIsSettingsOpen(false);
+    setIsNotificationsOpen(false);
+  };
+
+  const toggleNotifications = () => {
+    setIsNotificationsOpen((prev) => !prev);
+    setIsDropdownOpen(false);
     setIsSettingsOpen(false);
   };
 
@@ -258,6 +298,8 @@ export default function Navbar({ toggleSidebar }) {
       setIsLoggedIn(false);
       setIsDropdownOpen(false);
       setIsSettingsOpen(false);
+      setIsNotificationsOpen(false);
+      dispatch(resetNotifications());
       window.dispatchEvent(new Event("auth-change"));
       navigate("/login");
     }
@@ -268,8 +310,42 @@ export default function Navbar({ toggleSidebar }) {
     const text = typeof hint === "string" ? hint : hint.text || hint.title || "";
     setSearchQuery(text);
     setShowHints(false);
+    setIsMobileSearchOpen(false);
     handleSearch(text);
   };
+
+  // Shared hints dropdown (rendered inside whichever search box is visible)
+  const renderHints = () => (
+    <div className="absolute top-full left-0 right-0 mt-2 bg-[#212121] border border-gray-700/80 rounded-xl shadow-2xl z-50 max-h-80 overflow-y-auto overflow-x-hidden scroll-smooth py-1.5">
+      {hints.map((hint, i) => {
+        const text =
+          typeof hint === "string"
+            ? hint
+            : hint.text || hint.title || hint.name || "";
+        const type = hint.type || "";
+        return (
+          <button
+            key={i}
+            onClick={() => onHintClick(hint)}
+            className="w-full px-4 py-2.5 text-left hover:bg-[#3a3a3a] flex items-center gap-3 text-white text-sm transition-colors"
+          >
+            <Search size={16} className="text-gray-400 flex-shrink-0" />
+            <span className="truncate flex-1">{text}</span>
+            {type === "channel" && (
+              <span className="text-xs text-gray-500 flex-shrink-0">
+                Channel
+              </span>
+            )}
+            {type === "video" && (
+              <span className="text-xs text-gray-500 flex-shrink-0">
+                Video
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-[#0f0f0f] border-b border-gray-800 h-14 flex items-center">
@@ -283,7 +359,9 @@ export default function Navbar({ toggleSidebar }) {
             <Menu size={24} className="text-white" />
           </button>
           <div className="flex items-center gap-3">
-            <span className="text-red-600 text-3xl font-bold">Vidoo</span>
+            <span className="text-red-600 text-2xl sm:text-3xl font-bold">
+              Vidoo
+            </span>
             <div className="hidden sm:flex items-center gap-1.5 bg-[#272727] px-3 py-1 rounded-full border border-yellow-600/30">
               <Star size={18} className="text-yellow-400 fill-yellow-400" />
               <span className="text-white font-semibold text-sm">
@@ -295,7 +373,7 @@ export default function Navbar({ toggleSidebar }) {
         </div>
 
         {/* Center: Search + Hints + Mic */}
-        <div className="flex-1 max-w-2xl mx-8 hidden md:flex items-center gap-2">
+        <div className="flex-1 max-w-xl lg:max-w-2xl mx-4 lg:mx-8 hidden md:flex items-center gap-2.5">
           <div className="relative w-full" ref={searchBoxRef}>
             <input
               type="text"
@@ -305,58 +383,36 @@ export default function Navbar({ toggleSidebar }) {
               onFocus={() => searchQuery.trim() && hints.length > 0 && setShowHints(true)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleSearch();
+                if (e.key === "Escape") setShowHints(false);
               }}
-              className={`w-full bg-[#121212] border rounded-l-full py-2 px-5 focus:outline-none text-white placeholder-gray-400 transition-colors ${
+              aria-label="Search"
+              className={`w-full h-10 bg-[#121212] border rounded-full pl-4 pr-12 text-sm text-white placeholder-gray-500 focus:outline-none transition-all duration-200 hover:border-gray-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 ${
                 isListening
-                  ? "border-red-500 focus:border-red-500"
-                  : "border-gray-700 focus:border-blue-500"
+                  ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
+                  : "border-gray-700"
               }`}
             />
             <button
               onClick={() => handleSearch()}
-              className="absolute right-0 top-0 bottom-0 bg-[#222] px-6 rounded-r-full border border-gray-700 border-l-0 hover:bg-[#333] transition-colors"
+              aria-label="Submit search"
+              className="absolute right-1 top-1 bottom-1 w-9 flex items-center justify-center rounded-full hover:bg-[#272727] active:bg-[#333] transition-colors"
             >
-              <Search size={20} className="text-gray-300" />
+              <Search size={18} className="text-gray-300" />
             </button>
 
             {/* ===== HINTS DROPDOWN ===== */}
-            {showHints && hints.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-[#212121] border border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50 max-h-80 overflow-y-auto">
-                {hints.map((hint, i) => {
-                  const text =
-                    typeof hint === "string"
-                      ? hint
-                      : hint.text || hint.title || hint.name || "";
-                  const type = hint.type || "";
-                  return (
-                    <button
-                      key={i}
-                      onClick={() => onHintClick(hint)}
-                      className="w-full px-5 py-3 text-left hover:bg-[#3a3a3a] flex items-center gap-3 text-white text-sm transition"
-                    >
-                      <Search size={16} className="text-gray-400 flex-shrink-0" />
-                      <span className="truncate flex-1">{text}</span>
-                      {type === "channel" && (
-                        <span className="text-xs text-gray-500">Channel</span>
-                      )}
-                      {type === "video" && (
-                        <span className="text-xs text-gray-500">Video</span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            {showHints && hints.length > 0 && renderHints()}
           </div>
 
           {/* Mic */}
           <button
             onClick={handleMicClick}
-            className={`p-2.5 rounded-full transition-all flex-shrink-0 ${
+            className={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${
               isListening
                 ? "bg-red-600 hover:bg-red-700 animate-pulse"
                 : "hover:bg-[#272727]"
             }`}
+            aria-label={isListening ? "Stop listening" : "Search with voice"}
             title={isListening ? "Stop listening" : "Search with voice"}
           >
             {isListening ? (
@@ -370,16 +426,15 @@ export default function Navbar({ toggleSidebar }) {
         {/* Right */}
         <div className="flex items-center gap-4 sm:gap-6">
           <button
-            onClick={handleMicClick}
-            className={`p-2 rounded-full transition-all sm:hidden ${
-              isListening ? "bg-red-600 animate-pulse" : "hover:bg-[#272727]"
-            }`}
+            onClick={() => {
+              setIsMobileSearchOpen(true);
+              setIsDropdownOpen(false);
+              setIsNotificationsOpen(false);
+            }}
+            className="p-2 hover:bg-[#272727] rounded-full transition-colors flex items-center justify-center md:hidden"
+            aria-label="Search"
           >
-            {isListening ? (
-              <MicOff size={22} className="text-white" />
-            ) : (
-              <Mic size={22} className="text-white" />
-            )}
+            <Search size={22} className="text-white" />
           </button>
 
           <Link
@@ -389,9 +444,24 @@ export default function Navbar({ toggleSidebar }) {
             <Plus size={22} className="text-white" />
           </Link>
 
-          <button className="p-2 hover:bg-[#272727] rounded-full transition-colors hidden sm:block">
-            <Bell size={22} className="text-white" />
-          </button>
+          <div className="relative" ref={notifRef}>
+            <button
+              onClick={toggleNotifications}
+              className="p-2 hover:bg-[#272727] rounded-full transition-colors flex items-center justify-center relative"
+              aria-label="Notifications"
+            >
+              <Bell size={22} className="text-white" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-red-600 border-2 border-[#0f0f0f] rounded-full text-[11px] font-semibold text-white flex items-center justify-center">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
+            </button>
+            <NotificationPanel
+              isOpen={isNotificationsOpen}
+              onClose={() => setIsNotificationsOpen(false)}
+            />
+          </div>
 
           {/* Profile */}
           <div className="relative" ref={dropdownRef}>
@@ -425,8 +495,8 @@ export default function Navbar({ toggleSidebar }) {
             )}
 
             {isLoggedIn && isDropdownOpen && (
-              <div className="absolute right-0 mt-3 w-80 bg-[#0f0f0f] border border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50 text-white">
-                <div className="px-5 py-5 border-b border-gray-800 bg-gradient-to-b from-[#1a1a1a] to-[#0f0f0f]">
+              <div className="absolute right-0 mt-3 w-[min(20rem,calc(100vw-2rem))] max-h-[calc(100dvh-5rem)] overflow-y-auto overflow-x-hidden scroll-smooth bg-[#0f0f0f] border border-gray-700 rounded-xl shadow-2xl z-50 text-white">
+                <div className="sticky top-0 z-10 px-5 py-5 border-b border-gray-800 bg-gradient-to-b from-[#1a1a1a] to-[#0f0f0f]">
                   <div className="flex items-center gap-4">
                     <div className="w-14 h-14 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex-shrink-0 shadow-md overflow-hidden relative">
                       {user?.avatar && (
@@ -627,6 +697,79 @@ export default function Navbar({ toggleSidebar }) {
               Cancel
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Mobile Search Overlay */}
+      {isMobileSearchOpen && (
+        <div
+          className="absolute inset-0 z-50 bg-[#0f0f0f] flex items-center gap-2 px-3"
+          ref={mobileSearchRef}
+        >
+          <button
+            onClick={() => setIsMobileSearchOpen(false)}
+            className="p-2 -ml-1 rounded-full hover:bg-[#272727] transition-colors flex items-center justify-center flex-shrink-0"
+            aria-label="Close search"
+          >
+            <ArrowLeft size={22} className="text-white" />
+          </button>
+
+          <div className="relative flex-1 min-w-0" ref={mobileSearchBoxRef}>
+            <input
+              type="text"
+              autoFocus
+              placeholder={isListening ? "Listening..." : "Search"}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => searchQuery.trim() && hints.length > 0 && setShowHints(true)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  handleSearch();
+                  setIsMobileSearchOpen(false);
+                }
+                if (e.key === "Escape") setIsMobileSearchOpen(false);
+              }}
+              aria-label="Search"
+              className={`w-full h-10 bg-[#121212] border rounded-full pl-4 pr-12 text-sm text-white placeholder-gray-500 focus:outline-none transition-all duration-200 hover:border-gray-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 ${
+                isListening
+                  ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
+                  : "border-gray-700"
+              }`}
+            />
+            <button
+              onClick={() => {
+                handleSearch();
+                setIsMobileSearchOpen(false);
+              }}
+              aria-label="Submit search"
+              className="absolute right-1 top-1 bottom-1 w-9 flex items-center justify-center rounded-full hover:bg-[#272727] active:bg-[#333] transition-colors"
+            >
+              <Search size={18} className="text-gray-300" />
+            </button>
+            {showHints && hints.length > 0 && renderHints()}
+          </div>
+
+          <button
+            onClick={handleMicClick}
+            className={`p-2.5 rounded-full transition-all flex-shrink-0 ${
+              isListening ? "bg-red-600 animate-pulse" : "hover:bg-[#272727]"
+            }`}
+            aria-label={isListening ? "Stop listening" : "Search with voice"}
+          >
+            {isListening ? (
+              <MicOff size={22} className="text-white" />
+            ) : (
+              <Mic size={22} className="text-white" />
+            )}
+          </button>
+
+          <button
+            onClick={() => setIsMobileSearchOpen(false)}
+            className="p-2 rounded-full hover:bg-[#272727] transition-colors flex items-center justify-center flex-shrink-0"
+            aria-label="Close search"
+          >
+            <X size={22} className="text-white" />
+          </button>
         </div>
       )}
     </header>

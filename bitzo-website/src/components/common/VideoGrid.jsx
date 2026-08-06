@@ -14,6 +14,7 @@ import { fetchHomeVideos } from "../../features/videos/videosSlice";
 import { addToWatchLater, removeFromWatchLater } from "../../api/watchLater";
 import { formatTime } from "../player/utils";
 import ShortCard from "./ShortCard";
+import { ShortsCardSkeletonRow, VideoCardSkeletonRow } from "./Skeletons";
 
 const BACKEND_URL = "http://localhost:8000";
 
@@ -560,9 +561,7 @@ export default function NetflixStylePage() {
           />
           <div className="flex gap-4 overflow-x-auto pb-3 scrollbar-hide hover:scrollbar-show">
             {loading && recommended.length === 0 ? (
-              <p className="text-sm text-gray-400">
-                Loading recommended videos...
-              </p>
+              <VideoCardSkeletonRow />
             ) : recommended.length > 0 ? (
               recommended
                 .slice(0, HOMEPAGE_SECTION_LIMITS.recommended)
@@ -593,9 +592,7 @@ export default function NetflixStylePage() {
           />
           <div className="flex gap-4 overflow-x-auto pb-3 scrollbar-hide hover:scrollbar-show">
             {loading && trending.length === 0 ? (
-              <p className="text-sm text-gray-400">
-                Loading trending videos...
-              </p>
+              <VideoCardSkeletonRow />
             ) : trending.length > 0 ? (
               trending
                 .slice(0, HOMEPAGE_SECTION_LIMITS.trending)
@@ -626,9 +623,7 @@ export default function NetflixStylePage() {
           />
           <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-3 scrollbar-hide hover:scrollbar-show snap-x snap-mandatory">
             {loading && shorts.length === 0 ? (
-              <p className="text-sm text-gray-400">
-                Loading trending shorts...
-              </p>
+              <ShortsCardSkeletonRow />
             ) : shorts.length > 0 ? (
               shorts
                 .slice(0, HOMEPAGE_SECTION_LIMITS.trendingShorts)
@@ -656,7 +651,7 @@ export default function NetflixStylePage() {
           />
           <div className="flex gap-4 overflow-x-auto pb-3 scrollbar-hide hover:scrollbar-show">
             {loading && latest.length === 0 ? (
-              <p className="text-sm text-gray-400">Loading latest videos...</p>
+              <VideoCardSkeletonRow />
             ) : latest.length > 0 ? (
               latest
                 .slice(0, HOMEPAGE_SECTION_LIMITS.latest)
@@ -687,9 +682,7 @@ export default function NetflixStylePage() {
           />
           <div className="flex gap-4 overflow-x-auto pb-3 scrollbar-hide hover:scrollbar-show">
             {loading && subscriptions.length === 0 ? (
-              <p className="text-sm text-gray-400">
-                Loading subscription videos...
-              </p>
+              <VideoCardSkeletonRow />
             ) : subscriptions.length > 0 ? (
               subscriptions
                 .slice(0, HOMEPAGE_SECTION_LIMITS.subscriptions)
@@ -719,7 +712,7 @@ export default function NetflixStylePage() {
           />
           <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-3 scrollbar-hide hover:scrollbar-show snap-x snap-mandatory">
             {loading && shorts.length === 0 ? (
-              <p className="text-sm text-gray-400">Loading top shorts...</p>
+              <ShortsCardSkeletonRow />
             ) : shorts.length > 0 ? (
               shorts
                 .slice(0, HOMEPAGE_SECTION_LIMITS.topShorts)

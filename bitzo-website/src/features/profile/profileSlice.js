@@ -120,6 +120,30 @@ export const fetchProfileData = createAsyncThunk(
   },
 );
 
+export const removeHistoryItem = createAsyncThunk(
+  "profile/removeHistoryItem",
+  async (videoId, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) throw new Error("Please login again");
+      const res = await fetch(
+        `${BACKEND_URL}/api/uservideo/history/${videoId}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.message || "Failed to remove from history");
+      }
+      return videoId;
+    } catch (error) {
+      return rejectWithValue(error.message || "Something went wrong");
+    }
+  },
+);
+
 const initialState = {
   user: null,
   myVideos: [],
@@ -151,6 +175,11 @@ const profileSlice = createSlice({
       .addCase(fetchProfileData.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || "Failed to load profile";
+      })
+      .addCase(removeHistoryItem.fulfilled, (state, action) => {
+        state.historyVideos = state.historyVideos.filter(
+          (video) => video.id !== action.payload,
+        );
       });
   },
 });

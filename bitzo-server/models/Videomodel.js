@@ -94,6 +94,19 @@ const videoSchema = new mongoose.Schema(
     // ✅ ANONYMOUS COMMENTS
     comments: [
       {
+        user: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          default: null,
+        },
+        userName: {
+          type: String,
+          default: "",
+        },
+        userImage: {
+          type: String,
+          default: null,
+        },
         text: {
           type: String,
           required: true,

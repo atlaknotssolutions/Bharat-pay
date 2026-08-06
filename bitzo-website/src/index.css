@@ -204,3 +204,19 @@
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
   }
 }
+
+/* Skeleton loading shimmer */
+@keyframes shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, #262626 25%, #353535 50%, #262626 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}

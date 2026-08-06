@@ -86,23 +86,18 @@ import { setSelectedCategory } from "../../features/videos/videosSlice";
 
 const API_URL = "http://localhost:8000/api/category";
 
+const ALL_CHIP = { _id: "all", name: "All" };
+
 export default function TopicChips() {
   const dispatch = useDispatch();
   const [topics, setTopics] = useState([]);
-  const [selectedTopic, setSelectedTopic] = useState("For you");
+  const [selectedTopic, setSelectedTopic] = useState("All");
 
   useEffect(() => {
     const fetchCategories = async () => {
       try {
         const res = await axios.get(API_URL);
         setTopics(res.data);
-
-        // ✅ ensure "For you" is selected after API load
-        const hasForYou = res.data.some((item) => item.name === "For you");
-
-        if (!hasForYou && res.data.length > 0) {
-          setSelectedTopic(res.data[0].name);
-        }
       } catch (err) {
         console.error("Category fetch error:", err);
       }
@@ -114,7 +109,7 @@ export default function TopicChips() {
   const handleTopicClick = (topic) => {
     setSelectedTopic(topic);
 
-    if (topic === "For you") {
+    if (topic === "All") {
       dispatch(setSelectedCategory(null));
     } else {
       const selected = topics.find((t) => t.name === topic);
@@ -122,11 +117,13 @@ export default function TopicChips() {
     }
   };
 
+  const chips = [ALL_CHIP, ...topics.filter((t) => t.name !== "All")];
+
   return (
     <div className="sticky top-14 z-30 bg-[#0f0f0f] border-b border-gray-800">
       {/* Main topics */}
       <div className="flex items-center gap-3 px-6 py-3 overflow-x-auto scrollbar-hide">
-        {topics.map((topic) => (
+        {chips.map((topic) => (
           <button
             key={topic._id}
             onClick={() => handleTopicClick(topic.name)}

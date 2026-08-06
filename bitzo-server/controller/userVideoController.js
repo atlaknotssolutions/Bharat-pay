@@ -8,6 +8,10 @@ const ChannelModel = require("../models/Channel/ChannelModel");
 const User = require("../models/usermodel"); // ✅ Import User model
 const WatchSession = require("../models/WatchSession");
 const { getVideoDuration } = require("../utils/mediaDuration");
+const {
+  createNotification,
+  createBulkNotifications,
+} = require("../utils/notificationService");
 
 const ABS_WATCH_SECONDS_CAP = 12 * 60 * 60; // 43200s hard cap per session
 
@@ -201,6 +205,15 @@ const uploadVideo = async (req, res) => {
     // ✅ Push video ID into User's videos array
     await User.findByIdAndUpdate(req.user?.userId, {
       $push: { videos: newVideo._id },
+    });
+
+    // ✅ Notify all subscribers of the channel
+    await createBulkNotifications({
+      recipients: channel.subscribedBy || [],
+      actor: req.user?.userId,
+      type: "upload",
+      video: newVideo._id,
+      channel: channelId,
     });
 
     res.status(201).json({
@@ -1236,6 +1249,15 @@ const likeVideo = async (req, res) => {
 
     await Promise.all([user.save(), video.save()]);
 
+    if (reaction === "like") {
+      await createNotification({
+        recipient: video.uploadedBy || video.creator,
+        actor: userId,
+        type: "like",
+        video: video._id,
+      });
+    }
+
     return res.status(200).json({
       success: true,
       likes: video.likesCount || 0,
@@ -1384,6 +1406,15 @@ const subscribeChannel = async (req, res) => {
     await user.save();
     await channel.save();
 
+    if (subscribed) {
+      await createNotification({
+        recipient: channel.creator,
+        actor: userId,
+        type: "subscribe",
+        channel: channel._id,
+      });
+    }
+
     res.status(200).json({
       success: true,
       subscribed,
@@ -1400,7 +1431,9 @@ const addComment = async (req, res) => {
     const { videoId } = req.params;
     const { commentText } = req.body;
     const userId = req.user?.id || req.user?.userId || req.user?._id;
-    const userName = req.user?.name || req.user?.email || "User";
+    const userName =
+      req.body?.userName || req.user?.name || req.user?.email || "User";
+    const userImage = req.body?.userImage || null;
 
     if (!commentText || !commentText.trim()) {
       return res.status(400).json({
@@ -1422,10 +1455,20 @@ const addComment = async (req, res) => {
       createdAt: new Date(),
       user: userId || null,
       userName,
+      userImage,
     };
 
     video.comments.push(newComment);
     await video.save();
+
+    if (userId) {
+      await createNotification({
+        recipient: video.uploadedBy || video.creator,
+        actor: userId,
+        type: "comment",
+        video: video._id,
+      });
+    }
 
     res.status(200).json({
       success: true,
@@ -1450,9 +1493,31 @@ const getComments = async (req, res) => {
       });
     }
 
+    const comments = video.comments.map((comment) => comment.toObject());
+
+    // Attach the commenter's name + avatar from the User collection so every
+    // comment shows a real profile picture, even ones stored without one.
+    const userIds = comments
+      .map((comment) => comment.user)
+      .filter((id) => id && mongoose.Types.ObjectId.isValid(String(id)));
+
+    if (userIds.length > 0) {
+      const users = await User.find({ _id: { $in: userIds } })
+        .select("name avatar")
+        .lean();
+      const userMap = new Map(users.map((u) => [String(u._id), u]));
+      for (const comment of comments) {
+        const user = comment.user ? userMap.get(String(comment.user)) : null;
+        if (user) {
+          if (!comment.userName) comment.userName = user.name || "User";
+          if (!comment.userImage) comment.userImage = user.avatar || null;
+        }
+      }
+    }
+
     res.status(200).json({
       success: true,
-      comments: video.comments,
+      comments,
     });
   } catch (error) {
     console.error("Error in getComments:", error);

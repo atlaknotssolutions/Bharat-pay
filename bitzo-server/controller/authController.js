@@ -116,6 +116,7 @@ exports.registerUser = async (req, res) => {
         email: user.email,
         role: user.role,
         trustScore: user.trustScore,
+        avatar: user.avatar || null,
       },
     });
   } catch (error) {
@@ -185,6 +186,7 @@ exports.loginUser = async (req, res) => {
         role: user.role,
         token: token,
         trustScore: user.trustScore,
+        avatar: user.avatar || null,
       },
     });
   } catch (error) {

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchProfileData } from "../features/profile/profileSlice";
+import { fetchProfileData, removeHistoryItem } from "../features/profile/profileSlice";
 import { formatWatchTime, formatWatchMinutes } from "../utils/watchTime";
+import { toast } from "react-toastify";
 import {
   Eye,
   Clock,
@@ -18,6 +19,7 @@ import {
   X,
   Upload,
   Lock,
+  Trash2,
   Eye as EyeIcon,
   EyeOff,
 } from "lucide-react";
@@ -257,6 +259,16 @@ export default function Profile() {
     setShowPasswords({ old: false, new: false, confirm: false });
   };
 
+  const handleRemoveHistory = async (e, videoId) => {
+    e.stopPropagation();
+    try {
+      await dispatch(removeHistoryItem(videoId)).unwrap();
+      toast.success("Removed from watch history");
+    } catch (err) {
+      toast.error(err || "Something went wrong");
+    }
+  };
+
   const getStatusBadge = (status) => {
     const isActive = status?.toLowerCase() === "public";
     return (
@@ -341,7 +353,7 @@ export default function Profile() {
                 <div
                   key={video.id}
                   onClick={() => navigate(`/video/${video.id}`)}
-                  className="flex flex-col sm:flex-row items-start gap-3 rounded-xl border border-zinc-800 bg-zinc-900/80 p-3 hover:border-zinc-600 hover:bg-zinc-900 transition cursor-pointer"
+                  className="group flex flex-col sm:flex-row items-start gap-3 rounded-xl border border-zinc-800 bg-zinc-900/80 p-3 hover:border-zinc-600 hover:bg-zinc-900 transition cursor-pointer"
                 >
                   <div className="relative aspect-video w-full sm:w-40 md:w-48 flex-shrink-0 overflow-hidden rounded-lg bg-zinc-800">
                     <img
@@ -373,6 +385,13 @@ export default function Profile() {
                       )}
                     </p>
                   </div>
+                  <button
+                    onClick={(e) => handleRemoveHistory(e, video.id)}
+                    className="shrink-0 p-2 rounded-full text-zinc-500 hover:text-red-400 hover:bg-zinc-800 opacity-0 group-hover:opacity-100 transition-all"
+                    title="Remove from history"
+                  >
+                    <Trash2 size={18} />
+                  </button>
                 </div>
               ))}
             </div>

@@ -564,9 +564,9 @@ export default function Navigation({ isOpen }) {
       <aside
         className={`
           hidden md:block fixed top-14 left-0 z-40
-          h-[calc(100vh-3.5rem)]
+          h-[calc(100dvh-3.5rem)]
           bg-[#0f0f0f] border-r border-gray-800
-          overflow-y-auto
+          overflow-y-auto overflow-x-hidden scroll-smooth
           transition-all duration-300
           ${isOpen ? "w-64" : "w-16 hover:w-64 group/sidebar"}
         `}

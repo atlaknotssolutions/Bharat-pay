@@ -1,18 +1,28 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchProfileData } from "../../features/profile/profileSlice";
 import { getWatchSession } from "../../utils/watchSession";
 import VideoPlayer from "../../components/player/VideoPlayer";
 import {
-  ThumbsUp,
-  ThumbsDown,
-  MessageSquare,
-  Send,
+  BadgeCheck,
+  Bookmark,
   Check,
-  X,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  MessageSquare,
+  MoreHorizontal,
   RotateCcw,
+  Send,
+  Share2,
   SkipForward,
+  ThumbsDown,
+  ThumbsUp,
+  X,
 } from "lucide-react";
+import { formatTimeAgo } from "../../utils/timeAgo";
 
 const BACKEND_URL = "http://localhost:8000";
 const API_BASE = `${BACKEND_URL}/api/uservideo`;
@@ -99,24 +109,21 @@ function formatCount(value) {
   return `${n}`;
 }
 
-function timeAgo(value) {
-  if (!value) return "Recently added";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Recently added";
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days} day${days === 1 ? "" : "s"} ago`;
-  const weeks = Math.floor(days / 7);
-  if (weeks < 5) return `${weeks} week${weeks === 1 ? "" : "s"} ago`;
-  const months = Math.floor(days / 30);
-  if (months < 12) return `${months} month${months === 1 ? "" : "s"} ago`;
-  const years = Math.floor(days / 365);
-  return `${years} year${years === 1 ? "" : "s"} ago`;
+function getCurrentUser(profileUser) {
+  let local = null;
+  try {
+    const raw = localStorage.getItem("user");
+    if (raw) local = JSON.parse(raw);
+  } catch {
+    local = null;
+  }
+  const localName = local?.name || local?.username || local?.fullName || "";
+  const localAvatar =
+    local?.avatar || local?.profileImage || local?.channelImage || local?.image || "";
+  return {
+    name: profileUser?.name || localName,
+    avatar: profileUser?.avatar || localAvatar,
+  };
 }
 
 function formatDuration(seconds) {
@@ -175,6 +182,26 @@ export default function YouTubeLikeVideoPage() {
   const nextTargetRef = useRef(null);
   const autoplayNextRef = useRef(false);
   const playedVideoIdsRef = useRef(new Set());
+
+  const descriptionRef = useRef(null);
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  const [descFullHeight, setDescFullHeight] = useState(0);
+  const [shareCopied, setShareCopied] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+
+  const profileUser = useSelector((state) => state.profile?.user || null);
+  const currentUser = getCurrentUser(profileUser);
+
+  const dispatch = useDispatch();
+
+  // Ensure the profile (which carries the real avatar) is loaded so comment
+  // avatars show even if the user never visited their profile this session.
+  useEffect(() => {
+    if (!profileUser) {
+      dispatch(fetchProfileData());
+    }
+  }, [dispatch, profileUser]);
 
   // Clear the autoplay countdown from every exit path (Replay, Cancel,
   // manual navigation, unmount). Idempotent; safe to call repeatedly.
@@ -315,6 +342,13 @@ export default function YouTubeLikeVideoPage() {
     fetchComments();
   }, [id]);
 
+  // Measure the full description height so the Show more/less animation can
+  // animate max-height between the collapsed (3-line) and expanded states.
+  useEffect(() => {
+    const el = descriptionRef.current;
+    if (el) setDescFullHeight(el.scrollHeight);
+  }, [videoDetails?.description]);
+
   // Track every video played in this session so the "Up next" queue never
   // re-offers one (prevents A→B→A autoplay loops and duplicate cards).
   // The id is added in the cleanup, i.e. right after we navigate away from it.
@@ -369,7 +403,7 @@ export default function YouTubeLikeVideoPage() {
               channel,
               channelImage: video.channel?.channelImage || "",
               views: formatCount(video.views),
-              time: timeAgo(video.createdAt),
+              time: formatTimeAgo(video.createdAt),
               duration: formatDuration(video.duration),
               thumbnail: video.thumbnail || "",
             };
@@ -527,7 +561,11 @@ export default function YouTubeLikeVideoPage() {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ commentText: commentText.trim() }),
+        body: JSON.stringify({
+          commentText: commentText.trim(),
+          userName: currentUser?.name || "",
+          userImage: currentUser?.avatar || "",
+        }),
       });
       const data = await response.json();
 
@@ -536,6 +574,8 @@ export default function YouTubeLikeVideoPage() {
           _id: Date.now().toString(),
           text: commentText.trim(),
           createdAt: new Date().toISOString(),
+          userName: currentUser?.name || "",
+          userImage: currentUser?.avatar || "",
         };
         setComments((prev) => [newComment, ...prev]);
         setCommentText("");
@@ -731,10 +771,77 @@ export default function YouTubeLikeVideoPage() {
     </div>
   ) : null;
 
+  const goToChannel = () => {
+    const channelId = videoDetails?.channel?._id || videoDetails?.channel?.id;
+    if (channelId) navigate(`/channel/${channelId}`);
+  };
+
+  const handleShare = async () => {
+    try {
+      await navigator.clipboard.writeText(
+        `${window.location.origin}/video/${id}`,
+      );
+      setShareCopied(true);
+      setMoreMenuOpen(false);
+      setTimeout(() => setShareCopied(false), 2000);
+    } catch {
+      // clipboard unavailable
+    }
+  };
+
+  const toggleDescription = () => {
+    if (!descriptionExpanded) {
+      const el = descriptionRef.current;
+      if (el) setDescFullHeight(el.scrollHeight);
+    }
+    setDescriptionExpanded((prev) => !prev);
+  };
+
+  const renderDescription = (text) => {
+    if (!text) return null;
+    return text.split(/(#[A-Za-z0-9_]+)/g).map((part, index) =>
+      /^#[A-Za-z0-9_]+$/.test(part) ? (
+        <a
+          key={index}
+          href={`/search?q=${encodeURIComponent(part)}`}
+          onClick={(e) => {
+            e.preventDefault();
+            navigate(`/search?q=${encodeURIComponent(part)}`);
+          }}
+          className="text-[#3ea6ff] hover:underline"
+        >
+          {part}
+        </a>
+      ) : (
+        <span key={index}>{part}</span>
+      ),
+    );
+  };
+
+  const channelObj =
+    videoDetails?.channel && typeof videoDetails.channel === "object"
+      ? videoDetails.channel
+      : null;
+  const channelName =
+    getChannelName(videoDetails?.channel) ||
+    getChannelName(videoData.channel) ||
+    "Channel";
+  const channelAvatar =
+    channelObj?.channelImage ||
+    channelObj?.avatar ||
+    channelObj?.profileImage ||
+    "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=100&h=100&fit=crop";
+  const channelId = channelObj?._id || channelObj?.id;
+  const isVerified = Boolean(channelObj?.isVerified || channelObj?.verified);
+  const videoCreatedAt = videoDetails?.createdAt;
+  const commentInitial = currentUser?.name
+    ? currentUser.name.trim().charAt(0).toUpperCase()
+    : "?";
+
   return (
     <div className="bg-[#0f0f0f] text-white min-h-screen">
 
-      <div className="max-w-[1750px] mx-auto px-4 pt-4 flex flex-col lg:flex-row gap-6">
+      <div className="max-w-[1750px] mx-auto px-4 pt-4 md:px-6 lg:px-8 flex flex-col lg:flex-row gap-6">
         {/* Left – Video + Description + Comments */}
         <div
           className={`flex-1 ${theaterMode ? "max-w-none" : "max-w-[1280px]"}`}
@@ -763,149 +870,274 @@ export default function YouTubeLikeVideoPage() {
             />
           </div>
 
-          {/* Video Info Card */}
-          <div className="mt-4 bg-[#1a1a1a] rounded-xl p-4">
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gray-600 flex-shrink-0 overflow-hidden">
-                <img
-                  src={
-                    videoDetails?.channel?.channelImage
-                      ? resolveMediaUrl(videoDetails.channel.channelImage)
-                      : "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=100&h=100&fit=crop"
-                  }
-                  alt="Channel"
-                  className="w-full h-full object-cover"
-                />
-              </div>
+          {/* Video Info */}
+          <div className="mt-4 bg-[#1a1a1a] rounded-xl p-4 md:p-6">
+            {/* Title */}
+            <h1 className="text-lg sm:text-xl lg:text-2xl font-bold leading-snug line-clamp-2">
+              {videoDetails?.title || videoData.title}
+            </h1>
 
-              <div className="flex-1 min-w-0">
-                <h2 className="text-xl md:text-2xl font-bold">
-                  {videoDetails?.title || videoData.title}
-                </h2>
-                <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-gray-400">
-                  <span>
-                    {(videoDetails?.views || 0).toLocaleString()} views
-                  </span>
-                  <span>•</span>
-                  <span>
-                    {videoDetails?.createdAt
-                      ? new Date(videoDetails.createdAt).toLocaleDateString()
-                      : "Recently added"}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-3 mt-3">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold">
-                      {getChannelName(videoDetails?.channel) ||
-                        getChannelName(videoData.channel) ||
-                        "Channel"}
-                    </span>
-                    <div className="bg-gray-600 text-xs px-1.5 py-0.5 rounded-full flex items-center gap-1">
-                      <Check size={12} /> Verified
-                    </div>
-                  </div>
-                  <span className="text-gray-400">
-                    • {subscribersCount.toLocaleString()} subscribers
-                  </span>
-                </div>
-
-                {/* Like / Dislike / Subscribe Buttons */}
-                <div className="flex flex-wrap gap-3 mt-4">
-                  {/* Like */}
-                  <button
-                    onClick={() => handleReaction("like")}
-                    disabled={reactionLoading}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-full transition ${
-                      reaction === "like"
-                        ? "bg-white/20 text-white"
-                        : "bg-white/10 hover:bg-white/15"
-                    }`}
-                  >
-                    <ThumbsUp
-                      size={18}
-                      fill={reaction === "like" ? "currentColor" : "none"}
-                    />
-                    <span>{stats.likes.toLocaleString()}</span>
-                  </button>
-
-                  {/* Dislike */}
-                  <button
-                    onClick={() => handleReaction("dislike")}
-                    disabled={reactionLoading}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-full transition ${
-                      reaction === "dislike"
-                        ? "bg-white/20 text-white"
-                        : "bg-white/10 hover:bg-white/15"
-                    }`}
-                  >
-                    <ThumbsDown
-                      size={18}
-                      fill={reaction === "dislike" ? "currentColor" : "none"}
-                    />
-                    <span>{stats.dislikes.toLocaleString()}</span>
-                  </button>
-
-                  {/* Subscribe */}
-                  <button
-                    onClick={handleSubscribe}
-                    disabled={subscribeLoading}
-                    className={`px-6 py-2 rounded-full font-medium flex items-center justify-center gap-2 transition ${
-                      isSubscribed
-                        ? "bg-white/15 text-white hover:bg-white/20"
-                        : "bg-white text-black hover:bg-gray-200"
-                    } ${subscribeLoading ? "opacity-70 cursor-not-allowed" : ""}`}
-                  >
-                    {subscribeLoading
-                      ? "Please wait..."
-                      : isSubscribed
-                        ? "Subscribed"
-                        : "Subscribe"}
-                  </button>
-                </div>
-              </div>
+            {/* Views • time ago */}
+            <div className="mt-2.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-gray-400">
+              <span>{formatCount(videoDetails?.views || 0)} views</span>
+              {videoCreatedAt && (
+                <>
+                  <span className="text-gray-600">•</span>
+                  <span>{formatTimeAgo(videoCreatedAt)}</span>
+                </>
+              )}
             </div>
 
-            {/* Description */}
-            <div className="mt-6 text-gray-300 text-sm leading-relaxed">
-              <p>
-                {videoDetails?.description ||
-                  "This video is being loaded from the server. The selected content will play here."}
-              </p>
-              <button className="text-blue-400 hover:underline mt-2">
-                Show more
+            <div className="my-4 h-px bg-white/10 md:my-5" />
+
+            {/* Channel row */}
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:gap-6">
+              <div className="flex items-center gap-3 md:flex-1 min-w-0">
+                <button
+                  type="button"
+                  onClick={goToChannel}
+                  disabled={!channelId}
+                  aria-label="Visit channel"
+                  className={`h-12 w-12 md:h-14 md:w-14 rounded-full bg-gray-600 flex-shrink-0 overflow-hidden ${
+                    channelId
+                      ? "cursor-pointer transition-transform hover:scale-105"
+                      : "cursor-default"
+                  }`}
+                >
+                  <img
+                    src={resolveMediaUrl(channelAvatar)}
+                    alt={channelName}
+                    className="h-full w-full object-cover"
+                  />
+                </button>
+
+                <div className="min-w-0">
+                  <button
+                    type="button"
+                    onClick={goToChannel}
+                    disabled={!channelId}
+                    className={`flex items-center gap-1.5 min-w-0 max-w-full text-left ${
+                      channelId ? "cursor-pointer" : "cursor-default"
+                    }`}
+                  >
+                    <span className="font-semibold text-[15px] truncate transition-colors hover:text-gray-200">
+                      {channelName}
+                    </span>
+                    {isVerified && (
+                      <BadgeCheck
+                        size={16}
+                        className="shrink-0 text-gray-400"
+                      />
+                    )}
+                  </button>
+                  <p className="mt-0.5 text-sm text-gray-400">
+                    {subscribersCount.toLocaleString()} subscribers
+                  </p>
+                </div>
+              </div>
+
+              {/* Subscribe */}
+              <button
+                type="button"
+                onClick={handleSubscribe}
+                disabled={subscribeLoading}
+                className={`h-11 w-full md:w-auto px-5 rounded-full font-semibold flex items-center justify-center gap-2 transition-colors ${
+                  isSubscribed
+                    ? "bg-white/15 text-white hover:bg-white/20"
+                    : "bg-white text-black hover:bg-gray-200"
+                } ${subscribeLoading ? "opacity-70 cursor-not-allowed" : ""}`}
+              >
+                {subscribeLoading
+                  ? "Please wait..."
+                  : isSubscribed
+                    ? "Subscribed"
+                    : "Subscribe"}
               </button>
+            </div>
+
+            <div className="my-4 h-px bg-white/10 md:my-5" />
+
+            {/* Action buttons */}
+            <div className="flex items-center gap-2 overflow-x-auto md:flex-wrap md:overflow-visible pb-1 md:pb-0 scrollbar-hide">
+              {/* Like / Dislike group */}
+              <div className="flex items-center rounded-full bg-white/10 overflow-hidden flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleReaction("like")}
+                  disabled={reactionLoading}
+                  className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold transition-colors ${
+                    reaction === "like"
+                      ? "bg-white/25 text-white"
+                      : "hover:bg-white/15"
+                  }`}
+                >
+                  <ThumbsUp
+                    size={18}
+                    fill={reaction === "like" ? "currentColor" : "none"}
+                  />
+                  <span>{formatCount(stats.likes)}</span>
+                </button>
+                <span className="h-5 w-px bg-white/15 flex-shrink-0" />
+                <button
+                  type="button"
+                  onClick={() => handleReaction("dislike")}
+                  disabled={reactionLoading}
+                  aria-label="Dislike"
+                  title="Dislike"
+                  className={`flex items-center p-2.5 pr-4 text-sm transition-colors ${
+                    reaction === "dislike"
+                      ? "bg-white/25 text-white"
+                      : "hover:bg-white/15"
+                  }`}
+                >
+                  <ThumbsDown
+                    size={18}
+                    fill={reaction === "dislike" ? "currentColor" : "none"}
+                  />
+                </button>
+              </div>
+
+              {/* Share */}
+              <button
+                type="button"
+                onClick={handleShare}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-white/10 text-sm font-semibold hover:bg-white/15 transition-colors flex-shrink-0"
+              >
+                {shareCopied ? <Check size={18} /> : <Share2 size={18} />}
+                {shareCopied ? "Copied" : "Share"}
+              </button>
+
+              {/* Save (future) */}
+              <button
+                type="button"
+                onClick={() => setSaved((prev) => !prev)}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-white/10 text-sm font-semibold hover:bg-white/15 transition-colors flex-shrink-0"
+              >
+                <Bookmark size={18} fill={saved ? "currentColor" : "none"} />
+                {saved ? "Saved" : "Save"}
+              </button>
+
+              {/* More */}
+              <div className="relative flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setMoreMenuOpen((prev) => !prev)}
+                  aria-label="More options"
+                  className="flex items-center justify-center h-10 w-10 rounded-full bg-white/10 hover:bg-white/15 transition-colors"
+                >
+                  <MoreHorizontal size={20} />
+                </button>
+
+                {moreMenuOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setMoreMenuOpen(false)}
+                    />
+                    <div className="absolute right-0 top-12 z-50 w-52 bg-[#212121] border border-white/10 rounded-xl shadow-2xl overflow-hidden py-1.5">
+                      <button
+                        type="button"
+                        onClick={handleShare}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left hover:bg-white/10 transition-colors"
+                      >
+                        <Share2 size={16} /> Share
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleShare}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left hover:bg-white/10 transition-colors"
+                      >
+                        <Copy size={16} /> Copy link
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
+          {/* Description Card */}
+          <div className="mt-4 bg-[#1a1a1a] rounded-xl p-4 md:p-6">
+            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-gray-400">
+              <span className="font-medium text-white/90">
+                {formatCount(videoDetails?.views || 0)} views
+              </span>
+              {videoCreatedAt && (
+                <>
+                  <span className="text-gray-600">•</span>
+                  <span>{formatTimeAgo(videoCreatedAt)}</span>
+                </>
+              )}
+            </div>
+
+            <div
+              ref={descriptionRef}
+              style={{ maxHeight: descriptionExpanded ? descFullHeight : 72 }}
+              className="mt-3 overflow-hidden whitespace-pre-line text-[15px] leading-relaxed text-gray-300 transition-[max-height] duration-300 ease-in-out"
+            >
+              {renderDescription(
+                videoDetails?.description ||
+                  "This video is being loaded from the server. The selected content will play here.",
+              )}
+            </div>
+
+            {descFullHeight > 72 && (
+              <button
+                type="button"
+                onClick={toggleDescription}
+                className="mt-3 -ml-2 flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm font-semibold text-white/90 hover:bg-white/10 hover:text-white transition-colors"
+              >
+                {descriptionExpanded ? (
+                  <>
+                    Show less <ChevronUp size={16} />
+                  </>
+                ) : (
+                  <>
+                    Show more <ChevronDown size={16} />
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+
           {/* Comments Section */}
-          <div className="mt-6 bg-[#1a1a1a] rounded-xl p-4">
-            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <div className="mt-6 bg-[#1a1a1a] rounded-xl p-4 md:p-6">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
               <MessageSquare size={20} />
               Comments • {comments.length}
             </h3>
 
-            <form onSubmit={handleCommentSubmit} className="flex gap-3 mb-6">
-              <div className="w-10 h-10 rounded-full bg-gray-600 flex-shrink-0" />
-              <div className="flex-1">
+            <form onSubmit={handleCommentSubmit} className="flex gap-3 mt-6">
+              <div className="h-10 w-10 rounded-full bg-gradient-to-br from-zinc-600 to-zinc-800 flex items-center justify-center text-sm font-semibold text-white flex-shrink-0 overflow-hidden">
+                {currentUser?.avatar ? (
+                  <img
+                    src={resolveMediaUrl(currentUser.avatar)}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  commentInitial
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
                 <input
                   value={commentText}
                   onChange={(e) => setCommentText(e.target.value)}
                   placeholder="Add a comment..."
-                  className="w-full bg-[#0f0f0f] border border-gray-700 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-blue-500"
+                  className="w-full bg-transparent border-b border-white/15 px-2 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/40 transition-colors"
                 />
-                <div className="flex justify-end gap-3 mt-2">
+                <div className="flex justify-end gap-2 mt-3">
                   <button
                     type="button"
                     onClick={() => setCommentText("")}
-                    className="px-4 py-1.5 text-sm hover:bg-white/10 rounded"
+                    className="px-4 py-2 text-sm font-medium text-gray-300 hover:bg-white/10 rounded-lg transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={commentLoading || !commentText.trim()}
-                    className="px-6 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-full text-sm font-medium flex items-center gap-2 disabled:opacity-60"
+                    className="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-full text-sm font-semibold flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     <Send size={16} />{" "}
                     {commentLoading ? "Posting..." : "Comment"}
@@ -915,18 +1147,35 @@ export default function YouTubeLikeVideoPage() {
             </form>
 
             {comments.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-5 mt-6">
                 {comments.map((comment) => (
-                  <div
-                    key={comment._id}
-                    className="rounded-lg bg-[#0f0f0f] p-3 border border-gray-800"
-                  >
-                    <p className="text-sm text-white">{comment.text}</p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {comment.createdAt
-                        ? new Date(comment.createdAt).toLocaleString()
-                        : "Just now"}
-                    </p>
+                  <div key={comment._id} className="flex gap-3">
+                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-zinc-600 to-zinc-800 flex items-center justify-center text-sm font-semibold text-white flex-shrink-0 overflow-hidden">
+                      {comment.userImage ? (
+                        <img
+                          src={resolveMediaUrl(comment.userImage)}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        (comment.userName || "You").charAt(0).toUpperCase()
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 text-xs text-gray-500">
+                        <span className="font-medium text-white/80">
+                          {comment.userName || "You"}
+                        </span>
+                        <span>
+                          {comment.createdAt
+                            ? formatTimeAgo(comment.createdAt)
+                            : "Just now"}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-sm text-gray-200 break-words">
+                        {comment.text}
+                      </p>
+                    </div>
                   </div>
                 ))}
               </div>

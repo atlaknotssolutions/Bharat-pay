@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
+import { fetchProfileData } from "../features/profile/profileSlice";
 import { fetchHomeVideos } from "../features/videos/videosSlice";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -24,6 +25,23 @@ const toMediaUrl = (value) => {
   if (normalized.startsWith("uploads/")) return `${BACKEND_URL}/${normalized}`;
   return `${BACKEND_URL}/${normalized.replace(/^\/+/, "")}`;
 };
+
+function resolveCommenter(profileUser) {
+  let local = null;
+  try {
+    const raw = localStorage.getItem("user");
+    if (raw) local = JSON.parse(raw);
+  } catch {
+    local = null;
+  }
+  const localName = local?.name || local?.username || local?.fullName || "";
+  const localAvatar =
+    local?.avatar || local?.profileImage || local?.channelImage || local?.image || "";
+  return {
+    name: profileUser?.name || localName,
+    avatar: profileUser?.avatar || localAvatar,
+  };
+}
 
 const normalizeShort = (v) => ({
   id: v._id || v.id,
@@ -61,6 +79,16 @@ export default function Shorts() {
   const dispatch = useDispatch();
   const stateShort = location.state?.video || null;
   const { shorts: reduxShorts, loading } = useSelector((state) => state.videos);
+  const profileUser = useSelector((state) => state.profile?.user || null);
+  const commenter = resolveCommenter(profileUser);
+
+  // Ensure the profile (which carries the real avatar) is loaded so comment
+  // avatars show even if the user never visited their profile this session.
+  useEffect(() => {
+    if (!profileUser) {
+      dispatch(fetchProfileData());
+    }
+  }, [dispatch, profileUser]);
   const [fetchedShort, setFetchedShort] = useState(null);
   const [urlShortLoading, setUrlShortLoading] = useState(false);
 
@@ -615,6 +643,7 @@ export default function Shorts() {
     if (!text || !token) return;
 
     setCommentLoading(true);
+
     try {
       const response = await fetch(`${API_BASE}/${short.id}/comment`, {
         method: "POST",
@@ -622,7 +651,11 @@ export default function Shorts() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ commentText: text }),
+        body: JSON.stringify({
+          commentText: text,
+          userName: commenter?.name || "",
+          userImage: commenter?.avatar || "",
+        }),
       });
       const data = await response.json();
 
@@ -631,7 +664,8 @@ export default function Shorts() {
           _id: Date.now().toString(),
           text,
           createdAt: new Date().toISOString(),
-          userName: "You",
+          userName: commenter?.name || "You",
+          userImage: commenter?.avatar || "",
         };
 
         setCommentsById((prev) => ({
@@ -848,6 +882,8 @@ export default function Shorts() {
                                 comments={commentsById[short.id] || []}
                                 text={commentTextById[short.id] || ""}
                                 loading={commentLoading}
+                                commenterName={commenter.name}
+                                commenterImage={commenter.avatar}
                                 onTextChange={(value) =>
                                   setCommentTextById((prev) => ({
                                     ...prev,
