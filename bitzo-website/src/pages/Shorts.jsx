@@ -1,4 +1,11 @@
-import React, { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useCallback,
+} from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchProfileData } from "../features/profile/profileSlice";
@@ -14,7 +21,7 @@ import BottomInfo from "../components/shorts/BottomInfo";
 import CommentsSheet from "../components/shorts/CommentsSheet";
 import SwipeHint from "../components/shorts/SwipeHint";
 
-const BACKEND_URL = "http://localhost:8000";
+const BACKEND_URL = "https://bharat-pay.onrender.com";
 const API_BASE = `${BACKEND_URL}/api/uservideo`;
 
 const toMediaUrl = (value) => {
@@ -36,7 +43,11 @@ function resolveCommenter(profileUser) {
   }
   const localName = local?.name || local?.username || local?.fullName || "";
   const localAvatar =
-    local?.avatar || local?.profileImage || local?.channelImage || local?.image || "";
+    local?.avatar ||
+    local?.profileImage ||
+    local?.channelImage ||
+    local?.image ||
+    "";
   return {
     name: profileUser?.name || localName,
     avatar: profileUser?.avatar || localAvatar,
@@ -217,7 +228,10 @@ export default function Shorts() {
       if (commentOpenForId) setCommentOpenForId(null);
       return;
     }
-    if (isEditable || (target instanceof HTMLElement && target.tagName === "BUTTON")) {
+    if (
+      isEditable ||
+      (target instanceof HTMLElement && target.tagName === "BUTTON")
+    ) {
       return;
     }
     if (e.key === " ") {
@@ -366,7 +380,10 @@ export default function Shorts() {
         startIndex = existingIdx;
       } else {
         const clicked = normalizeShort(primaryShort);
-        queue = [clicked, ...list.filter((short) => String(short.id) !== primaryId)];
+        queue = [
+          clicked,
+          ...list.filter((short) => String(short.id) !== primaryId),
+        ];
         startIndex = 0;
       }
     }
@@ -414,8 +431,7 @@ export default function Shorts() {
 
     pendingInitialScrollRef.current = null;
     isProgrammaticScrollRef.current = true;
-    containerRef.current.scrollTop =
-      index * containerRef.current.clientHeight;
+    containerRef.current.scrollTop = index * containerRef.current.clientHeight;
   }, [shorts]);
 
   // ─── Size the 9:16 player to fit inside the layout column ───
@@ -432,7 +448,10 @@ export default function Shorts() {
         w = cw;
         h = w * (16 / 9);
       }
-      setPlayerBox({ width: Math.max(1, Math.floor(w)), height: Math.max(1, Math.floor(h)) });
+      setPlayerBox({
+        width: Math.max(1, Math.floor(w)),
+        height: Math.max(1, Math.floor(h)),
+      });
     };
 
     measure();
@@ -696,14 +715,18 @@ export default function Shorts() {
       if (navigator.share) {
         await navigator.share({
           title: short.title || "Bitzo Short",
-          text: short.title ? `${short.title} - Watch on Bitzo` : "Watch on Bitzo",
+          text: short.title
+            ? `${short.title} - Watch on Bitzo`
+            : "Watch on Bitzo",
           url: shareUrl,
         });
         return;
       }
     } catch (error) {
       if (!error || error.name !== "AbortError") {
-        console.warn("Shorts: Web Share API unavailable, falling back to clipboard");
+        console.warn(
+          "Shorts: Web Share API unavailable, falling back to clipboard",
+        );
       }
     }
 
@@ -754,7 +777,9 @@ export default function Shorts() {
       const promise = video.play();
       if (promise && typeof promise.catch === "function") {
         promise.catch(() => {
-          console.error("Shorts: failed to resume playback after closing comments");
+          console.error(
+            "Shorts: failed to resume playback after closing comments",
+          );
         });
       }
     }
@@ -824,7 +849,9 @@ export default function Shorts() {
                   </div>
                 ) : shorts.length === 0 ? (
                   <div className="flex h-full w-full items-center justify-center">
-                    <p className="text-white/70 text-sm">No shorts available yet.</p>
+                    <p className="text-white/70 text-sm">
+                      No shorts available yet.
+                    </p>
                   </div>
                 ) : (
                   shorts.map((short, index) => {
@@ -848,7 +875,9 @@ export default function Shorts() {
                               onRegister={setVideoRef}
                               onReady={handleVideoReady}
                               onMetadata={(el) => trackShortProgress(short, el)}
-                              onTimeUpdate={(el) => trackShortProgress(short, el)}
+                              onTimeUpdate={(el) =>
+                                trackShortProgress(short, el)
+                              }
                               onTogglePlay={togglePlayCurrent}
                               onLike={() => toggleLike(short)}
                             />

@@ -1,5 +1,3 @@
-
-
 // "use client";
 
 // import { useState, useEffect } from "react";
@@ -21,7 +19,7 @@
 //   Eye,
 // } from "lucide-react";
 
-// const BASE_URL = "http://localhost:8000/api";
+// const BASE_URL = "https://bharat-pay.onrender.com/api";
 
 // export default function Users() {
 //   const [users, setUsers] = useState([]);
@@ -634,14 +632,18 @@ import {
   Eye,
 } from "lucide-react";
 
-const BASE_URL = "http://localhost:8000/api";
+const BASE_URL = "https://bharat-pay.onrender.com/api";
 
 export default function Users() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [pagination, setPagination] = useState({ total: 0, pages: 1, limit: 15 });
+  const [pagination, setPagination] = useState({
+    total: 0,
+    pages: 1,
+    limit: 15,
+  });
   const [selectedUser, setSelectedUser] = useState(null);
   const [editModal, setEditModal] = useState(false);
   const [detailModal, setDetailModal] = useState(false);
@@ -752,8 +754,10 @@ export default function Users() {
   };
 
   const roleColor = (role) => {
-    if (role === "admin") return "bg-purple-500/15 text-purple-400 border border-purple-500/20";
-    if (role === "creator") return "bg-blue-500/15 text-blue-400 border border-blue-500/20";
+    if (role === "admin")
+      return "bg-purple-500/15 text-purple-400 border border-purple-500/20";
+    if (role === "creator")
+      return "bg-blue-500/15 text-blue-400 border border-blue-500/20";
     return "bg-gray-500/15 text-gray-400 border border-gray-500/20";
   };
 
@@ -801,12 +805,24 @@ export default function Users() {
             <table className="min-w-full divide-y divide-gray-800">
               <thead className="bg-gray-800/50">
                 <tr>
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">User</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Role</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Channels</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Videos</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Trust</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Joined</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">
+                    User
+                  </th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">
+                    Role
+                  </th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">
+                    Channels
+                  </th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">
+                    Videos
+                  </th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">
+                    Trust
+                  </th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">
+                    Joined
+                  </th>
                   <th className="px-5 py-3 text-center text-xs font-semibold text-gray-400 uppercase min-w-[160px]">
                     Actions
                   </th>
@@ -814,7 +830,10 @@ export default function Users() {
               </thead>
               <tbody className="divide-y divide-gray-800">
                 {users.map((user) => (
-                  <tr key={user._id} className="hover:bg-gray-800/50 transition">
+                  <tr
+                    key={user._id}
+                    className="hover:bg-gray-800/50 transition"
+                  >
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-sm flex-shrink-0">
@@ -829,7 +848,9 @@ export default function Users() {
                           )}
                         </div>
                         <div className="min-w-0">
-                          <p className="font-medium text-gray-200 truncate">{user.name}</p>
+                          <p className="font-medium text-gray-200 truncate">
+                            {user.name}
+                          </p>
                           <p className="text-sm text-gray-500 truncate flex items-center gap-1">
                             <Mail size={12} />
                             {user.email}
@@ -839,7 +860,9 @@ export default function Users() {
                     </td>
 
                     <td className="px-5 py-4">
-                      <span className={`px-2.5 py-1 text-xs font-semibold rounded-full capitalize ${roleColor(user.role)}`}>
+                      <span
+                        className={`px-2.5 py-1 text-xs font-semibold rounded-full capitalize ${roleColor(user.role)}`}
+                      >
                         {user.role}
                       </span>
                     </td>
@@ -847,14 +870,18 @@ export default function Users() {
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-1.5">
                         <Tv size={15} className="text-amber-400" />
-                        <span className="font-semibold text-gray-300">{user.totalChannels}</span>
+                        <span className="font-semibold text-gray-300">
+                          {user.totalChannels}
+                        </span>
                       </div>
                     </td>
 
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-1.5">
                         <Video size={15} className="text-blue-400" />
-                        <span className="font-semibold text-gray-300">{user.totalVideos}</span>
+                        <span className="font-semibold text-gray-300">
+                          {user.totalVideos}
+                        </span>
                       </div>
                     </td>
 
@@ -955,7 +982,10 @@ export default function Users() {
 
             {detailLoading ? (
               <div className="flex flex-col items-center justify-center py-20">
-                <Loader2 size={40} className="animate-spin text-indigo-400 mb-3" />
+                <Loader2
+                  size={40}
+                  className="animate-spin text-indigo-400 mb-3"
+                />
                 <p className="text-gray-400">Loading full details...</p>
               </div>
             ) : selectedUser ? (
@@ -974,11 +1004,13 @@ export default function Users() {
                     )}
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-white">{selectedUser.name}</h3>
+                    <h3 className="text-lg font-bold text-white">
+                      {selectedUser.name}
+                    </h3>
                     <p className="text-gray-400">{selectedUser.email}</p>
                     <span
                       className={`mt-1 inline-block px-2.5 py-0.5 text-xs font-semibold rounded-full capitalize ${roleColor(
-                        selectedUser.role
+                        selectedUser.role,
                       )}`}
                     >
                       {selectedUser.role}
@@ -1041,7 +1073,9 @@ export default function Users() {
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-gray-200 truncate">{ch.name}</p>
+                            <p className="font-medium text-gray-200 truncate">
+                              {ch.name}
+                            </p>
                             <p className="text-xs text-gray-500">
                               {ch.totalVideos} videos
                             </p>
@@ -1077,8 +1111,12 @@ export default function Users() {
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm text-gray-200 truncate">{v.title}</p>
-                            <p className="text-xs text-amber-400">{v.channelName}</p>
+                            <p className="font-medium text-sm text-gray-200 truncate">
+                              {v.title}
+                            </p>
+                            <p className="text-xs text-amber-400">
+                              {v.channelName}
+                            </p>
                           </div>
                           <span className="text-xs text-gray-500">
                             {v.views || 0} views

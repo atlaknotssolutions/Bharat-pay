@@ -15,9 +15,9 @@ export default function ForgotPassword() {
 
     try {
       const res = await axios.post(
-        "http://localhost:8000/api/admin/forgot-password", // ← apna endpoint
+        "https://bharat-pay.onrender.com/api/admin/forgot-password", // ← apna endpoint
         { email },
-        { headers: { "Content-Type": "application/json" } }
+        { headers: { "Content-Type": "application/json" } },
       );
 
       if (!res.data.success) {
@@ -65,14 +65,17 @@ export default function ForgotPassword() {
           ) : (
             <>
               <p className="text-gray-600 text-sm mb-6 text-center">
-                Enter your email address and we'll send you a link to reset your password.
+                Enter your email address and we'll send you a link to reset your
+                password.
               </p>
 
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Email</label>
+                  <label className="block text-sm font-medium mb-1">
+                    Email
+                  </label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" /  >
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                     <input
                       type="email"
                       value={email}

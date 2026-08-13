@@ -1,6 +1,6 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 
-const BACKEND_URL = "http://localhost:8000";
+const BACKEND_URL = "https://bharat-pay.onrender.com";
 export const API_BASE = `${BACKEND_URL}/api/uservideo`;
 
 export const normalizeVideoListItem = (video) => ({
@@ -198,7 +198,9 @@ export const searchVideos = createAsyncThunk(
           ? video.videoType
           : [video.videoType];
         const isShort = rawTypes.some((type) =>
-          String(type || "").toLowerCase().includes("short"),
+          String(type || "")
+            .toLowerCase()
+            .includes("short"),
         );
         if (isShort) shorts.push(normalizeShort(video));
         else videos.push(normalizeVideoListItem(video));

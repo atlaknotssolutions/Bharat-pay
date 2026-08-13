@@ -1,5 +1,3 @@
-
-
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -36,7 +34,7 @@ import {
 } from "../../features/notifications/notificationsSlice";
 import axios from "axios";
 
-const API_BASE_URL = "http://localhost:8000";
+const API_BASE_URL = "https://bharat-pay.onrender.com";
 const HINTS_URL = `${API_BASE_URL}/api/uservideo/search/hints`;
 
 export default function Navbar({ toggleSidebar }) {
@@ -48,7 +46,7 @@ export default function Navbar({ toggleSidebar }) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(
-    Boolean(localStorage.getItem("token"))
+    Boolean(localStorage.getItem("token")),
   );
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -76,7 +74,7 @@ export default function Navbar({ toggleSidebar }) {
       setIsListening(false);
       navigate(`/search?q=${encodeURIComponent(q)}`);
     },
-    [searchQuery, navigate]
+    [searchQuery, navigate],
   );
 
   // ===== Speech Recognition setup =====
@@ -206,8 +204,7 @@ export default function Navbar({ toggleSidebar }) {
         setIsNotificationsOpen(false);
       }
       const insideSearch =
-        (searchBoxRef.current &&
-          searchBoxRef.current.contains(event.target)) ||
+        (searchBoxRef.current && searchBoxRef.current.contains(event.target)) ||
         (mobileSearchBoxRef.current &&
           mobileSearchBoxRef.current.contains(event.target));
       if (!insideSearch) {
@@ -285,7 +282,7 @@ export default function Navbar({ toggleSidebar }) {
           .post(
             `${API_BASE_URL}/api/logout`,
             {},
-            { headers: { Authorization: `Bearer ${token}` } }
+            { headers: { Authorization: `Bearer ${token}` } },
           )
           .catch(() => {});
       }
@@ -307,7 +304,8 @@ export default function Navbar({ toggleSidebar }) {
 
   // Hint item click
   const onHintClick = (hint) => {
-    const text = typeof hint === "string" ? hint : hint.text || hint.title || "";
+    const text =
+      typeof hint === "string" ? hint : hint.text || hint.title || "";
     setSearchQuery(text);
     setShowHints(false);
     setIsMobileSearchOpen(false);
@@ -337,9 +335,7 @@ export default function Navbar({ toggleSidebar }) {
               </span>
             )}
             {type === "video" && (
-              <span className="text-xs text-gray-500 flex-shrink-0">
-                Video
-              </span>
+              <span className="text-xs text-gray-500 flex-shrink-0">Video</span>
             )}
           </button>
         );
@@ -380,7 +376,9 @@ export default function Navbar({ toggleSidebar }) {
               placeholder={isListening ? "Listening..." : "Search"}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              onFocus={() => searchQuery.trim() && hints.length > 0 && setShowHints(true)}
+              onFocus={() =>
+                searchQuery.trim() && hints.length > 0 && setShowHints(true)
+              }
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleSearch();
                 if (e.key === "Escape") setShowHints(false);
@@ -721,7 +719,9 @@ export default function Navbar({ toggleSidebar }) {
               placeholder={isListening ? "Listening..." : "Search"}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              onFocus={() => searchQuery.trim() && hints.length > 0 && setShowHints(true)}
+              onFocus={() =>
+                searchQuery.trim() && hints.length > 0 && setShowHints(true)
+              }
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   handleSearch();

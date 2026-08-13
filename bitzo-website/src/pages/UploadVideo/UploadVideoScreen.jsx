@@ -1,10 +1,9 @@
-
 "use client";
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { ArrowLeft, ChevronDown, Loader2 } from "lucide-react";
 
-const API = "http://localhost:8000/api";
+const API = "https://bharat-pay.onrender.com/api";
 
 export default function UploadVideo() {
   const [title, setTitle] = useState("");
@@ -58,11 +57,7 @@ export default function UploadVideo() {
   }, [token]);
 
   const isFormValid =
-    title.trim() &&
-    category &&
-    selectedChannelId &&
-    videoFile &&
-    !loading;
+    title.trim() && category && selectedChannelId && videoFile && !loading;
 
   const getVideoDuration = (file) => {
     return new Promise((resolve) => {
@@ -95,11 +90,7 @@ export default function UploadVideo() {
         canvas.height = video.videoHeight;
         const ctx = canvas.getContext("2d");
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        canvas.toBlob(
-          (blob) => resolve(blob),
-          "image/jpeg",
-          0.85
-        );
+        canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.85);
       };
       video.onerror = () => resolve(null);
     });
@@ -113,7 +104,7 @@ export default function UploadVideo() {
 
     try {
       const formData = new FormData();
-      formData.append("name", title.trim());           // backend expects "name"
+      formData.append("name", title.trim()); // backend expects "name"
       formData.append("description", description);
       formData.append("category", category);
       formData.append("videoType", videoType);
@@ -140,7 +131,7 @@ export default function UploadVideo() {
             Authorization: `Bearer ${token}`,
             "Content-Type": "multipart/form-data",
           },
-        }
+        },
       );
 
       if (res.data?.success) {
@@ -157,7 +148,8 @@ export default function UploadVideo() {
       }
     } catch (error) {
       console.error(error);
-      const msg = error.response?.data?.message || "Upload failed. Please try again.";
+      const msg =
+        error.response?.data?.message || "Upload failed. Please try again.";
       setErrorMsg(msg);
       alert(msg);
     } finally {

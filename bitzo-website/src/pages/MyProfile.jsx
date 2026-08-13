@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchProfileData, removeHistoryItem } from "../features/profile/profileSlice";
+import {
+  fetchProfileData,
+  removeHistoryItem,
+} from "../features/profile/profileSlice";
 import { formatWatchTime, formatWatchMinutes } from "../utils/watchTime";
 import { toast } from "react-toastify";
 import {
@@ -24,7 +27,7 @@ import {
   EyeOff,
 } from "lucide-react";
 
-const BACKEND_URL = "http://localhost:8000";
+const BACKEND_URL = "https://bharat-pay.onrender.com";
 
 const resolveMediaUrl = (value) => {
   if (!value) return "";
@@ -149,13 +152,16 @@ export default function Profile() {
         throw new Error("No changes detected");
       }
 
-      const res = await fetch(`http://localhost:8000/api/user/${user._id}`, {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
+      const res = await fetch(
+        `https://bharat-pay.onrender.com/api/user/${user._id}`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
         },
-        body: formData,
-      });
+      );
 
       const data = await res.json();
 
@@ -217,7 +223,7 @@ export default function Profile() {
       if (!token || !user?._id) throw new Error("Authentication required");
 
       const res = await fetch(
-        `http://localhost:8000/api/user/password/${user._id}`,
+        `https://bharat-pay.onrender.com/api/user/password/${user._id}`,
         {
           method: "PUT",
           headers: {

@@ -1,4 +1,4 @@
-const API_BASE = "http://localhost:8000/api"; // ← change to your backend URL
+const API_BASE = "https://bharat-pay.onrender.com/api"; // ← change to your backend URL
 
 async function apiFetch(endpoint, options = {}) {
   const url = `${API_BASE}${endpoint}`;

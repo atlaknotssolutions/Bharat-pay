@@ -1,7 +1,7 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import { formatWatchTime } from "../../utils/watchTime";
 
-const BACKEND_URL = "http://localhost:8000";
+const BACKEND_URL = "https://bharat-pay.onrender.com";
 
 const normalizeProfileVideos = (videos = []) =>
   Array.isArray(videos)

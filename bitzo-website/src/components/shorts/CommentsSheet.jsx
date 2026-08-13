@@ -1,6 +1,6 @@
 import { X } from "lucide-react";
 
-const BACKEND_URL = "http://localhost:8000";
+const BACKEND_URL = "https://bharat-pay.onrender.com";
 
 const toMediaUrl = (value) => {
   if (!value) return "";
@@ -55,10 +55,7 @@ export default function CommentsSheet({
 
       <form onSubmit={onSubmit} className="mb-3">
         <div className="flex items-start gap-2">
-          <CommentAvatar
-            image={commenterImage}
-            name={commenterName || "U"}
-          />
+          <CommentAvatar image={commenterImage} name={commenterName || "U"} />
           <textarea
             value={text}
             onChange={(e) => onTextChange(e.target.value)}

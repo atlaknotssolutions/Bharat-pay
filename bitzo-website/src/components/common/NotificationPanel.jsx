@@ -9,7 +9,7 @@ import {
   deleteNotification,
 } from "../../features/notifications/notificationsSlice";
 
-const BACKEND_URL = "http://localhost:8000";
+const BACKEND_URL = "https://bharat-pay.onrender.com";
 
 const resolveUrl = (url) =>
   url
@@ -139,7 +139,9 @@ export default function NotificationPanel({ isOpen, onClose }) {
                 key={notification._id}
                 onClick={() => handleItemClick(notification)}
                 className={`w-full px-4 py-3 text-left flex items-start gap-3 transition cursor-pointer ${
-                  notification.isRead ? "hover:bg-[#272727]" : "bg-[#1a1a1a] hover:bg-[#2a2a2a]"
+                  notification.isRead
+                    ? "hover:bg-[#272727]"
+                    : "bg-[#1a1a1a] hover:bg-[#2a2a2a]"
                 }`}
               >
                 <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex-shrink-0 overflow-hidden flex items-center justify-center text-white text-sm font-semibold mt-0.5">
@@ -149,9 +151,7 @@ export default function NotificationPanel({ isOpen, onClose }) {
                       src={avatarUrl}
                       alt={actorName}
                       className="w-full h-full object-cover"
-                      onError={(e) =>
-                        (e.currentTarget.style.display = "none")
-                      }
+                      onError={(e) => (e.currentTarget.style.display = "none")}
                     />
                   )}
                 </div>

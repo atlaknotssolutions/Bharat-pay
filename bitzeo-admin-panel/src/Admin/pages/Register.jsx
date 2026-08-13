@@ -37,7 +37,7 @@
 
 //     try {
 //       const res = await axios.post(
-//         "http://localhost:8000/api/admin/register", // ← apna endpoint check kar lena
+//         "https://bharat-pay.onrender.com/api/admin/register", // ← apna endpoint check kar lena
 //         {
 //           name: formData.name,
 //           email: formData.email,
@@ -208,13 +208,13 @@ export default function Register() {
 
     try {
       const res = await axios.post(
-        "http://localhost:8000/api/admin/register",
+        "https://bharat-pay.onrender.com/api/admin/register",
         {
           name: formData.name,
           email: formData.email,
           password: formData.password,
         },
-        { headers: { "Content-Type": "application/json" } }
+        { headers: { "Content-Type": "application/json" } },
       );
 
       if (!res.data.success) {
@@ -237,7 +237,6 @@ export default function Register() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-950 via-gray-900 to-indigo-950 px-4">
       <div className="w-full max-w-md bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl overflow-hidden">
-        
         {/* Header */}
         <div className="bg-indigo-600 text-white text-center py-8">
           <h1 className="text-3xl font-bold tracking-tight">AdminX</h1>
@@ -247,7 +246,6 @@ export default function Register() {
         {/* Form */}
         <div className="p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
-            
             {/* Name */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1.5">

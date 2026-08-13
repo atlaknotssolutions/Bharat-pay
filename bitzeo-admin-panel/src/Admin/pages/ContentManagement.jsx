@@ -18,7 +18,7 @@ import {
   Search,
 } from "lucide-react";
 
-const BASE_URL = "http://localhost:8000/api";
+const BASE_URL = "https://bharat-pay.onrender.com/api";
 
 export default function ContentManagement({ type = "long" }) {
   const pageType = type === "short" ? "short" : "long";
@@ -49,7 +49,7 @@ export default function ContentManagement({ type = "long" }) {
       setLoading(true);
       setError(null);
       const res = await axios.get(
-        `${BASE_URL}/adminvideo?videoType=${pageType}`
+        `${BASE_URL}/adminvideo?videoType=${pageType}`,
       );
       setVideos(res.data?.videos || []);
     } catch (err) {
@@ -88,12 +88,14 @@ export default function ContentManagement({ type = "long" }) {
       if (view === "upload") {
         await axios.post(`${BASE_URL}/adminvideo/upload`, data);
         toast.success(
-          isShorts ? "Short uploaded successfully!" : "Video uploaded successfully!"
+          isShorts
+            ? "Short uploaded successfully!"
+            : "Video uploaded successfully!",
         );
       } else if (view === "update" && selectedVideo) {
         await axios.put(
           `${BASE_URL}/adminvideo/update/${selectedVideo._id}`,
-          data
+          data,
         );
         toast.success("Video updated successfully!");
       }
@@ -104,7 +106,7 @@ export default function ContentManagement({ type = "long" }) {
     } catch (err) {
       console.error(err);
       toast.error(
-        err.response?.data?.message || "Operation failed. Please try again."
+        err.response?.data?.message || "Operation failed. Please try again.",
       );
     } finally {
       setSubmitting(false);
@@ -386,7 +388,9 @@ export default function ContentManagement({ type = "long" }) {
               autoPlay
               playsInline
               className="w-full aspect-video"
-              onError={() => toast.error("Cannot load video – check file or server")}
+              onError={() =>
+                toast.error("Cannot load video – check file or server")
+              }
             />
           </div>
 
@@ -443,7 +447,9 @@ export default function ContentManagement({ type = "long" }) {
               </div>
               <div>
                 <div className="text-gray-500">Type</div>
-                <div className="font-medium text-gray-200">{selectedVideo.type || "—"}</div>
+                <div className="font-medium text-gray-200">
+                  {selectedVideo.type || "—"}
+                </div>
               </div>
               <div>
                 <div className="text-gray-500">Duration</div>
@@ -455,7 +461,9 @@ export default function ContentManagement({ type = "long" }) {
               </div>
               <div>
                 <div className="text-gray-500">Views</div>
-                <div className="font-medium text-gray-200">{selectedVideo.views || 0}</div>
+                <div className="font-medium text-gray-200">
+                  {selectedVideo.views || 0}
+                </div>
               </div>
               <div>
                 <div className="text-gray-500">Uploaded</div>
@@ -701,7 +709,9 @@ export default function ContentManagement({ type = "long" }) {
             customStyles={customStyles}
             noDataComponent={
               <div className="text-center py-16 text-gray-500 bg-gray-900">
-                <p className="text-xl font-medium text-gray-400">No videos found</p>
+                <p className="text-xl font-medium text-gray-400">
+                  No videos found
+                </p>
                 <p className="mt-2 text-sm">
                   {search
                     ? "Try a different search term"

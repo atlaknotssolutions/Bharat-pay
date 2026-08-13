@@ -11,9 +11,9 @@ import {
 } from "lucide-react";
 
 // API base URLs
-const API_BASE = "http://localhost:8000/api";
-const API_CATEGORY = "http://localhost:8000/api/category";
-const BACKEND_URL = "http://localhost:8000";
+const API_BASE = "https://bharat-pay.onrender.com/api";
+const API_CATEGORY = "https://bharat-pay.onrender.com/api/category";
+const BACKEND_URL = "https://bharat-pay.onrender.com";
 
 // Helpers
 const getToken = () => localStorage.getItem("token") || null;
@@ -443,11 +443,7 @@ export default function ChannelPage() {
         canvas.height = video.videoHeight;
         const ctx = canvas.getContext("2d");
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        canvas.toBlob(
-          (blob) => resolve(blob),
-          "image/jpeg",
-          0.85
-        );
+        canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.85);
       };
       video.onerror = () => resolve(null);
     });
@@ -763,7 +759,6 @@ export default function ChannelPage() {
                         />
                       </div>
                     </div>
-                    
                   </div>
                   <div className="mt-3">
                     <h3 className="font-medium line-clamp-2 group-hover:text-blue-400 transition-colors">

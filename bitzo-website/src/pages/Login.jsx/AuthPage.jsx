@@ -5,7 +5,7 @@ import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
 import { toast } from "react-toastify";
 import { getDeviceId } from "./deviceId";
 
-const API_BASE = "http://localhost:8000/api";
+const API_BASE = "https://bharat-pay.onrender.com/api";
 const GOOGLE_CLIENT_ID =
   "1043684646784-d9igjhng2cfdp006ogsi0am1i3d4djh1.apps.googleusercontent.com"; // ← paste here
 

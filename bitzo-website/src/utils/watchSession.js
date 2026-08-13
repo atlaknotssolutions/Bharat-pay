@@ -1,4 +1,4 @@
-const API_BASE = "http://localhost:8000/api/uservideo";
+const API_BASE = "https://bharat-pay.onrender.com/api/uservideo";
 
 const FLUSH_INTERVAL_MS = 30000;
 const MAX_CAP_SECONDS = 12 * 60 * 60;

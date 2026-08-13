@@ -1,5 +1,3 @@
-
-
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
@@ -19,9 +17,9 @@ export default function Login() {
 
     try {
       const res = await axios.post(
-        "http://localhost:8000/api/admin/login",
+        "https://bharat-pay.onrender.com/api/admin/login",
         { email, password },
-        { headers: { "Content-Type": "application/json" } }
+        { headers: { "Content-Type": "application/json" } },
       );
 
       if (!res.data.success) {
@@ -43,8 +41,10 @@ export default function Login() {
       navigate("/", { replace: true });
     } catch (err) {
       const message =
-        err.response?.data?.message || err.message || "Login failed. Please try again.";
-      
+        err.response?.data?.message ||
+        err.message ||
+        "Login failed. Please try again.";
+
       toast.error(message, {
         style: {
           background: "#1f2937",

@@ -1,11 +1,9 @@
-
-
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useDispatch } from "react-redux";
 import { setSelectedCategory } from "../../features/videos/videosSlice";
 
-const API_URL = "http://localhost:8000/api/category";
+const API_URL = "https://bharat-pay.onrender.com/api/category";
 
 const ALL_CHIP = { _id: "all", name: "All" };
 

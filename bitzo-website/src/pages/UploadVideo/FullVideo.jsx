@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
@@ -24,7 +23,7 @@ import {
 } from "lucide-react";
 import { formatTimeAgo } from "../../utils/timeAgo";
 
-const BACKEND_URL = "http://localhost:8000";
+const BACKEND_URL = "https://bharat-pay.onrender.com";
 const API_BASE = `${BACKEND_URL}/api/uservideo`;
 
 const AUTOPLAY_KEY = "videoo.autoplay";
@@ -33,20 +32,27 @@ const AUTOPLAY_COUNTDOWN_SECONDS = 5;
 // Fake data (fallback only)
 const VIDEO_POOL = [
   {
-    video: "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-    poster: "https://storage.googleapis.com/gtv-videos-bucket/sample/images/BigBuckBunny.jpg",
+    video:
+      "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+    poster:
+      "https://storage.googleapis.com/gtv-videos-bucket/sample/images/BigBuckBunny.jpg",
   },
   {
     video: "https://storage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
-    poster: "https://storage.googleapis.com/gtv-videos-bucket/sample/images/Sintel.jpg",
+    poster:
+      "https://storage.googleapis.com/gtv-videos-bucket/sample/images/Sintel.jpg",
   },
   {
-    video: "https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-    poster: "https://storage.googleapis.com/gtv-videos-bucket/sample/images/ElephantsDream.jpg",
+    video:
+      "https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+    poster:
+      "https://storage.googleapis.com/gtv-videos-bucket/sample/images/ElephantsDream.jpg",
   },
   {
-    video: "https://storage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
-    poster: "https://storage.googleapis.com/gtv-videos-bucket/sample/images/TearsOfSteel.jpg",
+    video:
+      "https://storage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
+    poster:
+      "https://storage.googleapis.com/gtv-videos-bucket/sample/images/TearsOfSteel.jpg",
   },
 ];
 
@@ -89,13 +95,19 @@ const UP_NEXT_VIDEOS = [
 ];
 
 function getVideoEntry(id) {
-  const idx = (typeof id === "number" ? id : parseInt(id) || 1) % VIDEO_POOL.length;
+  const idx =
+    (typeof id === "number" ? id : parseInt(id) || 1) % VIDEO_POOL.length;
   return VIDEO_POOL[idx];
 }
 
 function getChannelName(channel) {
   if (typeof channel === "string" && channel) return channel;
-  if (channel && typeof channel === "object" && typeof channel.name === "string" && channel.name) {
+  if (
+    channel &&
+    typeof channel === "object" &&
+    typeof channel.name === "string" &&
+    channel.name
+  ) {
     return channel.name;
   }
   return null;
@@ -119,7 +131,11 @@ function getCurrentUser(profileUser) {
   }
   const localName = local?.name || local?.username || local?.fullName || "";
   const localAvatar =
-    local?.avatar || local?.profileImage || local?.channelImage || local?.image || "";
+    local?.avatar ||
+    local?.profileImage ||
+    local?.channelImage ||
+    local?.image ||
+    "";
   return {
     name: profileUser?.name || localName,
     avatar: profileUser?.avatar || localAvatar,
@@ -307,9 +323,7 @@ export default function YouTubeLikeVideoPage() {
           setReaction(video.userReaction || null); // "like" | "dislike" | null
           setIsSubscribed(Boolean(video.isSubscribed));
           setSubscribersCount(
-            video.channel?.subscribersCount ||
-              video.subscribersCount ||
-              0
+            video.channel?.subscribersCount || video.subscribersCount || 0,
           );
 
           // Restore previously watched percentage (agar backend se aaye)
@@ -440,7 +454,7 @@ export default function YouTubeLikeVideoPage() {
         const data = await res.json().catch(() => ({}));
         if (data.success && typeof data.views === "number") {
           setVideoDetails((prev) =>
-            prev ? { ...prev, views: data.views } : prev
+            prev ? { ...prev, views: data.views } : prev,
           );
         }
       })
@@ -474,7 +488,7 @@ export default function YouTubeLikeVideoPage() {
         .then((data) => {
           if (data.success && typeof data.views === "number") {
             setVideoDetails((prev) =>
-              prev ? { ...prev, views: data.views } : prev
+              prev ? { ...prev, views: data.views } : prev,
             );
           }
         })
@@ -489,9 +503,7 @@ export default function YouTubeLikeVideoPage() {
     setReactionLoading(true);
     const token = localStorage.getItem("token");
     const endpoint =
-      type === "like"
-        ? `${API_BASE}/${id}/like`
-        : `${API_BASE}/${id}/dislike`;
+      type === "like" ? `${API_BASE}/${id}/like` : `${API_BASE}/${id}/dislike`;
 
     try {
       const response = await fetch(endpoint, {
@@ -517,8 +529,7 @@ export default function YouTubeLikeVideoPage() {
 
   // ==================== SUBSCRIBE ====================
   const handleSubscribe = async () => {
-    const channelId =
-      videoDetails?.channel?._id || videoDetails?.channel?.id;
+    const channelId = videoDetails?.channel?._id || videoDetails?.channel?.id;
     if (!channelId) return;
 
     setSubscribeLoading(true);
@@ -605,7 +616,9 @@ export default function YouTubeLikeVideoPage() {
       );
       const target =
         idx >= 0
-          ? upNextVideos[(idx + step + upNextVideos.length) % upNextVideos.length]
+          ? upNextVideos[
+              (idx + step + upNextVideos.length) % upNextVideos.length
+            ]
           : upNextVideos[0];
       openVideo(target);
     },
@@ -721,8 +734,7 @@ export default function YouTubeLikeVideoPage() {
             src={
               upNextTarget.thumbnail
                 ? resolveMediaUrl(upNextTarget.thumbnail)
-                : upNextTarget.poster ||
-                  getVideoEntry(upNextTarget.id)?.poster
+                : upNextTarget.poster || getVideoEntry(upNextTarget.id)?.poster
             }
             alt=""
           />
@@ -840,7 +852,6 @@ export default function YouTubeLikeVideoPage() {
 
   return (
     <div className="bg-[#0f0f0f] text-white min-h-screen">
-
       <div className="max-w-[1750px] mx-auto px-4 pt-4 md:px-6 lg:px-8 flex flex-col lg:flex-row gap-6">
         {/* Left – Video + Description + Comments */}
         <div

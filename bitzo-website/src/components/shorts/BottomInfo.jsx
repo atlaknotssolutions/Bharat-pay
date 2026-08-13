@@ -1,6 +1,6 @@
 import { BadgeCheck, Music2 } from "lucide-react";
 
-const BACKEND_URL = "http://localhost:8000";
+const BACKEND_URL = "https://bharat-pay.onrender.com";
 
 const resolveImage = (value) => {
   if (!value) return "";
@@ -34,9 +34,9 @@ export default function BottomInfo({ short, formattedViews, onSubscribe }) {
 
   const verified = Boolean(
     raw.verified === true ||
-      channel?.verified === true ||
-      uploadedBy?.verified === true ||
-      creator?.verified === true,
+    channel?.verified === true ||
+    uploadedBy?.verified === true ||
+    creator?.verified === true,
   );
 
   const description = raw.description || "";
@@ -86,9 +86,7 @@ export default function BottomInfo({ short, formattedViews, onSubscribe }) {
       </h1>
 
       {/* Views */}
-      <p className="mt-1 text-xs font-medium text-white/80">
-        {formattedViews}
-      </p>
+      <p className="mt-1 text-xs font-medium text-white/80">{formattedViews}</p>
 
       {/* Music row */}
       <div className="mt-1.5 flex items-center gap-1.5 text-sm text-white/80">
@@ -105,10 +103,7 @@ export default function BottomInfo({ short, formattedViews, onSubscribe }) {
       {hashtags.length > 0 ? (
         <div className="mt-1.5 flex flex-wrap gap-1.5">
           {hashtags.map((tag) => (
-            <span
-              key={tag}
-              className="text-sm font-medium text-sky-300"
-            >
+            <span key={tag} className="text-sm font-medium text-sky-300">
               #{tag}
             </span>
           ))}

@@ -53,7 +53,7 @@
 
 //       try {
 //         const response = await fetch(
-//           "http://localhost:8000/api/uservideo/subscribed-channels",
+//           "https://bharat-pay.onrender.com/api/uservideo/subscribed-channels",
 //           {
 //             headers: { Authorization: `Bearer ${token}` },
 //           },
@@ -440,12 +440,7 @@
 // }
 
 import React, { useState, useEffect } from "react";
-import {
-  NavLink,
-  matchPath,
-  useLocation,
-  useNavigate,
-} from "react-router-dom";
+import { NavLink, matchPath, useLocation, useNavigate } from "react-router-dom";
 import {
   Home,
   Flame,
@@ -461,7 +456,7 @@ import {
   Video,
 } from "lucide-react";
 
-const BACKEND_URL = "http://localhost:8000";
+const BACKEND_URL = "https://bharat-pay.onrender.com";
 
 const sidebarMainItems = [
   { icon: Home, label: "Home", path: "/" },
@@ -509,7 +504,7 @@ export default function Navigation({ isOpen }) {
           `${BACKEND_URL}/api/uservideo/subscribed-channels`,
           {
             headers: { Authorization: `Bearer ${token}` },
-          }
+          },
         );
 
         if (!response.ok) throw new Error("Failed to fetch subscriptions");
