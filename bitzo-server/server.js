@@ -10,10 +10,10 @@ const path = require("node:path");
 const mongoose = require("mongoose");
 const morgan = require("morgan");
 const dns = require("node:dns");
-// ---------- DNS ----------
+
 dns.setServers(["8.8.8.8", "1.1.1.1", "0.0.0.0"]);
 
-// ---------- Routes ----------
+
 const authRoutes = require("./routes/authRoute.js");
 const adminRoute = require("./routes/AdminRoute/AdminRoute.js");
 const videoRoutes = require("./routes/VideoRoutes.js");
