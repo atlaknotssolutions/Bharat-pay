@@ -3,16 +3,16 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Eye, EyeOff, Mail, Lock, User, ArrowRight } from "lucide-react";
 import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
 import { toast } from "react-toastify";
-<<<<<<< HEAD
+// <<<<<<< HEAD
 import { getDeviceId } from "./deviceId";
 
-const API_BASE = "https://bharat-pay-3.onrender.com/api";
-const GOOGLE_CLIENT_ID =
-  "1043684646784-d9igjhng2cfdp006ogsi0am1i3d4djh1.apps.googleusercontent.com"; // ← paste here
-=======
+// const API_BASE = "https://bharat-pay-3.onrender.com/api";
+// const GOOGLE_CLIENT_ID =
+  // "1043684646784-d9igjhng2cfdp006ogsi0am1i3d4djh1.apps.googleusercontent.com"; // ← paste here
+// =======
 import { API_BASE } from "../../config/api";
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
->>>>>>> feature/jeet-ahirwar
+// >>>>>>> feature/jeet-ahirwar
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
