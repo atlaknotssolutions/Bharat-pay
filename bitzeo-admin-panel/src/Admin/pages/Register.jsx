@@ -37,7 +37,7 @@
 
 //     try {
 //       const res = await axios.post(
-//         "https://bharat-pay.onrender.com/api/admin/register", // ← apna endpoint check kar lena
+//         "https://bharat-pay-3.onrender.com/api/admin/register", // ← apna endpoint check kar lena
 //         {
 //           name: formData.name,
 //           email: formData.email,
@@ -208,7 +208,7 @@ export default function Register() {
 
     try {
       const res = await axios.post(
-        "https://bharat-pay.onrender.com/api/admin/register",
+        "https://bharat-pay-3.onrender.com/api/admin/register",
         {
           name: formData.name,
           email: formData.email,

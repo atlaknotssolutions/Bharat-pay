@@ -141,7 +141,7 @@
 
 import React, { useEffect, useState } from "react";
 
-const BACKEND_URL = "https://bharat-pay.onrender.com";
+const BACKEND_URL = "https://bharat-pay-3.onrender.com";
 
 // Thumbnail / media URL fix
 const resolveMediaUrl = (value) => {

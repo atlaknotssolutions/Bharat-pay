@@ -4,7 +4,7 @@ import { Clock, Trash2, MoreVertical } from "lucide-react";
 import { toast } from "react-toastify";
 import { formatTime } from "../../components/player/utils";
 
-const BACKEND_URL = "https://bharat-pay.onrender.com";
+const BACKEND_URL = "https://bharat-pay-3.onrender.com";
 
 export default function WatchHistoryTab({ openDetail }) {
   const navigate = useNavigate();

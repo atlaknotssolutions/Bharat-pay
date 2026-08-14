@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "https://bharat-pay.onrender.com/api",
+  baseURL: "https://bharat-pay-3.onrender.com/api",
 });
 
 // Attach admin JWT to every request from this admin panel.

@@ -11,9 +11,9 @@ import {
 } from "lucide-react";
 
 // API base URLs
-const API_BASE = "https://bharat-pay.onrender.com/api";
-const API_CATEGORY = "https://bharat-pay.onrender.com/api/category";
-const BACKEND_URL = "https://bharat-pay.onrender.com";
+const API_BASE = "https://bharat-pay-3.onrender.com/api";
+const API_CATEGORY = "https://bharat-pay-3.onrender.com/api/category";
+const BACKEND_URL = "https://bharat-pay-3.onrender.com";
 
 // Helpers
 const getToken = () => localStorage.getItem("token") || null;

@@ -9,7 +9,7 @@ import {
   deleteNotification,
 } from "../../features/notifications/notificationsSlice";
 
-const BACKEND_URL = "https://bharat-pay.onrender.com";
+const BACKEND_URL = "https://bharat-pay-3.onrender.com";
 
 const resolveUrl = (url) =>
   url

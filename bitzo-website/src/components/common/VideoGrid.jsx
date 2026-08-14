@@ -16,7 +16,7 @@ import { formatTime } from "../player/utils";
 import ShortCard from "./ShortCard";
 import { ShortsCardSkeletonRow, VideoCardSkeletonRow } from "./Skeletons";
 
-const BACKEND_URL = "https://bharat-pay.onrender.com";
+const BACKEND_URL = "https://bharat-pay-3.onrender.com";
 
 const supportsHover =
   typeof window !== "undefined" &&

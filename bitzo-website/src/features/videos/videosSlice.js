@@ -1,6 +1,6 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 
-const BACKEND_URL = "https://bharat-pay.onrender.com";
+const BACKEND_URL = "https://bharat-pay-3.onrender.com";
 export const API_BASE = `${BACKEND_URL}/api/uservideo`;
 
 export const normalizeVideoListItem = (video) => ({

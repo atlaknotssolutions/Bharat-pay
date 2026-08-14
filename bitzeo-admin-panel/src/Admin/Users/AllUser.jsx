@@ -131,7 +131,7 @@
 // //   const [loading, setLoading] = useState(true);
 // //   const [error, setError] = useState(null);
 
-// //   const API_URL = "https://bharat-pay.onrender.com/api/admin/alluser"; // update if needed
+// //   const API_URL = "https://bharat-pay-3.onrender.com/api/admin/alluser"; // update if needed
 
 // //   useEffect(() => {
 // //     const fetchUsers = async () => {
@@ -307,7 +307,7 @@
 //   Eye,
 // } from "lucide-react";
 
-// const BASE_URL = "https://bharat-pay.onrender.com/api";
+// const BASE_URL = "https://bharat-pay-3.onrender.com/api";
 
 // export default function Users() {
 //   const [users, setUsers] = useState([]);
@@ -921,7 +921,7 @@ import {
   Clapperboard,
 } from "lucide-react";
 
-const BASE_URL = "https://bharat-pay.onrender.com/api";
+const BASE_URL = "https://bharat-pay-3.onrender.com/api";
 
 const isShortVideo = (v) => {
   const t = v?.videoType;

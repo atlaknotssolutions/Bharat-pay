@@ -17,7 +17,7 @@ export default function Login() {
 
     try {
       const res = await axios.post(
-        "https://bharat-pay.onrender.com/api/admin/login",
+        "https://bharat-pay-3.onrender.com/api/admin/login",
         { email, password },
         { headers: { "Content-Type": "application/json" } },
       );

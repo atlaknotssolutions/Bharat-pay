@@ -34,7 +34,7 @@ import {
 } from "../../features/notifications/notificationsSlice";
 import axios from "axios";
 
-const API_BASE_URL = "https://bharat-pay.onrender.com";
+const API_BASE_URL = "https://bharat-pay-3.onrender.com";
 const HINTS_URL = `${API_BASE_URL}/api/uservideo/search/hints`;
 
 export default function Navbar({ toggleSidebar }) {

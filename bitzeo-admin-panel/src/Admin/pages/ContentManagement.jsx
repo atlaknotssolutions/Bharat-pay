@@ -18,7 +18,7 @@ import {
   Search,
 } from "lucide-react";
 
-const BASE_URL = "https://bharat-pay.onrender.com/api";
+const BASE_URL = "https://bharat-pay-3.onrender.com/api";
 
 export default function ContentManagement({ type = "long" }) {
   const pageType = type === "short" ? "short" : "long";

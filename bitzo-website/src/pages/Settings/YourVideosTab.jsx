@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Eye, Clock, Heart, ArrowUpDown } from "lucide-react";
 import { formatTime } from "../../components/player/utils";
 
-const BACKEND_URL = "https://bharat-pay.onrender.com";
+const BACKEND_URL = "https://bharat-pay-3.onrender.com";
 
 const toMediaUrl = (value) => {
   if (!value) return "";
@@ -44,7 +44,7 @@ export default function YourVideosTab({ openDetail, sortBy, onSortChange }) {
       return;
     }
 
-    fetch("https://bharat-pay.onrender.com/api/uservideo/my-videos", {
+    fetch("https://bharat-pay-3.onrender.com/api/uservideo/my-videos", {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())

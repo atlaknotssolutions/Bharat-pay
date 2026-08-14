@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { ArrowLeft, ChevronDown, Loader2 } from "lucide-react";
 
-const API = "https://bharat-pay.onrender.com/api";
+const API = "https://bharat-pay-3.onrender.com/api";
 
 export default function UploadVideo() {
   const [title, setTitle] = useState("");

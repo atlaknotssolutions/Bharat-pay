@@ -53,7 +53,7 @@
 
 //       try {
 //         const response = await fetch(
-//           "https://bharat-pay.onrender.com/api/uservideo/subscribed-channels",
+//           "https://bharat-pay-3.onrender.com/api/uservideo/subscribed-channels",
 //           {
 //             headers: { Authorization: `Bearer ${token}` },
 //           },
@@ -456,7 +456,7 @@ import {
   Video,
 } from "lucide-react";
 
-const BACKEND_URL = "https://bharat-pay.onrender.com";
+const BACKEND_URL = "https://bharat-pay-3.onrender.com";
 
 const sidebarMainItems = [
   { icon: Home, label: "Home", path: "/" },

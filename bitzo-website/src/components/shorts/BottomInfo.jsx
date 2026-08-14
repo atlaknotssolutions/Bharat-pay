@@ -1,6 +1,6 @@
 import { BadgeCheck, Music2 } from "lucide-react";
 
-const BACKEND_URL = "https://bharat-pay.onrender.com";
+const BACKEND_URL = "https://bharat-pay-3.onrender.com";
 
 const resolveImage = (value) => {
   if (!value) return "";

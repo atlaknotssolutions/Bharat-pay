@@ -21,7 +21,7 @@ import BottomInfo from "../components/shorts/BottomInfo";
 import CommentsSheet from "../components/shorts/CommentsSheet";
 import SwipeHint from "../components/shorts/SwipeHint";
 
-const BACKEND_URL = "https://bharat-pay.onrender.com";
+const BACKEND_URL = "https://bharat-pay-3.onrender.com";
 const API_BASE = `${BACKEND_URL}/api/uservideo`;
 
 const toMediaUrl = (value) => {

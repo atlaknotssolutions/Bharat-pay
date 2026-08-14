@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { formatTimeAgo } from "../../utils/timeAgo";
 
-const BACKEND_URL = "https://bharat-pay.onrender.com";
+const BACKEND_URL = "https://bharat-pay-3.onrender.com";
 const API_BASE = `${BACKEND_URL}/api/uservideo`;
 
 const AUTOPLAY_KEY = "videoo.autoplay";

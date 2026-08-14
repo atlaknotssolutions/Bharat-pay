@@ -15,7 +15,7 @@ export default function ForgotPassword() {
 
     try {
       const res = await axios.post(
-        "https://bharat-pay.onrender.com/api/admin/forgot-password", // ← apna endpoint
+        "https://bharat-pay-3.onrender.com/api/admin/forgot-password", // ← apna endpoint
         { email },
         { headers: { "Content-Type": "application/json" } },
       );

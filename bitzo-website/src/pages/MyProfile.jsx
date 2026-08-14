@@ -27,7 +27,7 @@ import {
   EyeOff,
 } from "lucide-react";
 
-const BACKEND_URL = "https://bharat-pay.onrender.com";
+const BACKEND_URL = "https://bharat-pay-3.onrender.com";
 
 const resolveMediaUrl = (value) => {
   if (!value) return "";
@@ -153,7 +153,7 @@ export default function Profile() {
       }
 
       const res = await fetch(
-        `https://bharat-pay.onrender.com/api/user/${user._id}`,
+        `https://bharat-pay-3.onrender.com/api/user/${user._id}`,
         {
           method: "PUT",
           headers: {
@@ -223,7 +223,7 @@ export default function Profile() {
       if (!token || !user?._id) throw new Error("Authentication required");
 
       const res = await fetch(
-        `https://bharat-pay.onrender.com/api/user/password/${user._id}`,
+        `https://bharat-pay-3.onrender.com/api/user/password/${user._id}`,
         {
           method: "PUT",
           headers: {

@@ -3,7 +3,7 @@ import axios from "axios";
 import { useDispatch } from "react-redux";
 import { setSelectedCategory } from "../../features/videos/videosSlice";
 
-const API_URL = "https://bharat-pay.onrender.com/api/category";
+const API_URL = "https://bharat-pay-3.onrender.com/api/category";
 
 const ALL_CHIP = { _id: "all", name: "All" };
 

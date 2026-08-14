@@ -13,7 +13,7 @@ export default function LikedVideosTab({ openDetail }) {
       return;
     }
 
-    fetch("https://bharat-pay.onrender.com/api/uservideo/liked", {
+    fetch("https://bharat-pay-3.onrender.com/api/uservideo/liked", {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())
