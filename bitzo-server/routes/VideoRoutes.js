@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const riskCheck = require("../middlewares/riskCheck.middleware");
 const { videoAndThumbnailUpload: upload } = require("../middlewares/multer");
 const isAuthenticated = require("../middlewares/isAuthenticated");
 const { uploadVideo, getAllVideos, deleteVideo, updateVideoupdated, getMyVideos, editMyVideo, deleteMyVideo } = require("../controller/videoController");
@@ -10,7 +11,7 @@ router.post(
   upload.single("video"),
   uploadVideo
 );
-router.get("/my-videos", isAuthenticated, getMyVideos);
+router.get("/my-videos",riskCheck, isAuthenticated, getMyVideos);
 
 router.put(
   "/update/:id",

@@ -3,7 +3,7 @@
 require("dotenv").config(); // ✅ MUST BE FIRST LINE
 
 require("./config/validateEnv")();
-
+const { startTrustScoreJob } = require("./services/vpn.service/trustScore.job.js");
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
@@ -98,6 +98,7 @@ app.use((err, req, res, next) => {
 });
 
 // ---------- Listen ----------
+startTrustScoreJob();
 app.listen(PORT, () => {
   console.log(`🌐 Server running on port ${PORT}`);
 });

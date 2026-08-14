@@ -20,6 +20,26 @@ const {
   clearRefreshCookie,
 } = require("../utils/refreshCookie");
 
+
+const { detectVPN } = require("../services/vpn.service/vpn.service.js");
+const {
+  logFraudEvent,
+  analyzeBehavior,
+  applyRiskToUser,
+} = require("../services/vpn.service/fraud.service.js");
+
+
+
+const getClientIp = (req) => {
+  return (
+    req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+    req.headers["x-real-ip"] ||
+    req.connection?.remoteAddress ||
+    req.ip ||
+    "unknown"
+  );
+};
+
 // Creates a refresh-token session for a user/admin and returns the raw token.
 // Only the hash is persisted. The caller sets the httpOnly cookie.
 const createAuthSession = async (userId, kind = "user") => {
@@ -74,6 +94,30 @@ exports.registerUser = async (req, res) => {
     // 🔐 HASH PASSWORD IN CONTROLLER
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
+
+
+
+    const ip = getClientIp(req);
+// const ua = req.headers["user-agent"];
+const vpnInfo = await detectVPN(ip);
+
+await logFraudEvent({
+  userId: user._id,
+  eventType: "REGISTER",
+  severity: vpnInfo.isVPN ? "medium" : "low",
+  ip,
+  deviceId,
+  userAgent: ua,
+  isVPN: vpnInfo.isVPN,
+  isProxy: vpnInfo.isProxy,
+  riskScoreImpact: vpnInfo.isVPN ? 15 : 0,
+  metadata: { country: vpnInfo.country },
+});
+
+if (vpnInfo.isVPN) {
+  await applyRiskToUser(user._id, 15, ["VPN used during registration"]);
+}
+
 
     const user = await User.create({
       name,
@@ -156,10 +200,72 @@ exports.loginUser = async (req, res) => {
       });
     }
 
+    
+
     if (!user.deviceId) {
       user.deviceId = deviceId;
       await user.save();
     }
+
+
+    // const ip = getClientIp(req);
+// const deviceId = resolveDeviceId(req, res);
+// const ua = req.headers["user-agent"];
+
+await logFraudEvent({
+  userId: user?._id || null,
+  eventType: "LOGIN_FAILED",
+  severity: "medium",
+  ip,
+  deviceId,
+  userAgent: ua,
+  riskScoreImpact: 8,
+});
+
+if (user) {
+  const { riskPoints, reasons } = await analyzeBehavior(user._id);
+  if (riskPoints > 0) {
+    await applyRiskToUser(user._id, riskPoints, reasons);
+  }
+}
+
+const ip = getClientIp(req);
+const ua = req.headers["user-agent"];
+const vpnInfo = await detectVPN(ip);
+
+await logFraudEvent({
+  userId: user._id,
+  eventType: "LOGIN_SUCCESS",
+  severity: vpnInfo.isVPN ? "medium" : "low",
+  ip,
+  deviceId,
+  userAgent: ua,
+  isVPN: vpnInfo.isVPN,
+  isProxy: vpnInfo.isProxy,
+  riskScoreImpact: vpnInfo.isVPN ? 10 : 0,
+});
+
+const { riskPoints, reasons } = await analyzeBehavior(user._id);
+if (riskPoints > 0 || vpnInfo.isVPN) {
+  await applyRiskToUser(user._id, riskPoints + (vpnInfo.isVPN ? 10 : 0), [
+    ...reasons,
+    ...(vpnInfo.isVPN ? ["VPN detected"] : []),
+  ]);
+}
+
+await logFraudEvent({
+  userId: user._id,
+  eventType: "DEVICE_CLAIM",
+  severity: "high",
+  ip: getClientIp(req),
+  deviceId,
+  userAgent: req.headers["user-agent"],
+  riskScoreImpact: 25,
+  metadata: { previousDevice: user.deviceId },
+});
+
+await applyRiskToUser(user._id, 25, ["Device claim performed"]);
+
 
     // 5️⃣ Generate JWT token
     const token = signAccessToken({ userId: user._id, role: user.role });
@@ -174,6 +280,8 @@ exports.loginUser = async (req, res) => {
     const refreshToken = await createAuthSession(user._id, "user");
     setRefreshCookie(res, refreshToken, "user");
 
+
+    
     // 7️⃣ Send response
     res.status(200).json({
       success: true,
