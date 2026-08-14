@@ -8,8 +8,8 @@ import {
   Play,
   Link as LinkIcon,
 } from "lucide-react";
+import { API_ORIGIN as BACKEND_URL } from "../../config/api";
 
-const BACKEND_URL = "http://localhost:8000";
 const API_BASE = `${BACKEND_URL}/api/uservideo`;
 
 export default function SubscribedChannels() {

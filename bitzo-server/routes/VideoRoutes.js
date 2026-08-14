@@ -6,7 +6,7 @@ const { uploadVideo, getAllVideos, deleteVideo, updateVideoupdated, getMyVideos,
 
 router.post(
   "/upload",
-  // isAuthenticated,
+  isAuthenticated,
   upload.single("video"),
   uploadVideo
 );
@@ -14,7 +14,7 @@ router.get("/my-videos", isAuthenticated, getMyVideos);
 
 router.put(
   "/update/:id",
-  // isAuthenticated,
+  isAuthenticated,
   upload.single("video"), // optional
   updateVideoupdated
 );
@@ -29,6 +29,6 @@ router.delete(
 
 router.get("/", getAllVideos);
 
-router.delete("/:id", deleteVideo);
+router.delete("/:id", isAuthenticated, deleteVideo);
 
 module.exports = router;

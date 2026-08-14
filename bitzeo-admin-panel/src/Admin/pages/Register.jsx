@@ -171,8 +171,8 @@
 
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { User, Mail, Lock, Eye, EyeOff } from "lucide-react";
-import axios from "axios";
+import { User, Mail, Lock, KeyRound, Eye, EyeOff } from "lucide-react";
+import API from "../../api";
 import toast from "react-hot-toast";
 
 export default function Register() {
@@ -183,8 +183,10 @@ export default function Register() {
     email: "",
     password: "",
     confirmPassword: "",
+    registerKey: "",
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [showKey, setShowKey] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e) => {
@@ -207,15 +209,12 @@ export default function Register() {
     setIsLoading(true);
 
     try {
-      const res = await axios.post(
-        "http://localhost:8000/api/admin/register",
-        {
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
-        },
-        { headers: { "Content-Type": "application/json" } }
-      );
+      const res = await API.post("/admin/register", {
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        registerKey: formData.registerKey,
+      });
 
       if (!res.data.success) {
         throw new Error(res.data.message || "Registration failed");
@@ -332,6 +331,32 @@ export default function Register() {
                   className="w-full pl-10 py-3 bg-gray-800 border border-gray-700 text-white rounded-lg 
                              placeholder:text-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
                 />
+              </div>
+            </div>
+
+            {/* Setup Key */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                Setup Key
+              </label>
+              <div className="relative">
+                <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-5 h-5" />
+                <input
+                  type={showKey ? "text" : "password"}
+                  name="registerKey"
+                  value={formData.registerKey}
+                  onChange={handleChange}
+                  placeholder="Admin setup key"
+                  className="w-full pl-10 pr-12 py-3 bg-gray-800 border border-gray-700 text-white rounded-lg 
+                             placeholder:text-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowKey(!showKey)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition"
+                >
+                  {showKey ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
               </div>
             </div>
 

@@ -35,8 +35,8 @@ import {
   resetNotifications,
 } from "../../features/notifications/notificationsSlice";
 import axios from "axios";
+import { API_ORIGIN as API_BASE_URL } from "../../config/api";
 
-const API_BASE_URL = "http://localhost:8000";
 const HINTS_URL = `${API_BASE_URL}/api/uservideo/search/hints`;
 
 export default function Navbar({ toggleSidebar }) {

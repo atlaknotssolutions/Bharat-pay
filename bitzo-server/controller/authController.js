@@ -1,69 +1,44 @@
 const User = require("../models/usermodel");
 const WatchSession = require("../models/WatchSession");
-const generateToken = require("../utils/generateToken");
+const RefreshToken = require("../models/RefreshToken");
+const {
+  signAccessToken,
+  signRefreshToken,
+  verifyRefreshToken,
+  hashToken,
+  REFRESH_TOKEN_TTL_MS,
+} = require("../utils/tokenService");
 const bcrypt = require("bcryptjs"); // ← make sure this is installed
+const crypto = require("crypto");
 const mongoose = require("mongoose");
-const jwt = require("jsonwebtoken");
 const imagekit = require("../utils/imagekit.js");
 const path = require("path");
-exports.loginUser = async (req, res) => {
-  try {
-    const { email, password, deviceId } = req.body;
-    if (!email || !password || !deviceId) {
-      return res.status(400).json({
-        success: false,
-        message: "All fields are required",
-      });
-    }
-    const user = await User.findOne({ email }).select("+password");
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid credentials",
-      });
-    }
-    if (user.deviceId !== deviceId) {
-      return res.status(401).json({
-        success: false,
-        message: "Login blocked: different device detected",
-      });
-    }
-    const isMatch = await user.comparePassword(password);
-    if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid credentials",
-      });
-    }
-    const token = require("../utils/generateToken")(user._id);
-    res.status(200).json({
-      success: true,
-      message: "Login successful",
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        token: user.token,
-        role: user.role,
-        trustScore: user.trustScore,
-      },
-    });
-  } catch (error) {
-    console.error("Login error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Login failed",
-    });
-  }
+const { resolveDeviceId } = require("../utils/deviceCookie");
+const {
+  REFRESH_COOKIE,
+  setRefreshCookie,
+  clearRefreshCookie,
+} = require("../utils/refreshCookie");
+
+// Creates a refresh-token session for a user/admin and returns the raw token.
+// Only the hash is persisted. The caller sets the httpOnly cookie.
+const createAuthSession = async (userId, kind = "user") => {
+  const refreshToken = signRefreshToken({ sub: String(userId), kind });
+  await RefreshToken.create({
+    userId,
+    kind,
+    tokenHash: hashToken(refreshToken),
+    expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
+  });
+  return refreshToken;
 };
 
 /* ===================== REGISTER ===================== */
 exports.registerUser = async (req, res) => {
   try {
-    const { name, email, password, deviceId } = req.body;
+    const { name, email, password } = req.body;
 
-    if (!name || !email || !password || !deviceId) {
+    if (!name || !email || !password) {
       return res.status(400).json({
         success: false,
         message: "All fields are required",
@@ -77,7 +52,8 @@ exports.registerUser = async (req, res) => {
       });
     }
 
-    // Device lock
+    // Device lock (server-issued device id from HttpOnly cookie)
+    const deviceId = resolveDeviceId(req, res);
     const deviceExists = await User.findOne({ deviceId });
     if (deviceExists) {
       return res.status(400).json({
@@ -106,10 +82,15 @@ exports.registerUser = async (req, res) => {
       deviceId,
     });
 
+    // Auto-login: issue access token + refresh session (rotated on refresh)
+    const token = signAccessToken({ userId: user._id, role: user.role });
+    const refreshToken = await createAuthSession(user._id, "user");
+    setRefreshCookie(res, refreshToken, "user");
+
     res.status(201).json({
       success: true,
       message: "User registered successfully",
-      token: generateToken(user._id),
+      token,
       user: {
         _id: user._id,
         name: user.name,
@@ -131,13 +112,13 @@ exports.registerUser = async (req, res) => {
 
 exports.loginUser = async (req, res) => {
   try {
-    const { email, password, deviceId } = req.body;
+    const { email, password } = req.body;
 
     // 1️⃣ Validate input
-    if (!email || !password || !deviceId) {
+    if (!email || !password) {
       return res.status(400).json({
         success: false,
-        message: "Email, password and deviceId are required",
+        message: "Email and password are required",
       });
     }
 
@@ -159,22 +140,41 @@ exports.loginUser = async (req, res) => {
       });
     }
 
-    // 4️⃣ Generate JWT token
-    const token = jwt.sign(
-      { userId: user._id },
-      process.env.SECRET_KEY, // 🔴 MUST exist in .env
-      { expiresIn: "7d" },
-    );
+    // 4️⃣ Device binding (server-issued device id from HttpOnly cookie)
+    // A cookie-less browser/device must NOT silently take ownership of the
+    // account. Any mismatch (fresh browser, cleared cookies, different profile)
+    // returns DEVICE_LOCKED; the explicit claim-device flow is the only rebind
+    // path. The only auto-bind is the very first binding of a legacy account.
+    const deviceId = resolveDeviceId(req, res);
 
-    // 5️⃣ Set cookie
+    if (user.deviceId && user.deviceId !== deviceId) {
+      return res.status(403).json({
+        success: false,
+        code: "DEVICE_LOCKED",
+        message:
+          "Your account is currently linked to another browser or device. If you don't have access to that browser, you can continue on this device by signing out all other active sessions.",
+      });
+    }
+
+    if (!user.deviceId) {
+      user.deviceId = deviceId;
+      await user.save();
+    }
+
+    // 5️⃣ Generate JWT token
+    const token = signAccessToken({ userId: user._id, role: user.role });
+
+    // 6️⃣ Set cookies (access token cookie kept for compatibility; refresh session)
     res.cookie("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production", // ✅ prod safe
       sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
+    const refreshToken = await createAuthSession(user._id, "user");
+    setRefreshCookie(res, refreshToken, "user");
 
-    // 6️⃣ Send response
+    // 7️⃣ Send response
     res.status(200).json({
       success: true,
       message: "Login successful",
@@ -198,47 +198,90 @@ exports.loginUser = async (req, res) => {
   }
 };
 
-exports.AllUsers = async (req, res) => {
+/* ===================== CLAIM DEVICE =====================
+   Recovery path for the DEVICE_LOCKED login flow.
+   After credential re-verification, this releases the account from its
+   previously bound device so the current browser/device becomes the active
+   device. All refresh-token sessions are revoked, matching the resetPassword
+   and logout revocation patterns. No tokens are issued here. */
+exports.claimDevice = async (req, res) => {
   try {
-    const users = await User.find().select("-password").lean();
-    res.status(200).json({
-      success: true,
-      users,
-    });
-  } catch (error) {
-    console.error("❌ Fetch users error:", error.message);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-    });
-  }
-};
+    const { email, password } = req.body;
 
-exports.getUserDetail = async (req, res) => {
-  try {
-    const userId = req.params.id;
-
-    const user = await User.findById(userId)
-      .populate("channels", "name description")
-      .populate("videos", "title thumbnail views")
-      .select("-password");
-
-    if (!user) {
-      return res.status(404).json({
+    if (!email || !password) {
+      return res.status(400).json({
         success: false,
-        message: "User not found",
+        message: "Email and password are required",
       });
     }
 
+    const user = await User.findOne({ email }).select("+password");
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password",
+      });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password",
+      });
+    }
+
+    const deviceId = resolveDeviceId(req, res);
+
+    // Nothing to claim: the account is already usable on this device.
+    if (!user.deviceId || user.deviceId === deviceId) {
+      return res.status(400).json({
+        success: false,
+        message: "This device is already linked to your account. You can sign in now.",
+      });
+    }
+
+    // 1-device = 1-account hard limit: this device must not already be bound
+    // to another account, otherwise rebinding here would violate the unique
+    // deviceId constraint (E11000) and steal the device from that account.
+    const deviceOwner = await User.findOne({ deviceId, _id: { $ne: user._id } });
+    if (deviceOwner) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "This browser or device is already linked to a different account. Sign in with that account on this device instead.",
+      });
+    }
+
+    // Revoke every refresh session for this user so old devices cannot refresh.
+    await RefreshToken.updateMany(
+      { userId: user._id, kind: "user" },
+      { $set: { revokedAt: new Date() } }
+    );
+
+    // Clear any auth cookies on this response (same as logout).
+    clearRefreshCookie(res, "user");
+    res.clearCookie("token", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+    });
+
+    // Release the old binding and make this device the account's active device.
+    user.deviceId = deviceId;
+    await user.save();
+
     return res.status(200).json({
       success: true,
-      user,
+      message:
+        "All other sessions have been signed out. You can now sign in on this device.",
     });
   } catch (error) {
-    console.error("getUserDetail Error:", error.message);
+    console.error("❌ Claim device error:", error.message);
     return res.status(500).json({
       success: false,
-      message: "Server Error",
+      message: "Internal server error",
     });
   }
 };
@@ -311,19 +354,51 @@ exports.getMyProfile = async (req, res) => {
 
 exports.updatePassword = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select("+password");
+    // Authorization identity comes from the JWT (authMiddleware), never from
+    // req.params.id. The :id URL parameter is kept for frontend compatibility.
+    if (
+      req.params.id &&
+      String(req.params.id) !== String(req.user?.id)
+    ) {
+      return res
+        .status(403)
+        .json({ success: false, message: "Forbidden" });
+    }
+
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const { oldPassword, newPassword } = req.body || {};
+
+    if (!oldPassword) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Old password is required" });
+    }
+
+    if (typeof newPassword !== "string" || newPassword.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: "New password must be at least 8 characters long",
+      });
+    }
+
+    const user = await User.findById(userId).select("+password");
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ success: false, message: "User not found" });
     }
 
-    const isMatch = await user.comparePassword(req.body.oldPassword);
+    const isMatch = await user.comparePassword(oldPassword);
 
     if (!isMatch) {
-      return res.status(400).json({ message: "Old password incorrect" });
+      return res.status(400).json({ success: false, message: "Old password incorrect" });
     }
 
-    const hashedPassword = await bcrypt.hash(req.body.newPassword, 10);
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
     user.password = hashedPassword;
 
     await user.save();
@@ -333,12 +408,12 @@ exports.updatePassword = async (req, res) => {
       message: "Password updated",
     });
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
 exports.UserEdit = async (req, res) => {
   try {
-    const userId = req.params.id;
+    const userId = req.user.id;
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res
@@ -476,211 +551,281 @@ exports.UserEdit = async (req, res) => {
     });
   }
 };
-// exports.UserEdit = async (req, res) => {
-//   try {
-//     const userId = req.params.id;
 
-//     if (!mongoose.Types.ObjectId.isValid(userId)) {
-//       return res.status(400).json({ success: false, message: "Invalid user ID format" });
-//     }
+/* ===================== REFRESH (rotation + reuse detection) ===================== */
+exports.refreshToken = async (req, res) => {
+  try {
+    const kind = "user";
+    const presented = req.cookies && req.cookies[REFRESH_COOKIE];
 
-//     const user = await User.findById(userId).select('+avatar +name +email');
-//     if (!user) {
-//       return res.status(404).json({ success: false, message: "User not found" });
-//     }
+    if (!presented) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Unauthorized - No refresh session" });
+    }
 
-//     const updateData = {};
-//     let oldAvatarUrl = user.avatar;
+    let payload;
+    try {
+      payload = verifyRefreshToken(presented);
+    } catch (error) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Unauthorized - Invalid refresh session" });
+    }
 
-//     // Avatar
-//     if (req.files?.avatar) {
-//       const file = req.files.avatar;
+    if (!payload.sub) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Unauthorized - Invalid refresh session" });
+    }
 
-//       if (!file.mimetype?.startsWith('image/')) {
-//         return res.status(400).json({ success: false, message: "Only image files allowed" });
-//       }
-//       if (file.size > 5 * 1024 * 1024) {
-//         return res.status(400).json({ success: false, message: "Image too large (max 5MB)" });
-//       }
+    const tokenHash = hashToken(presented);
+    const session = await RefreshToken.findOne({ tokenHash }).lean();
 
-//       const fileName = `avatar_${user._id.toString()}_${Date.now()}${path.extname(file.name || '.jpg')}`;
+    if (!session || session.kind !== kind) {
+      clearRefreshCookie(res, "user");
+      return res
+        .status(401)
+        .json({ success: false, message: "Unauthorized - Refresh session not found" });
+    }
 
-//       const uploadResponse = await imagekit.upload({
-//         file: file.data,
-//         fileName,
-//         folder: "/avatars",
-//         useUniqueFileName: true,
-//       });
+    // Rotated token being reused → treat as theft: revoke the whole family.
+    if (session.replacedBy) {
+      await RefreshToken.updateMany(
+        { userId: session.userId, kind },
+        { $set: { revokedAt: new Date() } }
+      );
+      clearRefreshCookie(res, "user");
+      return res
+        .status(401)
+        .json({ success: false, message: "Unauthorized - Refresh session reused" });
+    }
 
-//       updateData.avatar = uploadResponse.url;
-//     }
+    if (session.revokedAt) {
+      clearRefreshCookie(res, "user");
+      return res
+        .status(401)
+        .json({ success: false, message: "Unauthorized - Refresh session revoked" });
+    }
 
-//     // Name
-//     if (req.body?.name && typeof req.body.name === 'string') {
-//       const trimmed = req.body.name.trim();
-//       if (trimmed.length >= 2 && trimmed.length <= 50) {
-//         if (trimmed !== user.name) updateData.name = trimmed;
-//       } else if (trimmed) {
-//         return res.status(400).json({ success: false, message: "Name must be 2–50 characters" });
-//       }
-//     }
+    if (new Date(session.expiresAt).getTime() < Date.now()) {
+      await RefreshToken.deleteOne({ _id: session._id });
+      clearRefreshCookie(res, "user");
+      return res
+        .status(401)
+        .json({ success: false, message: "Unauthorized - Refresh session expired" });
+    }
 
-//     // Email
-//     if (req.body?.email && typeof req.body.email === 'string') {
-//       const email = req.body.email.trim().toLowerCase();
-//       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-//         return res.status(400).json({ success: false, message: "Invalid email format" });
-//       }
-//       if (email !== user.email) {
-//         const exists = await User.findOne({ email }).lean();
-//         if (exists) {
-//           return res.status(409).json({ success: false, message: "Email already in use" });
-//         }
-//         updateData.email = email;
-//       }
-//     }
+    const user = await User.findById(session.userId);
+    if (!user) {
+      await RefreshToken.deleteOne({ _id: session._id });
+      clearRefreshCookie(res, "user");
+      return res
+        .status(401)
+        .json({ success: false, message: "Unauthorized - User not found" });
+    }
 
-//     if (Object.keys(updateData).length === 0) {
-//       return res.status(200).json({
-//         success: true,
-//         message: "No changes provided",
-//         user: user.toObject({ versionKey: false }),
-//       });
-//     }
+    // Rotate: revoke this session, create a child session.
+    const newRefreshToken = await createAuthSession(user._id, "user");
+    const child = await RefreshToken.findOne({ tokenHash: hashToken(newRefreshToken) }).lean();
+    await RefreshToken.updateOne(
+      { _id: session._id },
+      { $set: { replacedBy: child._id, revokedAt: new Date() } }
+    );
 
-//     const updatedUser = await User.findByIdAndUpdate(
-//       userId,
-//       { $set: updateData },
-//       { new: true, runValidators: true }
-//     ).select('-password -__v -googleId -deviceId -createdAt -updatedAt').lean();
+    const token = signAccessToken({ userId: user._id, role: user.role });
+    setRefreshCookie(res, newRefreshToken, "user");
 
-//     // Clean up old avatar (non-blocking)
-//     if (updateData.avatar && oldAvatarUrl && oldAvatarUrl.includes('imagekit.io')) {
-//       (async () => {
-//         try {
-//           const filePath = oldAvatarUrl.split('/').slice(3).join('/').split('?')[0];
-//           await imagekit.deleteFile(filePath);
-//         } catch (e) {
-//           console.warn("[non-critical] Failed to delete old avatar:", e.message);
-//         }
-//       })();
-//     }
+    return res.status(200).json({
+      success: true,
+      message: "Token refreshed",
+      token,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        avatar: user.avatar || null,
+      },
+    });
+  } catch (error) {
+    console.error("Refresh error:", error.message);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
 
-//     return res.status(200).json({
-//       success: true,
-//       message: "Profile updated successfully",
-//       user: updatedUser,
-//     });
-//   } catch (error) {
-//     console.error("UserEdit error:", error);
-//     return res.status(500).json({
-//       success: false,
-//       message: "Failed to update profile",
-//       ...(process.env.NODE_ENV === 'development' && { debug: error.message }),
-//     });
-//   }
-// };
+/* ===================== LOGOUT (real server-side revocation) ===================== */
+exports.logout = async (req, res) => {
+  try {
+    const presented = req.cookies && req.cookies[REFRESH_COOKIE];
+    if (presented) {
+      await RefreshToken.updateOne(
+        { tokenHash: hashToken(presented), kind: "user", revokedAt: null },
+        { $set: { revokedAt: new Date() } }
+      );
+    }
 
-// exports.UserEdit = async (req, res) => {
-//   try {
-//     const userId = req.params.id;
-//     if (!mongoose.Types.ObjectId.isValid(userId)) {
-//       return res.status(400).json({ success: false, message: "Invalid user ID" });
-//     }
+    clearRefreshCookie(res, "user");
+    res.clearCookie("token", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+    });
 
-//     console.log(userId,"userId userId")
+    return res
+      .status(200)
+      .json({ success: true, message: "Logged out successfully" });
+  } catch (error) {
+    console.error("Logout error:", error.message);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
 
-//     const user = await User.findById(userId);
-//     if (!user) {
-//       return res.status(404).json({ success: false, message: "User not found" });
-//     }
+/* ===================== LOGOUT ALL (revoke every user session) ===================== */
+// Revokes ALL active refresh-token sessions for the authenticated user.
+// The backend cannot delete cookies from other browsers/devices: their refresh
+// sessions die server-side and their next refresh returns 401, at which point
+// the frontend clears local auth state. Existing stateless access JWTs expire
+// naturally (short-lived); no JWT blacklist is introduced.
+exports.logoutAll = async (req, res) => {
+  try {
+    const userId = req.user && req.user.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
 
-//     const updateData = {};
+    await RefreshToken.updateMany(
+      { userId, kind: "user", revokedAt: null },
+      { $set: { revokedAt: new Date() } }
+    );
 
-//     // ── 1. Handle avatar upload ───────────────────────────────────────
-//     let newAvatarUrl = null;
-//     if (req.files?.avatar) {
-//       const file = req.files.avatar;
+    clearRefreshCookie(res, "user");
+    res.clearCookie("token", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+    });
 
-//       if (!file.mimetype?.startsWith("image/")) {
-//         return res.status(400).json({ success: false, message: "Only image files allowed" });
-//       }
+    return res.status(200).json({
+      success: true,
+      message: "Signed out from all browsers and devices",
+    });
+  } catch (error) {
+    console.error("Logout all error:", error.message);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
 
-//       // Optional: size limit (e.g. 5MB)
-//       if (file.size > 5 * 1024 * 1024) {
-//         return res.status(400).json({ success: false, message: "Image too large (max 5MB)" });
-//       }
+/* ===================== FORGOT PASSWORD ===================== */
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body || {};
+    const normalizedEmail =
+      typeof email === "string" ? email.trim().toLowerCase() : "";
 
-//       const uploadResponse = await imagekit.upload({
-//         file: file.data,               // ← Buffer is preferred
-//         fileName: `avatar_${user._id}_${Date.now()}${file.name ? path.extname(file.name) : ".jpg"}`,
-//         folder: "/avatars",
-//       });
+    const user = normalizedEmail
+      ? await User.findOne({ email: normalizedEmail })
+      : null;
 
-//       newAvatarUrl = uploadResponse.url;
-//       updateData.avatar = newAvatarUrl;
-//     }
+    if (user) {
+      // Cryptographically secure, single-use, short-lived reset token.
+      const resetToken = crypto.randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
-//     // ── 2. Name ────────────────────────────────────────────────────────
-//     if (req.body?.name && typeof req.body.name === "string") {
-//       const name = req.body.name.trim();
-//       if (name.length >= 2 && name.length <= 50) {
-//         updateData.name = name;
-//       }
-//     }
+      await User.updateOne(
+        { _id: user._id },
+        {
+          $set: {
+            resetTokenHash: hashToken(resetToken),
+            resetTokenExpires: expiresAt,
+          },
+        }
+      );
 
-//     // ── 3. Email + uniqueness check ───────────────────────────────────
-//     if (req.body?.email && typeof req.body.email === "string") {
-//       const email = req.body.email.trim().toLowerCase();
-//       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      // NOTE: no email provider is configured in this project. In production,
+      // send a reset link containing the RAW resetToken to the user's email
+      // here. The raw token is never logged and only its hash is persisted.
+      // console.log(resetToken)  // ❌ NEVER DO THIS
+    }
 
-//       if (!emailRegex.test(email)) {
-//         return res.status(400).json({ success: false, message: "Invalid email format" });
-//       }
+    // Generic response: never reveal whether the email exists.
+    return res.status(200).json({
+      success: true,
+      message:
+        "If an account exists for this email, a password reset link has been sent.",
+    });
+  } catch (error) {
+    console.error("Forgot password error:", error.message);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
 
-//       if (email !== user.email) {
-//         const emailExists = await User.findOne({ email });
-//         if (emailExists) {
-//           return res.status(409).json({ success: false, message: "Email already in use" });
-//         }
-//         updateData.email = email;
-//       }
-//     }
+/* ===================== RESET PASSWORD ===================== */
+exports.resetPassword = async (req, res) => {
+  try {
+    const { token, newPassword } = req.body || {};
 
-//     if (Object.keys(updateData).length === 0) {
-//       return res.status(200).json({
-//         success: true,
-//         message: "No changes to apply",
-//         user: user.toProfileJSON(), // optional helper
-//       });
-//     }
+    if (typeof token !== "string" || !token) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Reset token is required" });
+    }
 
-//     const updatedUser = await User.findByIdAndUpdate(userId, updateData, {
-//       new: true,
-//       runValidators: true,
-//     }).select("-password -__v");
+    if (typeof newPassword !== "string" || newPassword.length < 8) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Password must be at least 8 characters" });
+    }
 
-//     // Optional: delete old avatar from ImageKit
-//     if (newAvatarUrl && user.avatar && user.avatar.includes("imagekit")) {
-//       try {
-//         const oldFileId = user.avatar.split("/").pop().split("?")[0];
-//         await imagekit.deleteFile(oldFileId);
-//       } catch (e) {
-//         console.warn("Failed to delete old avatar:", e);
-//       }
-//     }
+    const tokenHash = hashToken(token);
+    const user = await User.findOne({ resetTokenHash: tokenHash }).select(
+      "+resetTokenHash"
+    );
 
-//     return res.status(200).json({
-//       success: true,
-//       message: "Profile updated successfully",
-//       user: updatedUser,
-//     });
-//   } catch (error) {
-//     console.error("UserEdit error:", error);
-//     return res.status(500).json({
-//       success: false,
-//       message: "Server error while updating profile",
-//       error: process.env.NODE_ENV === "development" ? error.message : undefined,
-//     });
-//   }
-// };
+    if (!user) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid or expired reset token" });
+    }
+
+    if (
+      !user.resetTokenExpires ||
+      new Date(user.resetTokenExpires).getTime() < Date.now()
+    ) {
+      // Expired token: clear it so it cannot be reused.
+      await User.updateOne(
+        { _id: user._id },
+        { $unset: { resetTokenHash: 1, resetTokenExpires: 1 } }
+      );
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid or expired reset token" });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await User.updateOne(
+      { _id: user._id },
+      {
+        $set: { password: hashedPassword },
+        $unset: { resetTokenHash: 1, resetTokenExpires: 1 },
+      }
+    );
+
+    // Revoke all existing refresh sessions for this user after a reset.
+    await RefreshToken.updateMany(
+      { userId: user._id, kind: "user", revokedAt: null },
+      { $set: { revokedAt: new Date() } }
+    );
+    clearRefreshCookie(res, "user");
+
+    return res
+      .status(200)
+      .json({ success: true, message: "Password has been reset successfully" });
+  } catch (error) {
+    console.error("Reset password error:", error.message);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+

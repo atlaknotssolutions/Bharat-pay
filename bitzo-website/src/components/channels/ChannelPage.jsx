@@ -9,11 +9,11 @@ import {
   Users,
   Search,
 } from "lucide-react";
+import { API_BASE, API_ORIGIN } from "../../config/api";
 
 // API base URLs
-const API_BASE = "http://localhost:8000/api";
-const API_CATEGORY = "http://localhost:8000/api/category";
-const BACKEND_URL = "http://localhost:8000";
+const API_CATEGORY = `${API_BASE}/category`;
+const BACKEND_URL = API_ORIGIN;
 
 // Helpers
 const getToken = () => localStorage.getItem("token") || null;

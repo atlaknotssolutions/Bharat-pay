@@ -2,8 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Bookmark, Clock, X } from "lucide-react";
 import { toast } from "react-toastify";
 import { formatTime } from "../../components/player/utils";
-
-const API_BASE = "http://localhost:8000/api/uservideo";
+import { API_USERVIDEO as API_BASE } from "../../config/api";
 
 export default function WatchLaterTab({ openDetail }) {
   const [videos, setVideos] = useState([]);

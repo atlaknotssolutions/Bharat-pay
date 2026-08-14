@@ -83,8 +83,9 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useDispatch } from "react-redux";
 import { setSelectedCategory } from "../../features/videos/videosSlice";
+import { API_BASE } from "../../config/api";
 
-const API_URL = "http://localhost:8000/api/category";
+const API_URL = `${API_BASE}/category`;
 
 const ALL_CHIP = { _id: "all", name: "All" };
 

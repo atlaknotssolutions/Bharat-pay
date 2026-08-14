@@ -8,8 +8,7 @@ import {
   markNotificationRead,
   deleteNotification,
 } from "../../features/notifications/notificationsSlice";
-
-const BACKEND_URL = "http://localhost:8000";
+import { API_ORIGIN as BACKEND_URL } from "../../config/api";
 
 const resolveUrl = (url) =>
   url

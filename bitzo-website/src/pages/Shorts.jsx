@@ -13,8 +13,8 @@ import ActionRail from "../components/shorts/ActionRail";
 import BottomInfo from "../components/shorts/BottomInfo";
 import CommentsSheet from "../components/shorts/CommentsSheet";
 import SwipeHint from "../components/shorts/SwipeHint";
+import { API_ORIGIN as BACKEND_URL } from "../config/api";
 
-const BACKEND_URL = "http://localhost:8000";
 const API_BASE = `${BACKEND_URL}/api/uservideo`;
 
 const toMediaUrl = (value) => {

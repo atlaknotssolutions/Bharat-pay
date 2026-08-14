@@ -1,6 +1,5 @@
 import { X } from "lucide-react";
-
-const BACKEND_URL = "http://localhost:8000";
+import { API_ORIGIN as BACKEND_URL } from "../../config/api";
 
 const toMediaUrl = (value) => {
   if (!value) return "";

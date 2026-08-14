@@ -23,8 +23,8 @@ import {
   X,
 } from "lucide-react";
 import { formatTimeAgo } from "../../utils/timeAgo";
+import { API_ORIGIN as BACKEND_URL } from "../../config/api";
 
-const BACKEND_URL = "http://localhost:8000";
 const API_BASE = `${BACKEND_URL}/api/uservideo`;
 
 const AUTOPLAY_KEY = "videoo.autoplay";
@@ -425,9 +425,13 @@ export default function YouTubeLikeVideoPage() {
     if (!id || viewTracked.current) return;
 
     viewTracked.current = true;
+    const token = localStorage.getItem("token");
     fetch(`${API_BASE}/${id}/view`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({
         watchedPercent: 0,
         userId: localStorage.getItem("user")

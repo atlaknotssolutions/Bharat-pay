@@ -140,8 +140,7 @@
 // export default Leaderboard;
 
 import React, { useEffect, useState } from 'react';
-
-const BACKEND_URL = "http://localhost:8000";
+import { API_ORIGIN as BACKEND_URL } from "../../config/api";
 
 // Thumbnail / media URL fix
 const resolveMediaUrl = (value) => {

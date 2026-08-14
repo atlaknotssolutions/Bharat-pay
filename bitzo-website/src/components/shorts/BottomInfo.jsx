@@ -1,6 +1,5 @@
 import { BadgeCheck, Music2 } from "lucide-react";
-
-const BACKEND_URL = "http://localhost:8000";
+import { API_ORIGIN as BACKEND_URL } from "../../config/api";
 
 const resolveImage = (value) => {
   if (!value) return "";

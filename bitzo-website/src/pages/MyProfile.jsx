@@ -23,8 +23,8 @@ import {
   Eye as EyeIcon,
   EyeOff,
 } from "lucide-react";
-
-const BACKEND_URL = "http://localhost:8000";
+import { API_BASE, API_ORIGIN as BACKEND_URL } from "../config/api";
+import { authFetch } from "../utils/session";
 
 const resolveMediaUrl = (value) => {
   if (!value) return "";
@@ -149,7 +149,7 @@ export default function Profile() {
         throw new Error("No changes detected");
       }
 
-      const res = await fetch(`http://localhost:8000/api/user/${user._id}`, {
+      const res = await fetch(`${API_BASE}/user/${user._id}`, {
         method: "PUT",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -206,8 +206,8 @@ export default function Profile() {
       if (!oldPassword || !newPassword || !confirmPassword) {
         throw new Error("All fields are required");
       }
-      if (newPassword.length < 6) {
-        throw new Error("New password must be at least 6 characters");
+      if (newPassword.length < 8) {
+        throw new Error("New password must be at least 8 characters");
       }
       if (newPassword !== confirmPassword) {
         throw new Error("New passwords do not match");
@@ -216,13 +216,12 @@ export default function Profile() {
       const token = localStorage.getItem("token");
       if (!token || !user?._id) throw new Error("Authentication required");
 
-      const res = await fetch(
-        `http://localhost:8000/api/user/password/${user._id}`,
+      const res = await authFetch(
+        `${API_BASE}/user/password/${user._id}`,
         {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({ oldPassword, newPassword }),
         },

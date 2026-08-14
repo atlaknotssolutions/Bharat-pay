@@ -1,12 +1,45 @@
 const User = require("../../models/admin/AdminModel");
 const AllUser = require("../../models/usermodel");
-const generateToken = require("../../utils/generateToken");
+const RefreshToken = require("../../models/RefreshToken");
+const {
+  signAccessToken,
+  signRefreshToken,
+  verifyRefreshToken,
+  hashToken,
+  REFRESH_TOKEN_TTL_MS,
+} = require("../../utils/tokenService");
+const {
+  ADMIN_REFRESH_COOKIE,
+  setRefreshCookie,
+  clearRefreshCookie,
+} = require("../../utils/refreshCookie");
 const bcrypt = require("bcryptjs");
 
 
 exports.registerUser = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, registerKey } = req.body;
+
+    // Admin registration gate:
+    // - Production: ADMIN_REGISTER_KEY is mandatory.
+    // - Development: allowed only when no key is configured.
+    // A configured key must always match, even in development.
+    const envKey = process.env.ADMIN_REGISTER_KEY;
+    const isDev = process.env.NODE_ENV !== "production";
+
+    if (envKey) {
+      if (typeof registerKey !== "string" || registerKey !== envKey) {
+        return res.status(403).json({
+          success: false,
+          message: "Admin registration requires a valid setup key",
+        });
+      }
+    } else if (!isDev) {
+      return res.status(403).json({
+        success: false,
+        message: "Admin registration requires a valid setup key",
+      });
+    }
 
     // 1. Validation
     if (!name || !email || !password) {
@@ -47,7 +80,7 @@ exports.registerUser = async (req, res) => {
     return res.status(201).json({
       success: true,
       message: "User registered successfully",
-      token: generateToken(user._id),
+      token: signAccessToken({ userId: user._id, role: user.role }),
       user: {
         id: user._id,
         name: user.name,
@@ -522,71 +555,25 @@ exports.loginUser = async (req, res) => {
       });
     }
 
-    const token = generateToken(user._id);
-
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: false,
-      sameSite: "lax",
-    });
-
-    return res.status(200).json({
-      success: true,
-      message: "Admin login successful",
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
-    });
-  } catch (error) {
-    console.error("Admin login error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
-  }
-};
-exports.loginUser = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "Email and password are required",
-      });
-    }
-
-    const user = await User.findOne({
-      email: email.toLowerCase().trim(),
-      role: "admin",
-    }).select("+password");
-
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: "Admin not found",
-      });
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid credentials",
-      });
-    }
-
-    const token = generateToken(user._id);
+    const token = signAccessToken({ userId: user._id, role: user.role });
 
     // 🔥 COOKIE SET KARO
     res.cookie("token", token, {
       httpOnly: true,
-      secure: false, // production me true
+      secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
+
+    // Admin refresh session (rotated on refresh), stored httpOnly.
+    const refreshTokenValue = signRefreshToken({ sub: String(user._id), kind: "admin" });
+    await RefreshToken.create({
+      userId: user._id,
+      kind: "admin",
+      tokenHash: hashToken(refreshTokenValue),
+      expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
+    });
+    setRefreshCookie(res, refreshTokenValue, "admin");
 
     return res.status(200).json({
       success: true,
@@ -605,6 +592,141 @@ exports.loginUser = async (req, res) => {
       success: false,
       message: "Server error",
     });
+  }
+};
+
+// ================== ADMIN REFRESH ==================
+exports.adminRefresh = async (req, res) => {
+  try {
+    const kind = "admin";
+    const presented = req.cookies && req.cookies[ADMIN_REFRESH_COOKIE];
+
+    if (!presented) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Unauthorized - No refresh session" });
+    }
+
+    let payload;
+    try {
+      payload = verifyRefreshToken(presented);
+    } catch (error) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Unauthorized - Invalid refresh session" });
+    }
+
+    if (!payload.sub) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Unauthorized - Invalid refresh session" });
+    }
+
+    const tokenHash = hashToken(presented);
+    const session = await RefreshToken.findOne({ tokenHash }).lean();
+
+    if (!session || session.kind !== kind) {
+      clearRefreshCookie(res, "admin");
+      return res
+        .status(401)
+        .json({ success: false, message: "Unauthorized - Refresh session not found" });
+    }
+
+    // Rotated token being reused → revoke the whole admin session family.
+    if (session.replacedBy) {
+      await RefreshToken.updateMany(
+        { userId: session.userId, kind },
+        { $set: { revokedAt: new Date() } }
+      );
+      clearRefreshCookie(res, "admin");
+      return res
+        .status(401)
+        .json({ success: false, message: "Unauthorized - Refresh session reused" });
+    }
+
+    if (session.revokedAt) {
+      clearRefreshCookie(res, "admin");
+      return res
+        .status(401)
+        .json({ success: false, message: "Unauthorized - Refresh session revoked" });
+    }
+
+    if (new Date(session.expiresAt).getTime() < Date.now()) {
+      await RefreshToken.deleteOne({ _id: session._id });
+      clearRefreshCookie(res, "admin");
+      return res
+        .status(401)
+        .json({ success: false, message: "Unauthorized - Refresh session expired" });
+    }
+
+    const admin = await User.findById(session.userId);
+    if (!admin) {
+      await RefreshToken.deleteOne({ _id: session._id });
+      clearRefreshCookie(res, "admin");
+      return res
+        .status(401)
+        .json({ success: false, message: "Unauthorized - Admin not found" });
+    }
+
+    // Rotate: revoke this session, create a child session.
+    const newRefreshToken = signRefreshToken({ sub: String(admin._id), kind });
+    const child = await RefreshToken.create({
+      userId: admin._id,
+      kind,
+      tokenHash: hashToken(newRefreshToken),
+      expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
+      rotatedFrom: session._id,
+    });
+    await RefreshToken.updateOne(
+      { _id: session._id },
+      { $set: { replacedBy: child._id, revokedAt: new Date() } }
+    );
+
+    const token = signAccessToken({ userId: admin._id, role: admin.role });
+    setRefreshCookie(res, newRefreshToken, "admin");
+
+    return res.status(200).json({
+      success: true,
+      message: "Token refreshed",
+      token,
+      user: {
+        id: admin._id,
+        name: admin.name,
+        email: admin.email,
+        role: admin.role,
+      },
+    });
+  } catch (error) {
+    console.error("Admin refresh error:", error.message);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// ================== ADMIN LOGOUT ==================
+exports.adminLogout = async (req, res) => {
+  try {
+    const presented = req.cookies && req.cookies[ADMIN_REFRESH_COOKIE];
+    if (presented) {
+      await RefreshToken.updateOne(
+        { tokenHash: hashToken(presented), kind: "admin", revokedAt: null },
+        { $set: { revokedAt: new Date() } }
+      );
+    }
+
+    clearRefreshCookie(res, "admin");
+    res.clearCookie("token", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+    });
+
+    return res
+      .status(200)
+      .json({ success: true, message: "Admin logged out successfully" });
+  } catch (error) {
+    console.error("Admin logout error:", error.message);
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 

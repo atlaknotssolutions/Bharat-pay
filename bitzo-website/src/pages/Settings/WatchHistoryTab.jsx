@@ -3,8 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Clock, Trash2, MoreVertical } from "lucide-react";
 import { toast } from "react-toastify";
 import { formatTime } from "../../components/player/utils";
-
-const BACKEND_URL = "http://localhost:8000";
+import { API_ORIGIN as BACKEND_URL } from "../../config/api";
 
 export default function WatchHistoryTab({ openDetail }) {
   const navigate = useNavigate();

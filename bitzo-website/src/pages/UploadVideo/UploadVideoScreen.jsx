@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { ArrowLeft, ChevronDown, Loader2 } from "lucide-react";
-
-const API = "http://localhost:8000/api";
+import { API_BASE as API } from "../../config/api";
 
 export default function UploadVideo() {
   const [title, setTitle] = useState("");

@@ -1,143 +1,65 @@
-// const express = require("express");
-// const router = express.Router();
-// const authMiddleware = require("../middlewares/isAuthenticated");
-// const { registerUser, loginUser } = require("../controller/authController");
-// const { OAuth2Client } = require('google-auth-library');
-// const jwt = require('jsonwebtoken');
-
-// const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID || "1043684646784-d9igjhng2cfdp006ogsi0am1i3d4djh1.apps.googleusercontent.com");
-// const User = require("../models/usermodel");
-// router.post("/register", registerUser);
-// router.post("/login", loginUser);
-// const passport = require("passport");
-// const GoogleStrategy = require("passport-google-oauth20").Strategy;
-// router.get(
-//   "/auth/google/callback",
-//   passport.authenticate("google", { session: false }),
-//   (req, res) => {
-//     const token = jwt.sign(
-//       { id: req.user._id },
-//       process.env.JWT_SECRET,
-//       { expiresIn: "7d" }
-//     );
-
-//     res.redirect(`http://localhost:5173/login-success?token=${token}`);
-//   }
-// );
-
-// router.post('/auth/google', async (req, res) => {
-//   const { credential, deviceId } = req.body;
-
-//   try {
-//     const ticket = await client.verifyIdToken({
-//       idToken: credential,
-//       audience: process.env.GOOGLE_CLIENT_ID || "1043684646784-d9igjhng2cfdp006ogsi0am1i3d4djh1.apps.googleusercontent.com",
-//     });
-
-//     const payload = ticket.getPayload();
-//     const { email, name, picture, sub: googleId } = payload;
-
-//     // Find or create user (your logic)
-//     let user = await User.findOne({ email });
-//     if (!user) {
-//       user = await User.create({
-//         name: name || email.split('@')[0],
-//         email,
-//         googleId,
-//         picture,
-//         // password: null or random – since it's OAuth
-//       });
-//     }
-
-//     // Issue your own JWT (same as email/password flow)
-//     const token = jwt.sign(
-//       { id: user._id, email: user.email },
-//       process.env.JWT_SECRET,
-//       { expiresIn: '7d' }
-//     );
-
-//     res.json({ token, user: { id: user._id, name: user.name, email: user.email } });
-//   } catch (error) {
-//     console.error(error);
-//     res.status(401).json({ message: 'Invalid Google token' });
-//   }
-// });
-
-// router.get("/profile", authMiddleware, async (req, res) => {
-//   try {
-//     // req.user JWT middleware se aata hai
-//     const userId = req.user._id || req.user.userId || req.user.id;
-
-//     if (!userId) {
-//       return res.status(401).json({
-//         success: false,
-//         message: "User ID not found in token",
-//       });
-//     }
-
-//     const user = await User.findById(userId)
-//       .select(
-//         "username email fullName profilePicture bio rewardPoints createdAt lastLogin"
-//       )
-//       .lean();
-
-//     if (!user) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "User not found",
-//       });
-//     }
-
-//     return res.status(200).json({
-//       success: true,
-//       user: {
-//         ...user,
-//         joinedAt: user.createdAt
-//           ? new Date(user.createdAt).toLocaleDateString()
-//           : null,
-//       },
-//     });
-//   } catch (error) {
-//     console.error("Error in getProfile:", error);
-//     return res.status(500).json({
-//       success: false,
-//       message: "Server error while fetching profile",
-//     });
-//   }
-// });
-
-// module.exports = router;
-
 const express = require("express");
 const router = express.Router();
-const jwt = require("jsonwebtoken");
+const {
+  signAccessToken,
+  signRefreshToken,
+  hashToken,
+  REFRESH_TOKEN_TTL_MS,
+} = require("../utils/tokenService");
 const { OAuth2Client } = require("google-auth-library");
+const { resolveDeviceId } = require("../utils/deviceCookie");
+const { setRefreshCookie } = require("../utils/refreshCookie");
 
 const User = require("../models/usermodel");
+const RefreshToken = require("../models/RefreshToken");
 const authMiddleware = require("../middlewares/isAuthenticated");
+const requireAdmin = require("../middlewares/requireAdmin");
+const {
+  loginLimiter,
+  registerLimiter,
+  passwordLimiter,
+  googleLimiter,
+  refreshLimiter,
+  forgotPasswordLimiter,
+  resetPasswordLimiter,
+} = require("../middlewares/rateLimit");
 const {
   registerUser,
   loginUser,
+  claimDevice,
   UserEdit,
   updatePassword,
   getMyProfile,
+  refreshToken,
+  logout,
+  logoutAll,
+  forgotPassword,
+  resetPassword,
 } = require("../controller/authController");
 const {
   getAllUsers,
 } = require("../controller/AdminController/AdminController");
 const { imageUpload } = require("../middlewares/multer");
 
-const GOOGLE_CLIENT_ID =
-  process.env.GOOGLE_CLIENT_ID ||
-  "1043684646784-d9igjhng2cfdp006ogsi0am1i3d4djh1.apps.googleusercontent.com";
+// Google client ID must come from the environment. No hardcoded fallback.
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const client = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
 
-const client = new OAuth2Client(GOOGLE_CLIENT_ID);
+router.post("/register", registerLimiter, registerUser);
+router.post("/login", loginLimiter, loginUser);
+router.post("/claim-device", loginLimiter, claimDevice);
+router.post("/refresh", refreshLimiter, refreshToken);
+router.post("/logout", logout);
+router.post("/logout-all", authMiddleware, logoutAll);
+router.post("/forgot-password", forgotPasswordLimiter, forgotPassword);
+router.post("/reset-password", resetPasswordLimiter, resetPassword);
 
-router.post("/register", registerUser);
-router.post("/login", loginUser);
-
-router.post("/auth/google", async (req, res) => {
+router.post("/auth/google", googleLimiter, async (req, res) => {
   const { credential } = req.body;
+
+  if (!GOOGLE_CLIENT_ID || !client) {
+    return res.status(503).json({ message: "Google sign-in is not configured" });
+  }
 
   if (!credential) {
     return res.status(400).json({ message: "Google credential missing" });
@@ -150,25 +72,63 @@ router.post("/auth/google", async (req, res) => {
     });
 
     const payload = ticket.getPayload();
+
+    // Reject unverified emails — do not create accounts for them.
+    if (payload.email_verified !== true) {
+      return res.status(403).json({ message: "Google email is not verified" });
+    }
+
     const { email, name, picture, sub: googleId } = payload;
+
+    // Device binding (server-issued device id from HttpOnly cookie).
+    // Same security rule as email/password login: Google must NOT silently
+    // adopt/rebind an account. Any device mismatch -> DEVICE_LOCKED.
+    const deviceId = resolveDeviceId(req, res);
 
     let user = await User.findOne({ email });
 
     if (!user) {
+      const deviceExists = await User.findOne({ deviceId });
+      if (deviceExists) {
+        return res.status(400).json({ message: "This device is already registered" });
+      }
+
       user = await User.create({
         name: name || email.split("@")[0],
         email,
         googleId,
         avatar: picture,
+        deviceId,
       });
-    } else if (!user.avatar && picture) {
+    } else if (!user.deviceId) {
+      // First binding of a legacy Google account (no prior device binding).
+      user.deviceId = deviceId;
+      await user.save();
+    } else if (user.deviceId !== deviceId) {
+      return res.status(403).json({
+        success: false,
+        code: "DEVICE_LOCKED",
+        message:
+          "This account is linked to another browser or device. Sign in on the linked browser, or choose Continue on this device to sign out all other active sessions.",
+      });
+    }
+
+    if (!user.avatar && picture) {
       user.avatar = picture;
       await user.save();
     }
 
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "7d",
+    const token = signAccessToken({ userId: user._id, role: user.role });
+
+    // Issue a refresh session (rotated on refresh), stored httpOnly.
+    const refreshTokenValue = signRefreshToken({ sub: String(user._id), kind: "user" });
+    await RefreshToken.create({
+      userId: user._id,
+      kind: "user",
+      tokenHash: hashToken(refreshTokenValue),
+      expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
     });
+    setRefreshCookie(res, refreshTokenValue, "user");
 
     return res.status(200).json({
       success: true,
@@ -221,37 +181,10 @@ router.get("/profile", authMiddleware, async (req, res) => {
     });
   }
 });
-// router.get("/profile", authMiddleware, async (req, res) => {
-//   try {
-//     const userId = req.user.id;
+router.get("/alluser", requireAdmin, getAllUsers);
 
-//     const user = await User.findById(userId).select("_id name email").lean();
-
-//     if (!user) {
-//       return res.status(404).json({ message: "User not found" });
-//     }
-
-//     // Authorization header se token
-//     const token = req.headers.authorization?.split(" ")[1];
-
-//     return res.status(200).json({
-//       success: true,
-//       token: token,
-//       user: {
-//         id: user._id,
-//         name: user.name,
-//         email: user.email,
-//       },
-//     });
-//   } catch (error) {
-//     console.error("Profile Error:", error);
-//     return res.status(500).json({ message: "Server error" });
-//   }
-// });
-router.get("/alluser", getAllUsers);
-
-router.put("/user/:id", imageUpload.single("avatar"), UserEdit);
-router.put("/user/password/:id", updatePassword);
+router.put("/user/:id", authMiddleware, imageUpload.single("avatar"), UserEdit);
+router.put("/user/password/:id", passwordLimiter, authMiddleware, updatePassword);
 router.get("/me", authMiddleware, getMyProfile);
 
 module.exports = router;

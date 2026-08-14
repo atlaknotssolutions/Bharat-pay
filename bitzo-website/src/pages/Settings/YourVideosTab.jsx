@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Eye, Clock, Heart, ArrowUpDown } from "lucide-react";
 import { formatTime } from "../../components/player/utils";
-
-const BACKEND_URL = "http://localhost:8000";
+import { API_ORIGIN as BACKEND_URL, API_USERVIDEO } from "../../config/api";
 
 const toMediaUrl = (value) => {
   if (!value) return "";
@@ -44,7 +43,7 @@ export default function YourVideosTab({ openDetail, sortBy, onSortChange }) {
       return;
     }
 
-    fetch("http://localhost:8000/api/uservideo/my-videos", {
+    fetch(`${API_USERVIDEO}/my-videos`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())

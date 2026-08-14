@@ -53,7 +53,7 @@
 
 //       try {
 //         const response = await fetch(
-//           "http://localhost:8000/api/uservideo/subscribed-channels",
+//           `${BACKEND_URL}/api/uservideo/subscribed-channels`,
 //           {
 //             headers: { Authorization: `Bearer ${token}` },
 //           },
@@ -460,8 +460,7 @@ import {
   Clock,
   Video,
 } from "lucide-react";
-
-const BACKEND_URL = "http://localhost:8000";
+import { API_ORIGIN as BACKEND_URL } from "../../config/api";
 
 const sidebarMainItems = [
   { icon: Home, label: "Home", path: "/" },

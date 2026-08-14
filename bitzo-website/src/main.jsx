@@ -6,6 +6,10 @@ import "react-toastify/dist/ReactToastify.css";
 import React from "react";
 import { Provider } from "react-redux";
 import { store } from "./store/store";
+import axios from "axios";
+import { setupAxiosAuth } from "./utils/session";
+
+setupAxiosAuth(axios);
 
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>

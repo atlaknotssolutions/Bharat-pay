@@ -27,6 +27,13 @@ exports.updateVideoupdated = async (req, res) => {
       });
     }
 
+    if (!video.creator || video.creator.toString() !== String(req.user.id)) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to update this video",
+      });
+    }
+
     if (title) video.title = title;
     if (description !== undefined) video.description = description;
     if (type) video.videoType = [type];
@@ -118,6 +125,8 @@ exports.uploadVideo = async (req, res) => {
       videoType,
       duration: authoritativeDuration || (duration ? Number(duration) : undefined),
       category,            // only category is saved now
+      creator: req.user.id,
+      uploadedBy: req.user.id,
       videoUrl: filePath,
     });
 
@@ -365,6 +374,13 @@ exports.deleteVideo = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "Video not found"
+      });
+    }
+
+    if (!video.creator || video.creator.toString() !== String(req.user.id)) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to delete this video"
       });
     }
 

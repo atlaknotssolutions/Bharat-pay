@@ -15,8 +15,7 @@ import { addToWatchLater, removeFromWatchLater } from "../../api/watchLater";
 import { formatTime } from "../player/utils";
 import ShortCard from "./ShortCard";
 import { ShortsCardSkeletonRow, VideoCardSkeletonRow } from "./Skeletons";
-
-const BACKEND_URL = "http://localhost:8000";
+import { API_ORIGIN as BACKEND_URL } from "../../config/api";
 
 const supportsHover =
   typeof window !== "undefined" &&

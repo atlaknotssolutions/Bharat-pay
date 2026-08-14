@@ -1,4 +1,4 @@
-const API_BASE = "http://localhost:8000/api"; // ← change to your backend URL
+import { API_BASE } from "../../../config/api";
 
 async function apiFetch(endpoint, options = {}) {
   const url = `${API_BASE}${endpoint}`;
