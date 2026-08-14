@@ -1,6 +1,10 @@
 import { X } from "lucide-react";
+<<<<<<< HEAD
 
 const BACKEND_URL = "https://bharat-pay-3.onrender.com";
+=======
+import { API_ORIGIN as BACKEND_URL } from "../../config/api";
+>>>>>>> feature/jeet-ahirwar
 
 const toMediaUrl = (value) => {
   if (!value) return "";

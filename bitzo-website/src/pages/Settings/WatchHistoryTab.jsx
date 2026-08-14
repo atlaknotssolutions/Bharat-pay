@@ -3,8 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { Clock, Trash2, MoreVertical } from "lucide-react";
 import { toast } from "react-toastify";
 import { formatTime } from "../../components/player/utils";
+<<<<<<< HEAD
 
 const BACKEND_URL = "https://bharat-pay-3.onrender.com";
+=======
+import { API_ORIGIN as BACKEND_URL } from "../../config/api";
+>>>>>>> feature/jeet-ahirwar
 
 export default function WatchHistoryTab({ openDetail }) {
   const navigate = useNavigate();

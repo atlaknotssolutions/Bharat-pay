@@ -140,6 +140,13 @@ const uploadVideo = async (req, res) => {
       });
     }
 
+    if (channel.creator?.toString() !== String(req.user.id)) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to upload to this channel",
+      });
+    }
+
     if (!req.files || !req.files.video) {
       return res.status(400).json({
         success: false,
@@ -623,10 +630,10 @@ const getvideosByChannel = async (req, res) => {
 
 const deleteChannel = async (req, res) => {
   try {
-    const { channelId } = req.params;
-    const userId = req.user._id;
-    const channel = await Channel.find.findOneAndDelete({
-      _id: channelId,
+    const { id } = req.params;
+    const userId = req.user.id;
+    const channel = await Channel.findOneAndDelete({
+      _id: id,
       creator: userId,
     });
     if (!channel) {
@@ -634,7 +641,7 @@ const deleteChannel = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Channel not found or unauthorized" });
     }
-    await Video.deleteMany({ channel: channelId });
+    await Video.deleteMany({ channel: id });
     res.status(200).json({
       success: true,
       message: "Channel and associated videos deleted",
@@ -1085,7 +1092,7 @@ const recordWatchSession = async (video, userId, body) => {
 const addView = async (req, res) => {
   try {
     const { videoId } = req.params;
-    const { watchedPercent, userId } = req.body || {};
+    const { watchedPercent } = req.body || {};
 
     const video = await Video.findById(videoId);
     if (!video) {
@@ -1094,7 +1101,9 @@ const addView = async (req, res) => {
         .json({ success: false, message: "Video not found" });
     }
 
-    const normalizedUserId = userId || req.user?.userId || req.user?.id;
+    // Identity is server-authoritative: JWT only (optionalAuth).
+    // req.body.userId is intentionally ignored (Phase 4 / F13).
+    const normalizedUserId = req.user?.userId || req.user?.id;
     const percent = Math.min(100, Math.max(0, Number(watchedPercent) || 0));
     const watchedEnough = percent >= 80;
     const isShortVideo = Array.isArray(video.videoType)
@@ -1430,10 +1439,10 @@ const addComment = async (req, res) => {
   try {
     const { videoId } = req.params;
     const { commentText } = req.body;
-    const userId = req.user?.id || req.user?.userId || req.user?._id;
-    const userName =
-      req.body?.userName || req.user?.name || req.user?.email || "User";
-    const userImage = req.body?.userImage || null;
+    const userId = req.user.id;
+    const commenter = await User.findById(userId).select("name avatar").lean();
+    const userName = commenter?.name || "User";
+    const userImage = commenter?.avatar || null;
 
     if (!commentText || !commentText.trim()) {
       return res.status(400).json({
@@ -1528,7 +1537,7 @@ const getComments = async (req, res) => {
 const deleteComment = async (req, res) => {
   try {
     const { videoId, commentId } = req.params;
-    const userId = req.user?.id || req.user?.userId || req.user?._id;
+    const userId = req.user.id;
     const video = await Video.findById(videoId);
     if (!video) {
       return res
@@ -1544,7 +1553,7 @@ const deleteComment = async (req, res) => {
         .json({ success: false, message: "Comment not found" });
     }
     const commentOwner = video.comments[commentIndex].user?.toString();
-    if (userId && commentOwner && commentOwner !== userId.toString()) {
+    if (!commentOwner || commentOwner !== String(userId)) {
       return res.status(403).json({
         success: false,
         message: "You are not authorized to delete this comment",

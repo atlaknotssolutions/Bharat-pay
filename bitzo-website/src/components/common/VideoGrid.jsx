@@ -15,8 +15,12 @@ import { addToWatchLater, removeFromWatchLater } from "../../api/watchLater";
 import { formatTime } from "../player/utils";
 import ShortCard from "./ShortCard";
 import { ShortsCardSkeletonRow, VideoCardSkeletonRow } from "./Skeletons";
+<<<<<<< HEAD
 
 const BACKEND_URL = "https://bharat-pay-3.onrender.com";
+=======
+import { API_ORIGIN as BACKEND_URL } from "../../config/api";
+>>>>>>> feature/jeet-ahirwar
 
 const supportsHover =
   typeof window !== "undefined" &&

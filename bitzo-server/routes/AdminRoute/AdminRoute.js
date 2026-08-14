@@ -6,16 +6,25 @@ const {
   getAllUsers,
   updateUser,
   deleteUser,
-  getUserById
+  getUserById,
+  adminRefresh,
+  adminLogout,
 } = require("../../controller/AdminController/AdminController");
 const requireAdmin = require("../../middlewares/requireAdmin");
+const {
+  adminLoginLimiter,
+  adminRegisterLimiter,
+  refreshLimiter,
+} = require("../../middlewares/rateLimit");
 const {
   getDashboard
 } = require("../../controller/AdminController/adminDashboardController");
 
 // Admin Auth Routes
-router.post("/register", registerUser);
-router.post("/login", loginUser);
+router.post("/register", adminRegisterLimiter, registerUser);
+router.post("/login", adminLoginLimiter, loginUser);
+router.post("/refresh", refreshLimiter, adminRefresh);
+router.post("/logout", adminLogout);
 
 // Protected Admin Routes
 router.get("/dashboard", requireAdmin, getDashboard);

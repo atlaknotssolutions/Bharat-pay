@@ -1,7 +1,12 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import { formatWatchTime } from "../../utils/watchTime";
+<<<<<<< HEAD
 
 const BACKEND_URL = "https://bharat-pay-3.onrender.com";
+=======
+import { API_ORIGIN as BACKEND_URL } from "../../config/api";
+import { authFetch, clearAuthState } from "../../utils/session";
+>>>>>>> feature/jeet-ahirwar
 
 const normalizeProfileVideos = (videos = []) =>
   Array.isArray(videos)
@@ -45,19 +50,16 @@ export const fetchProfileData = createAsyncThunk(
       const token = localStorage.getItem("token");
       if (!token) throw new Error("No token found. Please login first.");
 
-      const profileRes = await fetch(
+      const profileRes = await authFetch(
         `${BACKEND_URL}/api/me?tzOffsetMinutes=${new Date().getTimezoneOffset()}`,
         {
           method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
         },
       );
 
       if (!profileRes.ok) {
         if (profileRes.status === 401) {
-          localStorage.removeItem("token");
+          clearAuthState();
           throw new Error("Session expired. Please login again.");
         }
         throw new Error(`Server error: ${profileRes.status}`);
@@ -73,8 +75,8 @@ export const fetchProfileData = createAsyncThunk(
 
       let historyItems = [];
       try {
-        const historyRes = await fetch(`${BACKEND_URL}/api/uservideo/history`, {
-          headers: { Authorization: `Bearer ${token}` },
+        const historyRes = await authFetch(`${BACKEND_URL}/api/uservideo/history`, {
+          method: "GET",
         });
 
         if (historyRes.ok) {
@@ -126,11 +128,10 @@ export const removeHistoryItem = createAsyncThunk(
     try {
       const token = localStorage.getItem("token");
       if (!token) throw new Error("Please login again");
-      const res = await fetch(
+      const res = await authFetch(
         `${BACKEND_URL}/api/uservideo/history/${videoId}`,
         {
           method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
         },
       );
       const data = await res.json();

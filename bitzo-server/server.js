@@ -2,6 +2,8 @@
 
 require("dotenv").config(); // ✅ MUST BE FIRST LINE
 
+require("./config/validateEnv")();
+
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
@@ -24,7 +26,18 @@ const notificationRoutes = require("./routes/notificationRoute.js");
 
 const app = express();
 const PORT = process.env.PORT || 8000;
-morgan.token("body", (req) => JSON.stringify(req.body));
+// Never log plaintext credentials/tokens in request bodies.
+morgan.token("body", (req) => {
+  try {
+    const body = { ...(req.body || {}) };
+    for (const key of ["password", "newPassword", "oldPassword", "token", "resetToken", "credential", "registerKey"]) {
+      if (body[key] !== undefined) body[key] = "[REDACTED]";
+    }
+    return JSON.stringify(body);
+  } catch (_) {
+    return "{}";
+  }
+});
 app.use(morgan(":method :url :status :res[content-length] - :response-time ms :body"));
 
 // ---------- MongoDB ----------

@@ -8,8 +8,12 @@ import {
   Play,
   Link as LinkIcon,
 } from "lucide-react";
+import { API_ORIGIN as BACKEND_URL } from "../../config/api";
 
+<<<<<<< HEAD
 const BACKEND_URL = "https://bharat-pay-3.onrender.com";
+=======
+>>>>>>> feature/jeet-ahirwar
 const API_BASE = `${BACKEND_URL}/api/uservideo`;
 
 export default function SubscribedChannels() {

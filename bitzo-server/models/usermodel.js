@@ -38,6 +38,17 @@ const userSchema = new mongoose.Schema(
 
     googleId: String,
 
+    // Password reset (only a hash of the single-use token is stored)
+    resetTokenHash: {
+      type: String,
+      default: null,
+      select: false,
+    },
+    resetTokenExpires: {
+      type: Date,
+      default: null,
+    },
+
     // Avatar
     avatar: {
       type: String, // URL

@@ -41,6 +41,8 @@ const {
 } = require("../controller/userVideoController");
 const { imageUpload } = require("../middlewares/multer");
 const isAuthenticated = require("../middlewares/isAuthenticated");
+const optionalAuth = require("../middlewares/optionalAuth");
+const { viewLimiter } = require("../middlewares/rateLimit");
 const upload = require("../middlewares/multer");
 const uploadToBackblaze = require("../middlewares/blazerMiddlware");
 router.post(
@@ -72,7 +74,7 @@ router.get("/watch-later", isAuthenticated, getUserWatchLaterVideos);
 router.get("/my-videos", isAuthenticated, getUserUploadedVideos);
 router.get("/channel/:id", isAuthenticated, getChannelById);
 router.get("/channel/:id/videos", isAuthenticated, getvideosByChannel);
-router.delete("/channel/:id", deleteChannel);
+router.delete("/channel/:id", isAuthenticated, deleteChannel);
 
 router.get("/recommended", isAuthenticated, recommendedVideos);
 router.get("/trending", isAuthenticated, trendingVideos);
@@ -92,12 +94,12 @@ router.delete("/watch-later/:videoId", isAuthenticated, RemoveFromWatchLater);
 router.post("/watch-later/:videoId", isAuthenticated, addToWatchLater);
 router.get("/:id/related", isAuthenticated, getRelatedVideos);
 router.get("/:id", isAuthenticated, getVideoById);
-router.post("/:videoId/view", addView);
+router.post("/:videoId/view", viewLimiter, optionalAuth, addView);
 router.post("/:videoId/like", isAuthenticated, likeVideo);
 router.post("/:videoId/dislike", isAuthenticated, dislikeVideo);
 router.get("/:videoId/interaction", getVideoInteraction);
-router.delete("/:videoId/comment/:commentId", deleteComment);
-router.post("/:videoId/comment", addComment);
+router.delete("/:videoId/comment/:commentId", isAuthenticated, deleteComment);
+router.post("/:videoId/comment", isAuthenticated, addComment);
 router.get("/:videoId/comments", getComments);
 
 module.exports = router;

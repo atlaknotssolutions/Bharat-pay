@@ -1,8 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { Eye, Clock, Heart, ArrowUpDown } from "lucide-react";
 import { formatTime } from "../../components/player/utils";
+<<<<<<< HEAD
 
 const BACKEND_URL = "https://bharat-pay-3.onrender.com";
+=======
+import { API_ORIGIN as BACKEND_URL, API_USERVIDEO } from "../../config/api";
+>>>>>>> feature/jeet-ahirwar
 
 const toMediaUrl = (value) => {
   if (!value) return "";
@@ -44,7 +48,11 @@ export default function YourVideosTab({ openDetail, sortBy, onSortChange }) {
       return;
     }
 
+<<<<<<< HEAD
     fetch("https://bharat-pay-3.onrender.com/api/uservideo/my-videos", {
+=======
+    fetch(`${API_USERVIDEO}/my-videos`, {
+>>>>>>> feature/jeet-ahirwar
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())

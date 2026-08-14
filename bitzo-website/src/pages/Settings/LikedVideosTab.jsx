@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Heart } from "lucide-react";
+import { API_USERVIDEO } from "../../config/api";
 
 export default function LikedVideosTab({ openDetail }) {
   const [videos, setVideos] = useState([]);
@@ -13,7 +14,11 @@ export default function LikedVideosTab({ openDetail }) {
       return;
     }
 
+<<<<<<< HEAD
     fetch("https://bharat-pay-3.onrender.com/api/uservideo/liked", {
+=======
+    fetch(`${API_USERVIDEO}/liked`, {
+>>>>>>> feature/jeet-ahirwar
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())

@@ -3,17 +3,29 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Eye, EyeOff, Mail, Lock, User, ArrowRight } from "lucide-react";
 import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
 import { toast } from "react-toastify";
+<<<<<<< HEAD
 import { getDeviceId } from "./deviceId";
 
 const API_BASE = "https://bharat-pay-3.onrender.com/api";
 const GOOGLE_CLIENT_ID =
   "1043684646784-d9igjhng2cfdp006ogsi0am1i3d4djh1.apps.googleusercontent.com"; // ← paste here
+=======
+import { API_BASE } from "../../config/api";
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+>>>>>>> feature/jeet-ahirwar
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const [deviceLocked, setDeviceLocked] = useState(false);
+  const [deviceLockEmail, setDeviceLockEmail] = useState("");
+  const [claimPassword, setClaimPassword] = useState("");
+  const [showClaimModal, setShowClaimModal] = useState(false);
+  const [claiming, setClaiming] = useState(false);
+  const [claimError, setClaimError] = useState("");
 
   const [formData, setFormData] = useState({
     name: "",
@@ -35,6 +47,8 @@ export default function AuthPage() {
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     setError("");
+    setDeviceLocked(false);
+    setClaimError("");
   };
 
   // Shared success logic (used by both email/password and Google)
@@ -46,12 +60,24 @@ export default function AuthPage() {
     navigate(from, { replace: true });
   };
 
+  // Plain email/password login used by the form AND by the auto-login after a
+  // successful "Continue on this device" claim.
+  const performLogin = async (email, password) => {
+    const res = await fetch(`${API_BASE}/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || "Authentication failed");
+    handleAuthSuccess(data);
+  };
+
   const handleEmailSubmit = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     setLoading(true);
     setError("");
-
-    const deviceId = getDeviceId();
 
     if (!formData.email || !formData.password) {
       setError("Email and password are required");
@@ -74,18 +100,28 @@ export default function AuthPage() {
     try {
       const endpoint = isLogin ? "/login" : "/register";
       const body = isLogin
-        ? { email: formData.email, password: formData.password, deviceId }
-        : { ...formData, deviceId };
+        ? { email: formData.email, password: formData.password }
+        : { ...formData };
 
       const res = await fetch(`${API_BASE}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(body),
       });
 
       const data = await res.json();
 
-      if (!res.ok) throw new Error(data.message || "Authentication failed");
+      if (!res.ok) {
+        if (res.status === 403 && data.code === "DEVICE_LOCKED") {
+          setDeviceLocked(true);
+          setDeviceLockEmail(formData.email);
+          setClaimPassword(formData.password);
+          setError(data.message || "Authentication failed");
+          return;
+        }
+        throw new Error(data.message || "Authentication failed");
+      }
 
       handleAuthSuccess(data);
     } catch (err) {
@@ -93,6 +129,55 @@ export default function AuthPage() {
       toast.error(err.message || "Authentication failed");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // "Continue on this device" recovery flow (device-lock 403 path)
+  const handleClaimDevice = async () => {
+    const email = deviceLockEmail;
+    const password = claimPassword;
+    if (!email || !password) return;
+    setClaiming(true);
+    setClaimError("");
+
+    try {
+      const res = await fetch(`${API_BASE}/claim-device`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.message || "Could not continue on this device");
+
+      setShowClaimModal(false);
+      setDeviceLocked(false);
+      setClaimError("");
+      setClaimPassword("");
+      toast.success("All other sessions have been signed out. Signing you in...");
+
+      // Continue the login flow automatically on the now-bound device.
+      setFormData((f) => ({ ...f, email }));
+      await performLogin(email, password);
+    } catch (err) {
+      setClaimError(
+        err.message || "Could not continue on this device. Please try again."
+      );
+      toast.error("Could not continue on this device. Please try again.");
+    } finally {
+      setClaiming(false);
+    }
+  };
+
+  // Decode the email from Google's id_token JWT payload (for the claim flow).
+  const decodeGoogleEmail = (credential) => {
+    try {
+      const payload = credential.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+      return JSON.parse(atob(payload)).email || "";
+    } catch (_) {
+      return "";
     }
   };
 
@@ -105,15 +190,25 @@ export default function AuthPage() {
       const res = await fetch(`${API_BASE}/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           credential: credentialResponse.credential, // this is the id_token
-          deviceId: getDeviceId(),
         }),
       });
 
       const data = await res.json();
 
-      if (!res.ok) throw new Error(data.message || "Google login failed");
+      if (!res.ok) {
+        if (res.status === 403 && data.code === "DEVICE_LOCKED") {
+          // Same recovery flow as email/password: no silent rebinding.
+          setDeviceLocked(true);
+          setDeviceLockEmail(decodeGoogleEmail(credentialResponse.credential));
+          setClaimPassword("");
+          setError(data.message || "Google login failed");
+          return;
+        }
+        throw new Error(data.message || "Google login failed");
+      }
 
       handleAuthSuccess(data);
     } catch (err) {
@@ -144,7 +239,12 @@ export default function AuthPage() {
 
           <div className="flex border-b border-gray-800">
             <button
-              onClick={() => setIsLogin(true)}
+              onClick={() => {
+                setDeviceLocked(false);
+                setShowClaimModal(false);
+                setClaimError("");
+                setIsLogin(true);
+              }}
               className={`flex-1 py-4 font-medium ${
                 isLogin
                   ? "text-white border-b-2 border-red-600"
@@ -154,7 +254,12 @@ export default function AuthPage() {
               Login
             </button>
             <button
-              onClick={() => setIsLogin(false)}
+              onClick={() => {
+                setDeviceLocked(false);
+                setShowClaimModal(false);
+                setClaimError("");
+                setIsLogin(false);
+              }}
               className={`flex-1 py-4 font-medium ${
                 !isLogin
                   ? "text-white border-b-2 border-red-600"
@@ -166,24 +271,54 @@ export default function AuthPage() {
           </div>
 
           <div className="p-8 pt-6 space-y-5">
-            {error && (
+            {deviceLocked && (
+              <div className="bg-red-950/50 border border-red-800 text-red-300 px-4 py-3 rounded-lg text-sm space-y-1">
+                <p className="font-semibold text-red-200">
+                  Account already active on another device
+                </p>
+                <p>
+                  This account is currently linked to another browser or device.
+                  If you want to use this account here, you can sign out all
+                  other active sessions and continue on this device.
+                </p>
+              </div>
+            )}
+            {!deviceLocked && error && (
               <div className="bg-red-950/50 border border-red-800 text-red-300 px-4 py-3 rounded-lg text-sm">
                 {error}
               </div>
             )}
 
-            {/* Google Button – works for both login & signup */}
-            <div className="flex justify-center">
-              <GoogleLogin
-                onSuccess={handleGoogleSuccess}
-                onError={handleGoogleError}
-                theme="filled_black" // or "outline"
-                text={isLogin ? "signin_with" : "signup_with"} // "signup_with" available
-                shape="rectangular"
-                logo_alignment="left"
-                width="100%"
-              />
-            </div>
+            {deviceLocked && (
+              <button
+                type="button"
+                onClick={() => {
+                  setClaimError("");
+                  setShowClaimModal(true);
+                }}
+                disabled={claiming}
+                className="w-full py-3 rounded-lg font-medium bg-red-600 hover:bg-red-700 disabled:opacity-60"
+              >
+                Continue on this device
+              </button>
+            )}
+
+            {/* Google Button – works for both login & signup (hidden when unconfigured) */}
+            {GOOGLE_CLIENT_ID && (
+              <div className="flex justify-center">
+                <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+                  <GoogleLogin
+                    onSuccess={handleGoogleSuccess}
+                    onError={handleGoogleError}
+                    theme="filled_black" // or "outline"
+                    text={isLogin ? "signin_with" : "signup_with"} // "signup_with" available
+                    shape="rectangular"
+                    logo_alignment="left"
+                    width="100%"
+                  />
+                </GoogleOAuthProvider>
+              </div>
+            )}
 
             <div className="relative flex py-3 items-center">
               <div className="flex-grow border-t border-gray-700"></div>
@@ -268,7 +403,12 @@ export default function AuthPage() {
                   Don't have an account?{" "}
                   <button
                     type="button"
-                    onClick={() => setIsLogin(false)}
+                    onClick={() => {
+                      setDeviceLocked(false);
+                      setShowClaimModal(false);
+                      setClaimError("");
+                      setIsLogin(false);
+                    }}
                     className="text-red-500 hover:text-red-400"
                   >
                     Sign up
@@ -279,7 +419,12 @@ export default function AuthPage() {
                   Already have an account?{" "}
                   <button
                     type="button"
-                    onClick={() => setIsLogin(true)}
+                    onClick={() => {
+                      setDeviceLocked(false);
+                      setShowClaimModal(false);
+                      setClaimError("");
+                      setIsLogin(true);
+                    }}
                     className="text-red-500 hover:text-red-400"
                   >
                     Sign in
@@ -290,6 +435,57 @@ export default function AuthPage() {
           </div>
         </div>
       </div>
+
+      {/* ====================== CONFIRM CONTINUE ON THIS DEVICE ====================== */}
+      {showClaimModal && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-[#1a1a1a] rounded-2xl max-w-md w-full border border-gray-800 shadow-2xl p-6 space-y-5">
+            <h2 className="text-xl font-semibold">Continue on this device?</h2>
+            <p className="text-sm text-gray-400">
+              This will sign you out from all other browsers and devices where
+              this account is currently active.
+            </p>
+
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">
+                Account: {deviceLockEmail || "your account"}
+              </label>
+              <input
+                type="password"
+                placeholder="Enter your password to continue"
+                value={claimPassword}
+                onChange={(e) => setClaimPassword(e.target.value)}
+                className="w-full bg-[#121212] border border-gray-700 rounded-lg py-3 pl-4 pr-4 focus:outline-none focus:border-red-600"
+              />
+            </div>
+
+            {claimError && (
+              <div className="bg-red-950/50 border border-red-800 text-red-300 px-4 py-3 rounded-lg text-sm">
+                {claimError}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowClaimModal(false)}
+                disabled={claiming}
+                className="flex-1 py-3 rounded-lg font-medium bg-gray-700 hover:bg-gray-600 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleClaimDevice}
+                disabled={claiming || !deviceLockEmail || !claimPassword}
+                className="flex-1 py-3 rounded-lg font-medium bg-red-600 hover:bg-red-700 disabled:opacity-60"
+              >
+                {claiming ? "Signing out..." : "Continue"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </GoogleOAuthProvider>
   );
 }

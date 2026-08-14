@@ -33,8 +33,12 @@ import {
   resetNotifications,
 } from "../../features/notifications/notificationsSlice";
 import axios from "axios";
+import { API_ORIGIN as API_BASE_URL } from "../../config/api";
 
+<<<<<<< HEAD
 const API_BASE_URL = "https://bharat-pay-3.onrender.com";
+=======
+>>>>>>> feature/jeet-ahirwar
 const HINTS_URL = `${API_BASE_URL}/api/uservideo/search/hints`;
 
 export default function Navbar({ toggleSidebar }) {

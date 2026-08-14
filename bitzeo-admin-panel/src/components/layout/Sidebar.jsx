@@ -11,6 +11,8 @@ import {
   Clapperboard,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import API from "../../api";
+import { clearAdminState } from "../../utils/session";
 
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -25,10 +27,16 @@ const navItems = [
 export default function Sidebar() {
   const navigate = useNavigate();
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      // Revoke the admin refresh session server-side and clear its cookie.
+      await API.post("/admin/logout", {}).catch(() => {});
+    } catch (_) {
+      // ignore network errors; always clear local state
+    }
+
     // Clear token & user data
-    localStorage.removeItem("adminToken");
-    localStorage.removeItem("adminUser");
+    clearAdminState();
 
     toast.success("Logged out successfully!", {
       style: {

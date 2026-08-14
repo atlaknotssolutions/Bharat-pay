@@ -53,7 +53,11 @@
 
 //       try {
 //         const response = await fetch(
+<<<<<<< HEAD
 //           "https://bharat-pay-3.onrender.com/api/uservideo/subscribed-channels",
+=======
+//           `${BACKEND_URL}/api/uservideo/subscribed-channels`,
+>>>>>>> feature/jeet-ahirwar
 //           {
 //             headers: { Authorization: `Bearer ${token}` },
 //           },
@@ -455,8 +459,12 @@ import {
   Clock,
   Video,
 } from "lucide-react";
+<<<<<<< HEAD
 
 const BACKEND_URL = "https://bharat-pay-3.onrender.com";
+=======
+import { API_ORIGIN as BACKEND_URL } from "../../config/api";
+>>>>>>> feature/jeet-ahirwar
 
 const sidebarMainItems = [
   { icon: Home, label: "Home", path: "/" },

@@ -9,11 +9,17 @@ import {
   Users,
   Search,
 } from "lucide-react";
+import { API_BASE, API_ORIGIN } from "../../config/api";
 
 // API base URLs
+<<<<<<< HEAD
 const API_BASE = "https://bharat-pay-3.onrender.com/api";
 const API_CATEGORY = "https://bharat-pay-3.onrender.com/api/category";
 const BACKEND_URL = "https://bharat-pay-3.onrender.com";
+=======
+const API_CATEGORY = `${API_BASE}/category`;
+const BACKEND_URL = API_ORIGIN;
+>>>>>>> feature/jeet-ahirwar
 
 // Helpers
 const getToken = () => localStorage.getItem("token") || null;

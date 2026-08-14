@@ -1,4 +1,4 @@
-const jwt = require("jsonwebtoken");
+const { verifyAccessToken } = require("../utils/tokenService");
 const Admin = require("../models/admin/AdminModel");
 
 const requireAdmin = async (req, res, next) => {
@@ -28,9 +28,9 @@ const requireAdmin = async (req, res, next) => {
       });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "adityasecretkey");
+    const decoded = verifyAccessToken(token);
 
-    const admin = await Admin.findById(decoded.id);
+    const admin = await Admin.findById(decoded.sub || decoded.id);
 
     if (!admin) {
       return res.status(401).json({

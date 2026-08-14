@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
-import axios from "axios";
+import API from "../../api";
 import toast from "react-hot-toast";
 
 export default function Login() {
@@ -16,11 +16,15 @@ export default function Login() {
     setIsLoading(true);
 
     try {
+<<<<<<< HEAD
       const res = await axios.post(
         "https://bharat-pay-3.onrender.com/api/admin/login",
         { email, password },
         { headers: { "Content-Type": "application/json" } },
       );
+=======
+      const res = await API.post("/admin/login", { email, password });
+>>>>>>> feature/jeet-ahirwar
 
       if (!res.data.success) {
         throw new Error(res.data.message || "Login failed");
