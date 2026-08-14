@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-const API_BASE = "https://bharat-pay-3.onrender.com/api/uservideo";
-=======
 import { API_USERVIDEO as API_BASE } from "../config/api";
->>>>>>> feature/jeet-ahirwar
 
 const FLUSH_INTERVAL_MS = 30000;
 const MAX_CAP_SECONDS = 12 * 60 * 60;

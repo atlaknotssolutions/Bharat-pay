@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
@@ -10,10 +10,6 @@ import {
 } from "lucide-react";
 import { API_ORIGIN as BACKEND_URL } from "../../config/api";
 
-<<<<<<< HEAD
-const BACKEND_URL = "https://bharat-pay-3.onrender.com";
-=======
->>>>>>> feature/jeet-ahirwar
 const API_BASE = `${BACKEND_URL}/api/uservideo`;
 
 export default function SubscribedChannels() {
@@ -161,9 +157,9 @@ export default function SubscribedChannels() {
 
             <div className="flex items-center gap-1.5 mt-1 text-[14px] text-gray-400">
               <span>@{channel?.handle || "channel"}</span>
-              <span>•</span>
+              <span>ΓÇó</span>
               <span>{formatCount(subscribersCount)} subscribers</span>
-              <span>•</span>
+              <span>ΓÇó</span>
               <span>
                 {formatCount(channel?.videoCount || videos.length)} videos
               </span>
@@ -286,9 +282,9 @@ export default function SubscribedChannels() {
                     <span className="font-medium text-gray-200">
                       {channel?.name}
                     </span>
-                    <span>•</span>
+                    <span>ΓÇó</span>
                     <span>{formatCount(video.views)} views</span>
-                    <span>•</span>
+                    <span>ΓÇó</span>
                     <span>
                       {video.createdAt
                         ? new Date(video.createdAt).toLocaleDateString()

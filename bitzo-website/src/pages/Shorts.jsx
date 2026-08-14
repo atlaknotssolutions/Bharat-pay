@@ -22,10 +22,6 @@ import CommentsSheet from "../components/shorts/CommentsSheet";
 import SwipeHint from "../components/shorts/SwipeHint";
 import { API_ORIGIN as BACKEND_URL } from "../config/api";
 
-<<<<<<< HEAD
-const BACKEND_URL = "https://bharat-pay-3.onrender.com";
-=======
->>>>>>> feature/jeet-ahirwar
 const API_BASE = `${BACKEND_URL}/api/uservideo`;
 
 const toMediaUrl = (value) => {

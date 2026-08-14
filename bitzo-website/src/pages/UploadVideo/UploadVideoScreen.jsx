@@ -2,12 +2,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { ArrowLeft, ChevronDown, Loader2 } from "lucide-react";
-<<<<<<< HEAD
-
-const API = "https://bharat-pay-3.onrender.com/api";
-=======
 import { API_BASE as API } from "../../config/api";
->>>>>>> feature/jeet-ahirwar
 
 export default function UploadVideo() {
   const [title, setTitle] = useState("");

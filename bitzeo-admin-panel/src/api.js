@@ -6,11 +6,7 @@ export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
 
 const API = axios.create({
-<<<<<<< HEAD
-  baseURL: "https://bharat-pay-3.onrender.com/api",
-=======
   baseURL: API_BASE_URL,
->>>>>>> feature/jeet-ahirwar
 });
 
 // Attach admin JWT to every request from this admin panel and send cookies

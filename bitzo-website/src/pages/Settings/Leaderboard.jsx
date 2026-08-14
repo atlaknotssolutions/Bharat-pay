@@ -139,14 +139,8 @@
 
 // export default Leaderboard;
 
-<<<<<<< HEAD
-import React, { useEffect, useState } from "react";
-
-const BACKEND_URL = "https://bharat-pay-3.onrender.com";
-=======
 import React, { useEffect, useState } from 'react';
 import { API_ORIGIN as BACKEND_URL } from "../../config/api";
->>>>>>> feature/jeet-ahirwar
 
 // Thumbnail / media URL fix
 const resolveMediaUrl = (value) => {

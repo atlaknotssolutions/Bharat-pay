@@ -14,18 +14,10 @@ export default function ForgotPassword() {
     setIsLoading(true);
 
     try {
-<<<<<<< HEAD
-      const res = await axios.post(
-        "https://bharat-pay-3.onrender.com/api/admin/forgot-password", // ← apna endpoint
-        { email },
-        { headers: { "Content-Type": "application/json" } },
-      );
-=======
-      // NOTE: the backend admin forgot-password endpoint is not implemented yet,
+// NOTE: the backend admin forgot-password endpoint is not implemented yet,
       // so this request currently returns 404. Wired to the env-based API instance
       // so it works as soon as the endpoint exists.
       const res = await API.post("/admin/forgot-password", { email });
->>>>>>> feature/jeet-ahirwar
 
       if (!res.data.success) {
         throw new Error(res.data.message || "Something went wrong");

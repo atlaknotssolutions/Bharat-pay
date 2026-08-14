@@ -209,24 +209,12 @@ export default function Register() {
     setIsLoading(true);
 
     try {
-<<<<<<< HEAD
-      const res = await axios.post(
-        "https://bharat-pay-3.onrender.com/api/admin/register",
-        {
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
-        },
-        { headers: { "Content-Type": "application/json" } },
-      );
-=======
-      const res = await API.post("/admin/register", {
+const res = await API.post("/admin/register", {
         name: formData.name,
         email: formData.email,
         password: formData.password,
         registerKey: formData.registerKey,
       });
->>>>>>> feature/jeet-ahirwar
 
       if (!res.data.success) {
         throw new Error(res.data.message || "Registration failed");

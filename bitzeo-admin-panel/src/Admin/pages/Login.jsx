@@ -16,15 +16,7 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-<<<<<<< HEAD
-      const res = await axios.post(
-        "https://bharat-pay-3.onrender.com/api/admin/login",
-        { email, password },
-        { headers: { "Content-Type": "application/json" } },
-      );
-=======
-      const res = await API.post("/admin/login", { email, password });
->>>>>>> feature/jeet-ahirwar
+const res = await API.post("/admin/login", { email, password });
 
       if (!res.data.success) {
         throw new Error(res.data.message || "Login failed");

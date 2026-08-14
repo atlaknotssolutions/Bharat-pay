@@ -26,13 +26,8 @@ import {
   Eye as EyeIcon,
   EyeOff,
 } from "lucide-react";
-<<<<<<< HEAD
-
-const BACKEND_URL = "https://bharat-pay-3.onrender.com";
-=======
 import { API_BASE, API_ORIGIN as BACKEND_URL } from "../config/api";
 import { authFetch } from "../utils/session";
->>>>>>> feature/jeet-ahirwar
 
 const resolveMediaUrl = (value) => {
   if (!value) return "";
@@ -157,23 +152,13 @@ export default function Profile() {
         throw new Error("No changes detected");
       }
 
-<<<<<<< HEAD
-      const res = await fetch(
-        `https://bharat-pay-3.onrender.com/api/user/${user._id}`,
-        {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          body: formData,
-=======
       const res = await fetch(`${API_BASE}/user/${user._id}`, {
         method: "PUT",
         headers: {
           Authorization: `Bearer ${token}`,
->>>>>>> feature/jeet-ahirwar
         },
-      );
+        body: formData,
+      });
 
       const data = await res.json();
 
@@ -234,13 +219,8 @@ export default function Profile() {
       const token = localStorage.getItem("token");
       if (!token || !user?._id) throw new Error("Authentication required");
 
-<<<<<<< HEAD
-      const res = await fetch(
-        `https://bharat-pay-3.onrender.com/api/user/password/${user._id}`,
-=======
       const res = await authFetch(
         `${API_BASE}/user/password/${user._id}`,
->>>>>>> feature/jeet-ahirwar
         {
           method: "PUT",
           headers: {

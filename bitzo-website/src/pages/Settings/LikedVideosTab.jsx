@@ -14,11 +14,7 @@ export default function LikedVideosTab({ openDetail }) {
       return;
     }
 
-<<<<<<< HEAD
-    fetch("https://bharat-pay-3.onrender.com/api/uservideo/liked", {
-=======
-    fetch(`${API_USERVIDEO}/liked`, {
->>>>>>> feature/jeet-ahirwar
+fetch(`${API_USERVIDEO}/liked`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())

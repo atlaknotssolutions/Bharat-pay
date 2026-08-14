@@ -1,12 +1,7 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import { formatWatchTime } from "../../utils/watchTime";
-<<<<<<< HEAD
-
-const BACKEND_URL = "https://bharat-pay-3.onrender.com";
-=======
 import { API_ORIGIN as BACKEND_URL } from "../../config/api";
 import { authFetch, clearAuthState } from "../../utils/session";
->>>>>>> feature/jeet-ahirwar
 
 const normalizeProfileVideos = (videos = []) =>
   Array.isArray(videos)
