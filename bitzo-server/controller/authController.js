@@ -221,23 +221,99 @@ exports.saveDeviceFingerprint = async (req, res) => {
   try {
     const { fingerprint } = req.body || {};
     const deviceId = resolveDeviceId(req, res);
-    const userId = req.user?.id || req.user?._id || req.body?.userId || null;
+    const rawUserId = req.user?.id || req.user?._id || req.body?.userId || null;
+    const userId = rawUserId
+      ? new mongoose.Types.ObjectId(String(rawUserId))
+      : null;
     const ip = getClientIp(req);
     const userAgent = req.headers["user-agent"] || "unknown";
 
-    const existing = await DeviceFingerprint.findOne({ deviceId });
+    if (userId) {
+      const user = await User.findById(userId).select("deviceId name email");
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
 
+      const otherUserWithThisDevice = await User.findOne({
+        deviceId,
+        _id: { $ne: userId },
+      }).select("_id");
+
+      if (otherUserWithThisDevice) {
+        return res.status(409).json({
+          success: false,
+          message:
+            "This device is already linked to another user. One user can have only one active device.",
+        });
+      }
+
+      if (user.deviceId && user.deviceId !== deviceId) {
+        const existingOtherRecord = await DeviceFingerprint.findOne({
+          userId,
+        });
+
+        if (
+          existingOtherRecord &&
+          String(existingOtherRecord.deviceId) !== String(deviceId)
+        ) {
+          existingOtherRecord.deviceId = deviceId;
+          existingOtherRecord.fingerprint =
+            fingerprint || existingOtherRecord.fingerprint;
+          existingOtherRecord.userAgent = userAgent;
+          existingOtherRecord.lastIp = ip;
+          existingOtherRecord.lastSeen = new Date();
+          existingOtherRecord.associatedUsers = [userId];
+          existingOtherRecord.userId = userId;
+          await existingOtherRecord.save();
+
+          user.deviceId = deviceId;
+          await user.save();
+
+          return res.status(200).json({
+            success: true,
+            deviceId,
+            fingerprint: existingOtherRecord.fingerprint,
+          });
+        }
+      }
+
+      if (!user.deviceId || user.deviceId === deviceId) {
+        user.deviceId = deviceId;
+        await user.save();
+      }
+    }
+
+    const existingByDevice = await DeviceFingerprint.findOne({ deviceId });
+    const existingByUser = userId
+      ? await DeviceFingerprint.findOne({ userId })
+      : null;
+
+    if (
+      existingByUser &&
+      existingByDevice &&
+      String(existingByUser._id) !== String(existingByDevice._id)
+    ) {
+      await DeviceFingerprint.deleteOne({ _id: existingByUser._id });
+    }
+
+    const existing = existingByDevice || existingByUser;
     if (existing) {
+      existing.deviceId = deviceId;
+      existing.userId = userId || existing.userId;
       existing.fingerprint = fingerprint || existing.fingerprint;
       existing.userAgent = userAgent;
       existing.lastIp = ip;
       existing.lastSeen = new Date();
 
-      if (
-        userId &&
-        !existing.associatedUsers.some((id) => String(id) === String(userId))
-      ) {
-        existing.associatedUsers.push(userId);
+      if (userId) {
+        existing.associatedUsers = existing.associatedUsers.some(
+          (id) => String(id) === String(userId),
+        )
+          ? existing.associatedUsers
+          : [...existing.associatedUsers, userId];
       }
 
       await existing.save();
@@ -250,6 +326,7 @@ exports.saveDeviceFingerprint = async (req, res) => {
 
     const record = await DeviceFingerprint.create({
       deviceId,
+      userId,
       fingerprint: fingerprint || null,
       userAgent,
       lastIp: ip,
