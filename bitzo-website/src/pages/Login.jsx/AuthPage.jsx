@@ -11,6 +11,10 @@ export default function AuthPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [otpRequired, setOtpRequired] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [otpCountdown, setOtpCountdown] = useState(0);
+  const [resendingOtp, setResendingOtp] = useState(false);
 
   const [deviceLocked, setDeviceLocked] = useState(false);
   const [deviceLockEmail, setDeviceLockEmail] = useState("");
@@ -36,9 +40,27 @@ export default function AuthPage() {
     }
   }, [navigate, from]);
 
+  useEffect(() => {
+    if (!otpRequired || otpCountdown <= 0) return;
+
+    const timer = setTimeout(() => {
+      setOtpCountdown((prev) => Math.max(0, prev - 1));
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [otpRequired, otpCountdown]);
+
+  const startOtpCountdown = (seconds = 60) => {
+    setOtpCountdown(seconds);
+  };
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     setError("");
+    setOtpRequired(false);
+    setOtp("");
+    setOtpCountdown(0);
+    setResendingOtp(false);
     setDeviceLocked(false);
     setClaimError("");
   };
@@ -89,10 +111,20 @@ export default function AuthPage() {
       return;
     }
 
+    if (isLogin && otpRequired && !otp) {
+      setError("Please enter the OTP sent to your email.");
+      setLoading(false);
+      return;
+    }
+
     try {
       const endpoint = isLogin ? "/login" : "/register";
       const body = isLogin
-        ? { email: formData.email, password: formData.password }
+        ? {
+            email: formData.email,
+            password: formData.password,
+            ...(otpRequired ? { otp } : {}),
+          }
         : { ...formData };
 
       const res = await fetch(`${API_BASE}${endpoint}`, {
@@ -115,12 +147,63 @@ export default function AuthPage() {
         throw new Error(data.message || "Authentication failed");
       }
 
+      if (isLogin && data.requiresOtp) {
+        setOtpRequired(true);
+        setOtp("");
+        startOtpCountdown(60);
+        setError("OTP sent to your email. Enter the 6-digit code to continue.");
+        toast.info("OTP sent to your email. Please verify it.");
+        return;
+      }
+
       handleAuthSuccess(data);
     } catch (err) {
       setError(err.message);
       toast.error(err.message || "Authentication failed");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (!isLogin || !formData.email || !formData.password || otpCountdown > 0) {
+      return;
+    }
+
+    setResendingOtp(true);
+    setError("");
+
+    try {
+      const res = await fetch(`${API_BASE}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Could not resend OTP");
+      }
+
+      if (data.requiresOtp) {
+        setOtpRequired(true);
+        setOtp("");
+        startOtpCountdown(60);
+        toast.info("A new OTP has been sent to your email.");
+        return;
+      }
+
+      handleAuthSuccess(data);
+    } catch (err) {
+      setError(err.message || "Could not resend OTP");
+      toast.error(err.message || "Could not resend OTP");
+    } finally {
+      setResendingOtp(false);
     }
   };
 
@@ -142,20 +225,23 @@ export default function AuthPage() {
 
       const data = await res.json();
 
-      if (!res.ok) throw new Error(data.message || "Could not continue on this device");
+      if (!res.ok)
+        throw new Error(data.message || "Could not continue on this device");
 
       setShowClaimModal(false);
       setDeviceLocked(false);
       setClaimError("");
       setClaimPassword("");
-      toast.success("All other sessions have been signed out. Signing you in...");
+      toast.success(
+        "All other sessions have been signed out. Signing you in...",
+      );
 
       // Continue the login flow automatically on the now-bound device.
       setFormData((f) => ({ ...f, email }));
       await performLogin(email, password);
     } catch (err) {
       setClaimError(
-        err.message || "Could not continue on this device. Please try again."
+        err.message || "Could not continue on this device. Please try again.",
       );
       toast.error("Could not continue on this device. Please try again.");
     } finally {
@@ -166,7 +252,10 @@ export default function AuthPage() {
   // Decode the email from Google's id_token JWT payload (for the claim flow).
   const decodeGoogleEmail = (credential) => {
     try {
-      const payload = credential.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+      const payload = credential
+        .split(".")[1]
+        .replace(/-/g, "+")
+        .replace(/_/g, "/");
       return JSON.parse(atob(payload)).email || "";
     } catch (_) {
       return "";
@@ -235,6 +324,9 @@ export default function AuthPage() {
                 setDeviceLocked(false);
                 setShowClaimModal(false);
                 setClaimError("");
+                setOtpRequired(false);
+                setOtp("");
+                setOtpCountdown(0);
                 setIsLogin(true);
               }}
               className={`flex-1 py-4 font-medium ${
@@ -250,6 +342,9 @@ export default function AuthPage() {
                 setDeviceLocked(false);
                 setShowClaimModal(false);
                 setClaimError("");
+                setOtpRequired(false);
+                setOtp("");
+                setOtpCountdown(0);
                 setIsLogin(false);
               }}
               className={`flex-1 py-4 font-medium ${
@@ -373,6 +468,40 @@ export default function AuthPage() {
                 </button>
               </div>
 
+              {otpRequired && isLogin && (
+                <div className="space-y-3">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={6}
+                      placeholder="Enter 6-digit OTP"
+                      value={otp}
+                      onChange={(e) =>
+                        setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
+                      }
+                      className="w-full bg-[#121212] border border-gray-700 rounded-lg py-3.5 px-4 focus:outline-none focus:border-red-600 text-center tracking-[0.35em]"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3 text-xs text-gray-400">
+                    <span>
+                      {otpCountdown > 0
+                        ? `Resend OTP in ${otpCountdown}s`
+                        : "Didn't receive the code?"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleResendOtp}
+                      disabled={resendingOtp || otpCountdown > 0 || loading}
+                      className="font-medium text-red-400 disabled:text-gray-500 disabled:cursor-not-allowed"
+                    >
+                      {resendingOtp ? "Sending..." : "Resend OTP"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={loading}
@@ -382,9 +511,11 @@ export default function AuthPage() {
               >
                 {loading
                   ? "Processing..."
-                  : isLogin
-                    ? "Sign In"
-                    : "Create Account"}
+                  : otpRequired && isLogin
+                    ? "Verify OTP & Sign In"
+                    : isLogin
+                      ? "Sign In"
+                      : "Create Account"}
                 {!loading && <ArrowRight size={18} />}
               </button>
             </form>
@@ -399,6 +530,8 @@ export default function AuthPage() {
                       setDeviceLocked(false);
                       setShowClaimModal(false);
                       setClaimError("");
+                      setOtpRequired(false);
+                      setOtp("");
                       setIsLogin(false);
                     }}
                     className="text-red-500 hover:text-red-400"
@@ -415,6 +548,8 @@ export default function AuthPage() {
                       setDeviceLocked(false);
                       setShowClaimModal(false);
                       setClaimError("");
+                      setOtpRequired(false);
+                      setOtp("");
                       setIsLogin(true);
                     }}
                     className="text-red-500 hover:text-red-400"

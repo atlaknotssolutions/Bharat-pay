@@ -1,6 +1,7 @@
 const User = require("../models/usermodel");
 const WatchSession = require("../models/WatchSession");
 const RefreshToken = require("../models/RefreshToken");
+const DeviceFingerprint = require("../models/DeviceFingerprintModel");
 const {
   signAccessToken,
   signRefreshToken,
@@ -20,15 +21,15 @@ const {
   clearRefreshCookie,
 } = require("../utils/refreshCookie");
 
-
 const { detectVPN } = require("../services/vpn.service/vpn.service.js");
 const {
   logFraudEvent,
   analyzeBehavior,
   applyRiskToUser,
 } = require("../services/vpn.service/fraud.service.js");
-
-
+const transporter = require("../Email/nodemailer.js");
+const getRegisterMailOptions = require("../Email/register.js");
+const getLoginMailOptions = require("../Email/login.js");
 
 const getClientIp = (req) => {
   return (
@@ -51,6 +52,45 @@ const createAuthSession = async (userId, kind = "user") => {
     expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
   });
   return refreshToken;
+};
+
+const generateOtp = () => String(Math.floor(100000 + Math.random() * 900000));
+
+const sendMailSafely = async (mailOptions) => {
+  if (!mailOptions?.to || !transporter?.sendMail) {
+    return { sent: false, reason: "mailer-not-configured" };
+  }
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { sent: true };
+  } catch (error) {
+    console.error("Email send failed:", error.message);
+    return { sent: false, reason: error.message };
+  }
+};
+
+const issueOtpToDevice = async ({ deviceId, user, purpose = "login" }) => {
+  if (!deviceId || !user?.email) return null;
+
+  const otp = generateOtp();
+  const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+  await DeviceFingerprint.findOneAndUpdate(
+    { deviceId },
+    {
+      $set: {
+        pendingOtp: otp,
+        otpExpiresAt: expiresAt,
+        otpPurpose: purpose,
+        lastOtpSentAt: new Date(),
+      },
+    },
+    { upsert: true, new: true },
+  );
+
+  await sendMailSafely(getLoginMailOptions(user.email, user.name, otp));
+  return otp;
 };
 
 /* ===================== REGISTER ===================== */
@@ -91,33 +131,40 @@ exports.registerUser = async (req, res) => {
       });
     }
 
+    // ─── VPN / Proxy hard block ───────────────────────────────────────────────
+    const ip = getClientIp(req);
+    const ua = req.headers["user-agent"] || "unknown";
+    const vpnInfo = await detectVPN(ip);
+
+    if (vpnInfo.isVPN || vpnInfo.isProxy) {
+      await logFraudEvent({
+        userId: null,
+        eventType: vpnInfo.isVPN ? "VPN_DETECTED" : "PROXY_DETECTED",
+        severity: "high",
+        ip,
+        deviceId,
+        userAgent: ua,
+        isVPN: vpnInfo.isVPN,
+        isProxy: vpnInfo.isProxy,
+        riskScoreImpact: 25,
+        metadata: {
+          country: vpnInfo.country,
+          action: "blocked_register",
+        },
+      });
+
+      return res.status(403).json({
+        success: false,
+        code: "VPN_OR_PROXY_DETECTED",
+        message:
+          "Registration is not allowed over VPN or proxy. Please disable it and try again.",
+      });
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     // 🔐 HASH PASSWORD IN CONTROLLER
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
-
-
-
-    const ip = getClientIp(req);
-// const ua = req.headers["user-agent"];
-const vpnInfo = await detectVPN(ip);
-
-await logFraudEvent({
-  userId: user._id,
-  eventType: "REGISTER",
-  severity: vpnInfo.isVPN ? "medium" : "low",
-  ip,
-  deviceId,
-  userAgent: ua,
-  isVPN: vpnInfo.isVPN,
-  isProxy: vpnInfo.isProxy,
-  riskScoreImpact: vpnInfo.isVPN ? 15 : 0,
-  metadata: { country: vpnInfo.country },
-});
-
-if (vpnInfo.isVPN) {
-  await applyRiskToUser(user._id, 15, ["VPN used during registration"]);
-}
-
 
     const user = await User.create({
       name,
@@ -125,6 +172,22 @@ if (vpnInfo.isVPN) {
       password: hashedPassword,
       deviceId,
     });
+
+    await logFraudEvent({
+      userId: user._id,
+      eventType: "REGISTER",
+      severity: "low",
+      ip,
+      deviceId,
+      userAgent: ua,
+      isVPN: false,
+      isProxy: false,
+      riskScoreImpact: 0,
+      metadata: { country: vpnInfo.country },
+    });
+
+    await sendMailSafely(getRegisterMailOptions(user.email, user.name));
+    await issueOtpToDevice({ deviceId, user, purpose: "register" });
 
     // Auto-login: issue access token + refresh session (rotated on refresh)
     const token = signAccessToken({ userId: user._id, role: user.role });
@@ -154,139 +217,250 @@ if (vpnInfo.isVPN) {
   }
 };
 
+exports.saveDeviceFingerprint = async (req, res) => {
+  try {
+    const { fingerprint } = req.body || {};
+    const deviceId = resolveDeviceId(req, res);
+    const userId = req.user?.id || req.user?._id || req.body?.userId || null;
+    const ip = getClientIp(req);
+    const userAgent = req.headers["user-agent"] || "unknown";
+
+    const existing = await DeviceFingerprint.findOne({ deviceId });
+
+    if (existing) {
+      existing.fingerprint = fingerprint || existing.fingerprint;
+      existing.userAgent = userAgent;
+      existing.lastIp = ip;
+      existing.lastSeen = new Date();
+
+      if (
+        userId &&
+        !existing.associatedUsers.some((id) => String(id) === String(userId))
+      ) {
+        existing.associatedUsers.push(userId);
+      }
+
+      await existing.save();
+      return res.status(200).json({
+        success: true,
+        deviceId,
+        fingerprint: existing.fingerprint,
+      });
+    }
+
+    const record = await DeviceFingerprint.create({
+      deviceId,
+      fingerprint: fingerprint || null,
+      userAgent,
+      lastIp: ip,
+      lastSeen: new Date(),
+      associatedUsers: userId ? [userId] : [],
+    });
+
+    if (userId) {
+      const user = await User.findById(userId).select("name email");
+      if (user) {
+        await sendMailSafely(getLoginMailOptions(user.email, user.name));
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      deviceId,
+      fingerprint: record.fingerprint,
+    });
+  } catch (error) {
+    console.error("Device fingerprint save error:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to save device fingerprint",
+    });
+  }
+};
+
 exports.loginUser = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, otp } = req.body;
 
-    // 1️⃣ Validate input
-    if (!email || !password) {
+    if (!email) {
       return res.status(400).json({
         success: false,
-        message: "Email and password are required",
+        message: "Email is required",
       });
     }
 
-    // 2️⃣ Find user
-    const user = await User.findOne({ email }).select("+password");
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid email or password",
-      });
-    }
-
-    // 3️⃣ Compare password
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid email or password",
-      });
-    }
-
-    // 4️⃣ Device binding (server-issued device id from HttpOnly cookie)
-    // A cookie-less browser/device must NOT silently take ownership of the
-    // account. Any mismatch (fresh browser, cleared cookies, different profile)
-    // returns DEVICE_LOCKED; the explicit claim-device flow is the only rebind
-    // path. The only auto-bind is the very first binding of a legacy account.
+    const ip = getClientIp(req);
+    const ua = req.headers["user-agent"] || "unknown";
     const deviceId = resolveDeviceId(req, res);
 
-    if (user.deviceId && user.deviceId !== deviceId) {
-      return res.status(403).json({
+    const user = await User.findOne({ email }).select("+password");
+    if (!user) {
+      await logFraudEvent({
+        userId: null,
+        eventType: "LOGIN_FAILED",
+        severity: "medium",
+        ip,
+        deviceId,
+        userAgent: ua,
+        riskScoreImpact: 8,
+        metadata: { reason: "user_not_found" },
+      });
+
+      return res.status(401).json({
         success: false,
-        code: "DEVICE_LOCKED",
-        message:
-          "Your account is currently linked to another browser or device. If you don't have access to that browser, you can continue on this device by signing out all other active sessions.",
+        message: "Invalid email or password",
       });
     }
 
-    
+    if (!otp) {
+      if (!password) {
+        return res.status(400).json({
+          success: false,
+          message: "Password is required",
+        });
+      }
 
-    if (!user.deviceId) {
-      user.deviceId = deviceId;
-      await user.save();
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (!isMatch) {
+        await logFraudEvent({
+          userId: user._id,
+          eventType: "LOGIN_FAILED",
+          severity: "medium",
+          ip,
+          deviceId,
+          userAgent: ua,
+          riskScoreImpact: 8,
+          metadata: { reason: "wrong_password" },
+        });
+
+        const { riskPoints, reasons } = await analyzeBehavior(user._id);
+        if (riskPoints > 0) {
+          await applyRiskToUser(user._id, riskPoints, reasons);
+        }
+
+        return res.status(401).json({
+          success: false,
+          message: "Invalid email or password",
+        });
+      }
+
+      if (user.deviceId && user.deviceId !== deviceId) {
+        return res.status(403).json({
+          success: false,
+          code: "DEVICE_LOCKED",
+          message:
+            "Your account is currently linked to another browser or device. If you don't have access to that browser, you can continue on this device by signing out all other active sessions.",
+        });
+      }
+
+      if (!user.deviceId) {
+        user.deviceId = deviceId;
+        await user.save();
+      }
+
+      const vpnInfo = await detectVPN(ip);
+      if (vpnInfo.isVPN || vpnInfo.isProxy) {
+        await logFraudEvent({
+          userId: user._id,
+          eventType: vpnInfo.isVPN ? "VPN_DETECTED" : "PROXY_DETECTED",
+          severity: "high",
+          ip,
+          deviceId,
+          userAgent: ua,
+          isVPN: vpnInfo.isVPN,
+          isProxy: vpnInfo.isProxy,
+          riskScoreImpact: 25,
+          metadata: {
+            country: vpnInfo.country,
+            action: "blocked_login",
+          },
+        });
+
+        await applyRiskToUser(user._id, 25, [
+          vpnInfo.isVPN ? "VPN detected on login" : "Proxy detected on login",
+        ]);
+
+        return res.status(403).json({
+          success: false,
+          code: "VPN_OR_PROXY_DETECTED",
+          message:
+            "Login is not allowed over VPN or proxy. Please disable it and try again.",
+        });
+      }
+
+      const otpCode = await issueOtpToDevice({
+        deviceId,
+        user,
+        purpose: "login",
+      });
+
+      return res.status(200).json({
+        success: true,
+        requiresOtp: true,
+        message:
+          "OTP has been sent to your email. Verify it to complete login.",
+        otpCode: process.env.NODE_ENV !== "production" ? otpCode : undefined,
+      });
     }
 
+    const fingerprintRecord = await DeviceFingerprint.findOne({ deviceId });
+    if (!fingerprintRecord || !fingerprintRecord.pendingOtp) {
+      return res.status(401).json({
+        success: false,
+        message: "OTP session expired. Please log in again.",
+      });
+    }
 
-    // const ip = getClientIp(req);
-// const deviceId = resolveDeviceId(req, res);
-// const ua = req.headers["user-agent"];
+    const otpMatches = String(fingerprintRecord.pendingOtp) === String(otp);
+    const otpExpired =
+      !fingerprintRecord.otpExpiresAt ||
+      new Date(fingerprintRecord.otpExpiresAt).getTime() < Date.now();
 
-await logFraudEvent({
-  userId: user?._id || null,
-  eventType: "LOGIN_FAILED",
-  severity: "medium",
-  ip,
-  deviceId,
-  userAgent: ua,
-  riskScoreImpact: 8,
-});
+    if (!otpMatches || otpExpired) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid or expired OTP.",
+      });
+    }
 
-if (user) {
-  const { riskPoints, reasons } = await analyzeBehavior(user._id);
-  if (riskPoints > 0) {
-    await applyRiskToUser(user._id, riskPoints, reasons);
-  }
-}
+    await DeviceFingerprint.updateOne(
+      { deviceId },
+      { $unset: { pendingOtp: 1, otpExpiresAt: 1, otpPurpose: 1 } },
+    );
 
-const ip = getClientIp(req);
-const ua = req.headers["user-agent"];
-const vpnInfo = await detectVPN(ip);
+    const { riskPoints, reasons } = await analyzeBehavior(user._id);
+    if (riskPoints > 0) {
+      await applyRiskToUser(user._id, riskPoints, reasons);
+    }
 
-await logFraudEvent({
-  userId: user._id,
-  eventType: "LOGIN_SUCCESS",
-  severity: vpnInfo.isVPN ? "medium" : "low",
-  ip,
-  deviceId,
-  userAgent: ua,
-  isVPN: vpnInfo.isVPN,
-  isProxy: vpnInfo.isProxy,
-  riskScoreImpact: vpnInfo.isVPN ? 10 : 0,
-});
+    await logFraudEvent({
+      userId: user._id,
+      eventType: "LOGIN_SUCCESS",
+      severity: "low",
+      ip,
+      deviceId,
+      userAgent: ua,
+      isVPN: false,
+      isProxy: false,
+      riskScoreImpact: 0,
+    });
 
-const { riskPoints, reasons } = await analyzeBehavior(user._id);
-if (riskPoints > 0 || vpnInfo.isVPN) {
-  await applyRiskToUser(user._id, riskPoints + (vpnInfo.isVPN ? 10 : 0), [
-    ...reasons,
-    ...(vpnInfo.isVPN ? ["VPN detected"] : []),
-  ]);
-}
+    await sendMailSafely(getLoginMailOptions(user.email, user.name));
 
-await logFraudEvent({
-  userId: user._id,
-  eventType: "DEVICE_CLAIM",
-  severity: "high",
-  ip: getClientIp(req),
-  deviceId,
-  userAgent: req.headers["user-agent"],
-  riskScoreImpact: 25,
-  metadata: { previousDevice: user.deviceId },
-});
-
-await applyRiskToUser(user._id, 25, ["Device claim performed"]);
-
-
-    // 5️⃣ Generate JWT token
     const token = signAccessToken({ userId: user._id, role: user.role });
-
-    // 6️⃣ Set cookies (access token cookie kept for compatibility; refresh session)
     res.cookie("token", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production", // ✅ prod safe
+      secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
     const refreshToken = await createAuthSession(user._id, "user");
     setRefreshCookie(res, refreshToken, "user");
 
-
-    
-    // 7️⃣ Send response
     res.status(200).json({
       success: true,
       message: "Login successful",
-      token, // optional (frontend header use ke liye)
+      token,
       user: {
         id: user._id,
         name: user.name,
@@ -345,14 +519,18 @@ exports.claimDevice = async (req, res) => {
     if (!user.deviceId || user.deviceId === deviceId) {
       return res.status(400).json({
         success: false,
-        message: "This device is already linked to your account. You can sign in now.",
+        message:
+          "This device is already linked to your account. You can sign in now.",
       });
     }
 
     // 1-device = 1-account hard limit: this device must not already be bound
     // to another account, otherwise rebinding here would violate the unique
     // deviceId constraint (E11000) and steal the device from that account.
-    const deviceOwner = await User.findOne({ deviceId, _id: { $ne: user._id } });
+    const deviceOwner = await User.findOne({
+      deviceId,
+      _id: { $ne: user._id },
+    });
     if (deviceOwner) {
       return res.status(400).json({
         success: false,
@@ -364,7 +542,7 @@ exports.claimDevice = async (req, res) => {
     // Revoke every refresh session for this user so old devices cannot refresh.
     await RefreshToken.updateMany(
       { userId: user._id, kind: "user" },
-      { $set: { revokedAt: new Date() } }
+      { $set: { revokedAt: new Date() } },
     );
 
     // Clear any auth cookies on this response (same as logout).
@@ -445,10 +623,8 @@ exports.getMyProfile = async (req, res) => {
       { $group: { _id: null, seconds: { $sum: "$watchedSeconds" } } },
     ]);
 
-    populatedUser.watchTimeTodaySeconds =
-      todayResult?.seconds || 0;
-    populatedUser.watchTimeTotalSeconds =
-      totalResult?.seconds || 0;
+    populatedUser.watchTimeTodaySeconds = todayResult?.seconds || 0;
+    populatedUser.watchTimeTotalSeconds = totalResult?.seconds || 0;
 
     res.status(200).json({
       success: true,
@@ -464,13 +640,8 @@ exports.updatePassword = async (req, res) => {
   try {
     // Authorization identity comes from the JWT (authMiddleware), never from
     // req.params.id. The :id URL parameter is kept for frontend compatibility.
-    if (
-      req.params.id &&
-      String(req.params.id) !== String(req.user?.id)
-    ) {
-      return res
-        .status(403)
-        .json({ success: false, message: "Forbidden" });
+    if (req.params.id && String(req.params.id) !== String(req.user?.id)) {
+      return res.status(403).json({ success: false, message: "Forbidden" });
     }
 
     const userId = req.user?.id;
@@ -497,13 +668,17 @@ exports.updatePassword = async (req, res) => {
     const user = await User.findById(userId).select("+password");
 
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     const isMatch = await user.comparePassword(oldPassword);
 
     if (!isMatch) {
-      return res.status(400).json({ success: false, message: "Old password incorrect" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Old password incorrect" });
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -519,6 +694,7 @@ exports.updatePassword = async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
+
 exports.UserEdit = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -676,15 +852,17 @@ exports.refreshToken = async (req, res) => {
     try {
       payload = verifyRefreshToken(presented);
     } catch (error) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Unauthorized - Invalid refresh session" });
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized - Invalid refresh session",
+      });
     }
 
     if (!payload.sub) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Unauthorized - Invalid refresh session" });
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized - Invalid refresh session",
+      });
     }
 
     const tokenHash = hashToken(presented);
@@ -692,36 +870,40 @@ exports.refreshToken = async (req, res) => {
 
     if (!session || session.kind !== kind) {
       clearRefreshCookie(res, "user");
-      return res
-        .status(401)
-        .json({ success: false, message: "Unauthorized - Refresh session not found" });
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized - Refresh session not found",
+      });
     }
 
     // Rotated token being reused → treat as theft: revoke the whole family.
     if (session.replacedBy) {
       await RefreshToken.updateMany(
         { userId: session.userId, kind },
-        { $set: { revokedAt: new Date() } }
+        { $set: { revokedAt: new Date() } },
       );
       clearRefreshCookie(res, "user");
-      return res
-        .status(401)
-        .json({ success: false, message: "Unauthorized - Refresh session reused" });
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized - Refresh session reused",
+      });
     }
 
     if (session.revokedAt) {
       clearRefreshCookie(res, "user");
-      return res
-        .status(401)
-        .json({ success: false, message: "Unauthorized - Refresh session revoked" });
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized - Refresh session revoked",
+      });
     }
 
     if (new Date(session.expiresAt).getTime() < Date.now()) {
       await RefreshToken.deleteOne({ _id: session._id });
       clearRefreshCookie(res, "user");
-      return res
-        .status(401)
-        .json({ success: false, message: "Unauthorized - Refresh session expired" });
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized - Refresh session expired",
+      });
     }
 
     const user = await User.findById(session.userId);
@@ -735,10 +917,12 @@ exports.refreshToken = async (req, res) => {
 
     // Rotate: revoke this session, create a child session.
     const newRefreshToken = await createAuthSession(user._id, "user");
-    const child = await RefreshToken.findOne({ tokenHash: hashToken(newRefreshToken) }).lean();
+    const child = await RefreshToken.findOne({
+      tokenHash: hashToken(newRefreshToken),
+    }).lean();
     await RefreshToken.updateOne(
       { _id: session._id },
-      { $set: { replacedBy: child._id, revokedAt: new Date() } }
+      { $set: { replacedBy: child._id, revokedAt: new Date() } },
     );
 
     const token = signAccessToken({ userId: user._id, role: user.role });
@@ -769,7 +953,7 @@ exports.logout = async (req, res) => {
     if (presented) {
       await RefreshToken.updateOne(
         { tokenHash: hashToken(presented), kind: "user", revokedAt: null },
-        { $set: { revokedAt: new Date() } }
+        { $set: { revokedAt: new Date() } },
       );
     }
 
@@ -805,7 +989,7 @@ exports.logoutAll = async (req, res) => {
 
     await RefreshToken.updateMany(
       { userId, kind: "user", revokedAt: null },
-      { $set: { revokedAt: new Date() } }
+      { $set: { revokedAt: new Date() } },
     );
 
     clearRefreshCookie(res, "user");
@@ -849,7 +1033,7 @@ exports.forgotPassword = async (req, res) => {
             resetTokenHash: hashToken(resetToken),
             resetTokenExpires: expiresAt,
           },
-        }
+        },
       );
 
       // NOTE: no email provider is configured in this project. In production,
@@ -882,14 +1066,15 @@ exports.resetPassword = async (req, res) => {
     }
 
     if (typeof newPassword !== "string" || newPassword.length < 8) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Password must be at least 8 characters" });
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 8 characters",
+      });
     }
 
     const tokenHash = hashToken(token);
     const user = await User.findOne({ resetTokenHash: tokenHash }).select(
-      "+resetTokenHash"
+      "+resetTokenHash",
     );
 
     if (!user) {
@@ -905,7 +1090,7 @@ exports.resetPassword = async (req, res) => {
       // Expired token: clear it so it cannot be reused.
       await User.updateOne(
         { _id: user._id },
-        { $unset: { resetTokenHash: 1, resetTokenExpires: 1 } }
+        { $unset: { resetTokenHash: 1, resetTokenExpires: 1 } },
       );
       return res
         .status(400)
@@ -918,13 +1103,13 @@ exports.resetPassword = async (req, res) => {
       {
         $set: { password: hashedPassword },
         $unset: { resetTokenHash: 1, resetTokenExpires: 1 },
-      }
+      },
     );
 
     // Revoke all existing refresh sessions for this user after a reset.
     await RefreshToken.updateMany(
       { userId: user._id, kind: "user", revokedAt: null },
-      { $set: { revokedAt: new Date() } }
+      { $set: { revokedAt: new Date() } },
     );
     clearRefreshCookie(res, "user");
 
@@ -936,4 +1121,3 @@ exports.resetPassword = async (req, res) => {
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
-

@@ -26,6 +26,7 @@ const {
 const {
   registerUser,
   loginUser,
+  saveDeviceFingerprint,
   claimDevice,
   UserEdit,
   updatePassword,
@@ -47,6 +48,7 @@ const client = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
 
 router.post("/register", registerLimiter, registerUser);
 router.post("/login", loginLimiter, loginUser);
+router.post("/device-fingerprint", saveDeviceFingerprint);
 router.post("/claim-device", loginLimiter, claimDevice);
 router.post("/refresh", refreshLimiter, refreshToken);
 router.post("/logout", logout);
@@ -58,7 +60,9 @@ router.post("/auth/google", googleLimiter, async (req, res) => {
   const { credential } = req.body;
 
   if (!GOOGLE_CLIENT_ID || !client) {
-    return res.status(503).json({ message: "Google sign-in is not configured" });
+    return res
+      .status(503)
+      .json({ message: "Google sign-in is not configured" });
   }
 
   if (!credential) {
@@ -90,7 +94,9 @@ router.post("/auth/google", googleLimiter, async (req, res) => {
     if (!user) {
       const deviceExists = await User.findOne({ deviceId });
       if (deviceExists) {
-        return res.status(400).json({ message: "This device is already registered" });
+        return res
+          .status(400)
+          .json({ message: "This device is already registered" });
       }
 
       user = await User.create({
@@ -121,7 +127,10 @@ router.post("/auth/google", googleLimiter, async (req, res) => {
     const token = signAccessToken({ userId: user._id, role: user.role });
 
     // Issue a refresh session (rotated on refresh), stored httpOnly.
-    const refreshTokenValue = signRefreshToken({ sub: String(user._id), kind: "user" });
+    const refreshTokenValue = signRefreshToken({
+      sub: String(user._id),
+      kind: "user",
+    });
     await RefreshToken.create({
       userId: user._id,
       kind: "user",
@@ -147,10 +156,10 @@ router.post("/auth/google", googleLimiter, async (req, res) => {
 });
 router.get("/profile", authMiddleware, async (req, res) => {
   try {
-    const userId = req.user.id;   // ya req.user._id  (jo bhi aapke authMiddleware mein hai)
+    const userId = req.user.id; // ya req.user._id  (jo bhi aapke authMiddleware mein hai)
 
     const user = await User.findById(userId)
-      .select("_id name email avatar")   // ← Avatar add kiya
+      .select("_id name email avatar") // ← Avatar add kiya
       .lean();
 
     if (!user) {
@@ -165,12 +174,12 @@ router.get("/profile", authMiddleware, async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      token: token || null,           // agar zarurat nahi toh hata sakte ho
+      token: token || null, // agar zarurat nahi toh hata sakte ho
       user: {
         _id: user._id,
         name: user.name,
         email: user.email,
-        avatar: user.avatar || null,   // ← Ye important hai
+        avatar: user.avatar || null, // ← Ye important hai
       },
     });
   } catch (error) {
@@ -184,7 +193,12 @@ router.get("/profile", authMiddleware, async (req, res) => {
 router.get("/alluser", requireAdmin, getAllUsers);
 
 router.put("/user/:id", authMiddleware, imageUpload.single("avatar"), UserEdit);
-router.put("/user/password/:id", passwordLimiter, authMiddleware, updatePassword);
+router.put(
+  "/user/password/:id",
+  passwordLimiter,
+  authMiddleware,
+  updatePassword,
+);
 router.get("/me", authMiddleware, getMyProfile);
 
 module.exports = router;

@@ -9,9 +9,17 @@ const deviceFingerprintSchema = new mongoose.Schema(
     associatedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     riskScore: { type: Number, default: 0 },
     isBlocked: { type: Boolean, default: false },
+    pendingOtp: { type: String, default: null },
+    otpExpiresAt: { type: Date, default: null },
+    otpPurpose: {
+      type: String,
+      enum: ["login", "register", "device"],
+      default: null,
+    },
+    lastOtpSentAt: { type: Date, default: null },
     lastSeen: Date,
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 module.exports = mongoose.model("DeviceFingerprint", deviceFingerprintSchema);

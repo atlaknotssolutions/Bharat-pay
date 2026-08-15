@@ -13,7 +13,7 @@ const mongoose = require("mongoose");
 const morgan = require("morgan");
 const dns = require("node:dns");
 
-dns.setServers(["8.8.8.8", "1.1.1.1", "0.0.0.0"]);
+dns.setServers(["8.8.8.8", "1.1.1.1"]);
 
 
 const authRoutes = require("./routes/authRoute.js");
@@ -23,6 +23,7 @@ const userRoutes = require("./routes/userVideoRoute.js");
 const categoryRouter = require("./routes/categoryRoute/category.route.js");
 const leaderboardRoute = require("./routes/leaderboardRoute.js");
 const notificationRoutes = require("./routes/notificationRoute.js");
+const { detectVPN } = require("./services/vpn.service/vpn.service.js");
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -74,7 +75,16 @@ app.use("/api/uservideo", userRoutes);
 app.use("/api/leaderboard", leaderboardRoute);
 app.use("/api/notifications", notificationRoutes);
 
+// temporary test route
+app.use("/test-vpn", async (req, res) => {
+  const ip = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+             req.headers["x-real-ip"] ||
+             req.ip ||
+             "unknown";
 
+  const result = await detectVPN(ip);
+  res.json({ ip, ...result });
+});
 // ---------- Health ----------
 app.get("/", (req, res) => {
   res.send("🚀 Server is running successfully");

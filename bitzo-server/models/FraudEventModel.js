@@ -14,6 +14,7 @@ const fraudEventSchema = new mongoose.Schema(
         "LOGIN_FAILED",
         "REGISTER",
         "DEVICE_CLAIM",
+        "DEVICE_FINGERPRINT",
         "PASSWORD_RESET",
         "PASSWORD_CHANGE",
         "VPN_DETECTED",
