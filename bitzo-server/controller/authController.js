@@ -421,18 +421,52 @@ exports.loginUser = async (req, res) => {
         });
       }
 
+      // 🔄 Auto-replace old device binding with new device
       if (user.deviceId && user.deviceId !== deviceId) {
-        return res.status(403).json({
-          success: false,
-          code: "DEVICE_LOCKED",
-          message:
-            "Your account is currently linked to another browser or device. If you don't have access to that browser, you can continue on this device by signing out all other active sessions.",
-        });
-      }
+        const oldDeviceId = user.deviceId;
 
-      if (!user.deviceId) {
+        // Update user to new device
         user.deviceId = deviceId;
         await user.save();
+
+        // Update DeviceFingerprint: old record should no longer link to this user
+        await DeviceFingerprint.updateOne(
+          { deviceId: oldDeviceId },
+          { $unset: { userId: 1 } },
+        );
+
+        // Create/update fingerprint record for new device
+        await DeviceFingerprint.findOneAndUpdate(
+          { deviceId },
+          {
+            $set: {
+              userId: user._id,
+              lastIp: ip,
+              userAgent: ua,
+              lastSeen: new Date(),
+            },
+            $addToSet: { associatedUsers: user._id },
+          },
+          { upsert: true },
+        );
+      } else if (!user.deviceId) {
+        user.deviceId = deviceId;
+        await user.save();
+
+        // Link new device to user in DeviceFingerprint
+        await DeviceFingerprint.findOneAndUpdate(
+          { deviceId },
+          {
+            $set: {
+              userId: user._id,
+              lastIp: ip,
+              userAgent: ua,
+              lastSeen: new Date(),
+            },
+            $addToSet: { associatedUsers: user._id },
+          },
+          { upsert: true },
+        );
       }
 
       const vpnInfo = await detectVPN(ip);
@@ -504,6 +538,25 @@ exports.loginUser = async (req, res) => {
       { deviceId },
       { $unset: { pendingOtp: 1, otpExpiresAt: 1, otpPurpose: 1 } },
     );
+
+    // ✅ Ensure final device binding is set after OTP verification
+    if (
+      !fingerprintRecord.userId ||
+      String(fingerprintRecord.userId) !== String(user._id)
+    ) {
+      await DeviceFingerprint.updateOne(
+        { deviceId },
+        {
+          $set: {
+            userId: user._id,
+            lastIp: ip,
+            userAgent: ua,
+            lastSeen: new Date(),
+          },
+          $addToSet: { associatedUsers: user._id },
+        },
+      );
+    }
 
     const { riskPoints, reasons } = await analyzeBehavior(user._id);
     if (riskPoints > 0) {
