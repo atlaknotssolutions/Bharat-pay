@@ -75,6 +75,85 @@ export const deleteSubCategory = (id) => API.delete(`/subcategory/${id}`);
 export const getProductByBarcodes = (barcode) =>
   API.get(`/products/barcode/${barcode}`);
 
-// ✅ FIXED (API_URL was undefined)
+// Γ£à FIXED (API_URL was undefined)
 export const scanProduct = (barcodeData) =>
   API.put("/purchase/scan", barcodeData);
+
+// Admin User Management
+export const fetchAdminUsers = (params) =>
+  API.get("/admin/alluser", { params });
+export const fetchAdminUserById = (id) =>
+  API.get(`/admin/users/${id}`);
+export const fetchAdminUserOverview = (id) =>
+  API.get(`/admin/users/${id}/overview`);
+export const fetchAdminUserChannels = (id, params) =>
+  API.get(`/admin/users/${id}/channels`, { params });
+export const fetchAdminUserVideos = (id, params) =>
+  API.get(`/admin/users/${id}/videos`, { params });
+export const fetchAdminUserShorts = (id, params) =>
+  API.get(`/admin/users/${id}/shorts`, { params });
+export const updateAdminUser = (id, data) =>
+  API.put(`/admin/users/${id}`, data);
+export const deleteAdminUser = (id, reason) =>
+  API.delete(`/admin/users/${id}`, { data: { reason } });
+
+// Admin User 360┬░ ΓÇö Phase 3
+export const fetchAdminUserActivity = (id, params) =>
+  API.get(`/admin/users/${id}/activity`, { params });
+export const fetchAdminUserWatchHistory = (id, params) =>
+  API.get(`/admin/users/${id}/watch-history`, { params });
+export const fetchAdminUserSubscriptions = (id) =>
+  API.get(`/admin/users/${id}/subscriptions`);
+export const fetchAdminUserLikedVideos = (id, params) =>
+  API.get(`/admin/users/${id}/liked-videos`, { params });
+export const fetchAdminUserDislikedVideos = (id, params) =>
+  API.get(`/admin/users/${id}/disliked-videos`, { params });
+export const fetchAdminUserWatchLater = (id, params) =>
+  API.get(`/admin/users/${id}/watch-later`, { params });
+export const fetchAdminUserNotifications = (id, params) =>
+  API.get(`/admin/users/${id}/notifications`, { params });
+export const fetchAdminUserDevices = (id) =>
+  API.get(`/admin/users/${id}/devices`);
+export const fetchAdminUserFraudEvents = (id, params) =>
+  API.get(`/admin/users/${id}/fraud-events`, { params });
+export const fetchAdminUserEngagement = (id) =>
+  API.get(`/admin/users/${id}/engagement`);
+
+// Admin Uploads
+export const getAdminUploads = (params) => API.get("/admin/uploads", { params });
+
+// Admin User Moderation
+export const suspendAdminUser = (id, reason) =>
+  API.post(`/admin/users/${id}/suspend`, { reason });
+export const restoreAdminUser = (id) =>
+  API.post(`/admin/users/${id}/restore`);
+export const banAdminUser = (id, reason) =>
+  API.post(`/admin/users/${id}/ban`, { reason });
+
+// Admin Channel Moderation
+export const disableAdminChannel = (userId, channelId, reason) =>
+  API.post(`/admin/users/${userId}/channels/${channelId}/disable`, { reason });
+export const enableAdminChannel = (userId, channelId) =>
+  API.post(`/admin/users/${userId}/channels/${channelId}/enable`);
+export const banAdminChannel = (userId, channelId, reason) =>
+  API.post(`/admin/users/${userId}/channels/${channelId}/ban`, { reason });
+export const restoreAdminChannel = (userId, channelId) =>
+  API.post(`/admin/users/${userId}/channels/${channelId}/restore`);
+export const deleteAdminChannel = (userId, channelId, reason) =>
+  API.delete(`/admin/users/${userId}/channels/${channelId}`, { data: { reason } });
+
+// Admin Video Moderation
+export const disableAdminVideo = (userId, videoId, reason) =>
+  API.post(`/admin/users/${userId}/videos/${videoId}/disable`, { reason });
+export const enableAdminVideo = (userId, videoId) =>
+  API.post(`/admin/users/${userId}/videos/${videoId}/enable`);
+export const deleteAdminVideo = (userId, videoId, reason) =>
+  API.delete(`/admin/users/${userId}/videos/${videoId}`, { data: { reason } });
+
+// Admin Short Moderation
+export const disableAdminShort = (userId, videoId, reason) =>
+  API.post(`/admin/users/${userId}/shorts/${videoId}/disable`, { reason });
+export const enableAdminShort = (userId, videoId) =>
+  API.post(`/admin/users/${userId}/shorts/${videoId}/enable`);
+export const deleteAdminShort = (userId, videoId, reason) =>
+  API.delete(`/admin/users/${userId}/shorts/${videoId}`, { data: { reason } });

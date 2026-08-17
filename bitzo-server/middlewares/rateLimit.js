@@ -93,6 +93,33 @@ const viewLimiter = rateLimit({
   message: jsonMessage("Too many view requests. Please slow down."),
 });
 
+// Admin user list (read-only, generous — table view + search + pagination)
+const adminUserListLimiter = rateLimit({
+  windowMs: 15 * MINUTE,
+  limit: 200,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: jsonMessage("Too many requests. Please try again later."),
+});
+
+// Admin user detail / 360° endpoints (read-heavy, many sub-requests per user)
+const adminUserLimiter = rateLimit({
+  windowMs: 15 * MINUTE,
+  limit: 120,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: jsonMessage("Too many requests. Please try again later."),
+});
+
+// Admin destructive operations (delete, suspend)
+const adminDestructiveLimiter = rateLimit({
+  windowMs: 15 * MINUTE,
+  limit: 30,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: jsonMessage("Too many destructive operations. Please try again later."),
+});
+
 module.exports = {
   loginLimiter,
   adminLoginLimiter,
@@ -104,4 +131,7 @@ module.exports = {
   forgotPasswordLimiter,
   resetPasswordLimiter,
   viewLimiter,
+  adminUserListLimiter,
+  adminUserLimiter,
+  adminDestructiveLimiter,
 };

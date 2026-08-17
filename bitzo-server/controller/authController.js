@@ -9,7 +9,7 @@ const {
   hashToken,
   REFRESH_TOKEN_TTL_MS,
 } = require("../utils/tokenService");
-const bcrypt = require("bcryptjs"); // ← make sure this is installed
+const bcrypt = require("bcryptjs"); // ΓåÉ make sure this is installed
 const crypto = require("crypto");
 const mongoose = require("mongoose");
 const imagekit = require("../utils/imagekit.js");
@@ -27,9 +27,12 @@ const {
   analyzeBehavior,
   applyRiskToUser,
 } = require("../services/vpn.service/fraud.service.js");
+const { logAuditEvent } = require("../services/auditEventService");
 const transporter = require("../Email/nodemailer.js");
 const getRegisterMailOptions = require("../Email/register.js");
 const getLoginMailOptions = require("../Email/login.js");
+const getPasswordResetMailOptions = require("../Email/password.js");
+const getPasswordChangeConfirmationMailOptions = require("../Email/passwordReset.js");
 
 const getClientIp = (req) => {
   return (
@@ -131,7 +134,7 @@ exports.registerUser = async (req, res) => {
       });
     }
 
-    // ─── VPN / Proxy hard block ───────────────────────────────────────────────
+    // ΓöÇΓöÇΓöÇ VPN / Proxy hard block ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
     const ip = getClientIp(req);
     const ua = req.headers["user-agent"] || "unknown";
     const vpnInfo = await detectVPN(ip);
@@ -160,9 +163,9 @@ exports.registerUser = async (req, res) => {
           "Registration is not allowed over VPN or proxy. Please disable it and try again.",
       });
     }
-    // ─────────────────────────────────────────────────────────────────────────
+    // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
-    // 🔐 HASH PASSWORD IN CONTROLLER
+    // ≡ƒöÉ HASH PASSWORD IN CONTROLLER
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
@@ -188,6 +191,15 @@ exports.registerUser = async (req, res) => {
 
     await sendMailSafely(getRegisterMailOptions(user.email, user.name));
     await issueOtpToDevice({ deviceId, user, purpose: "register" });
+
+    await logAuditEvent({
+      userId: user._id,
+      eventType: "USER_REGISTER",
+      ip,
+      deviceId,
+      userAgent: ua,
+      metadata: { email, name },
+    });
 
     // Auto-login: issue access token + refresh session (rotated on refresh)
     const token = signAccessToken({ userId: user._id, role: user.role });
@@ -421,7 +433,7 @@ exports.loginUser = async (req, res) => {
         });
       }
 
-      // 🔄 Auto-replace old device binding with new device
+      // ≡ƒöä Auto-replace old device binding with new device
       if (user.deviceId && user.deviceId !== deviceId) {
         const oldDeviceId = user.deviceId;
 
@@ -539,7 +551,7 @@ exports.loginUser = async (req, res) => {
       { $unset: { pendingOtp: 1, otpExpiresAt: 1, otpPurpose: 1 } },
     );
 
-    // ✅ Ensure final device binding is set after OTP verification
+    // Γ£à Ensure final device binding is set after OTP verification
     if (
       !fingerprintRecord.userId ||
       String(fingerprintRecord.userId) !== String(user._id)
@@ -575,6 +587,15 @@ exports.loginUser = async (req, res) => {
       riskScoreImpact: 0,
     });
 
+    await logAuditEvent({
+      userId: user._id,
+      eventType: "USER_LOGIN",
+      ip,
+      deviceId,
+      userAgent: ua,
+      metadata: { email: user.email },
+    });
+
     await sendMailSafely(getLoginMailOptions(user.email, user.name));
 
     const token = signAccessToken({ userId: user._id, role: user.role });
@@ -586,6 +607,13 @@ exports.loginUser = async (req, res) => {
     });
     const refreshToken = await createAuthSession(user._id, "user");
     setRefreshCookie(res, refreshToken, "user");
+
+    // Update lastLoginAt and lastActivityAt on successful login
+    const now = new Date();
+    await User.updateOne(
+      { _id: user._id },
+      { $set: { lastLoginAt: now, lastActivityAt: now } },
+    );
 
     res.status(200).json({
       success: true,
@@ -602,7 +630,7 @@ exports.loginUser = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("❌ Login error:", error.message);
+    console.error("Γ¥î Login error:", error.message);
     res.status(500).json({
       success: false,
       message: "Internal server error",
@@ -688,13 +716,22 @@ exports.claimDevice = async (req, res) => {
     user.deviceId = deviceId;
     await user.save();
 
+    await logAuditEvent({
+      userId: user._id,
+      eventType: "DEVICE_CLAIM",
+      ip: getClientIp(req),
+      deviceId,
+      userAgent: req.headers["user-agent"] || "unknown",
+      metadata: { email: user.email },
+    });
+
     return res.status(200).json({
       success: true,
       message:
         "All other sessions have been signed out. You can now sign in on this device.",
     });
   } catch (error) {
-    console.error("❌ Claim device error:", error.message);
+    console.error("Γ¥î Claim device error:", error.message);
     return res.status(500).json({
       success: false,
       message: "Internal server error",
@@ -816,6 +853,13 @@ exports.updatePassword = async (req, res) => {
 
     await user.save();
 
+    await logAuditEvent({
+      userId,
+      eventType: "PASSWORD_CHANGE",
+      ip: getClientIp(req),
+      userAgent: req.headers["user-agent"] || "unknown",
+    });
+
     res.status(200).json({
       success: true,
       message: "Password updated",
@@ -873,7 +917,7 @@ exports.UserEdit = async (req, res) => {
       });
 
       updateData.avatar = uploadResponse.url;
-      updateData.avatarFileId = uploadResponse.fileId; // ← Ye important hai
+      updateData.avatarFileId = uploadResponse.fileId; // ΓåÉ Ye important hai
     }
 
     // ====================== NAME ======================
@@ -951,6 +995,14 @@ exports.UserEdit = async (req, res) => {
       })();
     }
 
+    await logAuditEvent({
+      userId,
+      eventType: "PROFILE_UPDATE",
+      ip: getClientIp(req),
+      userAgent: req.headers["user-agent"] || "unknown",
+      metadata: { fields: Object.keys(updateData) },
+    });
+
     return res.status(200).json({
       success: true,
       message: "Profile updated successfully",
@@ -1006,7 +1058,7 @@ exports.refreshToken = async (req, res) => {
       });
     }
 
-    // Rotated token being reused → treat as theft: revoke the whole family.
+    // Rotated token being reused ΓåÆ treat as theft: revoke the whole family.
     if (session.replacedBy) {
       await RefreshToken.updateMany(
         { userId: session.userId, kind },
@@ -1087,6 +1139,13 @@ exports.logout = async (req, res) => {
       );
     }
 
+    await logAuditEvent({
+      userId: req.user?.id || null,
+      eventType: "USER_LOGOUT",
+      ip: getClientIp(req),
+      userAgent: req.headers["user-agent"] || "unknown",
+    });
+
     clearRefreshCookie(res, "user");
     res.clearCookie("token", {
       httpOnly: true,
@@ -1121,6 +1180,13 @@ exports.logoutAll = async (req, res) => {
       { userId, kind: "user", revokedAt: null },
       { $set: { revokedAt: new Date() } },
     );
+
+    await logAuditEvent({
+      userId,
+      eventType: "USER_LOGOUT_ALL",
+      ip: getClientIp(req),
+      userAgent: req.headers["user-agent"] || "unknown",
+    });
 
     clearRefreshCookie(res, "user");
     res.clearCookie("token", {
@@ -1166,10 +1232,20 @@ exports.forgotPassword = async (req, res) => {
         },
       );
 
-      // NOTE: no email provider is configured in this project. In production,
-      // send a reset link containing the RAW resetToken to the user's email
-      // here. The raw token is never logged and only its hash is persisted.
-      // console.log(resetToken)  // ❌ NEVER DO THIS
+      await logAuditEvent({
+        userId: user._id,
+        eventType: "PASSWORD_RESET_REQUEST",
+        ip: getClientIp(req),
+        userAgent: req.headers["user-agent"] || "unknown",
+        metadata: { email: normalizedEmail },
+      });
+
+      // Send the reset link containing the RAW resetToken to the user's email.
+      // The raw token is never logged and only its hash is persisted.
+      // sendMailSafely safely no-ops when no mailer is configured.
+      await sendMailSafely(
+        getPasswordResetMailOptions(user.email, user.name, resetToken),
+      );
     }
 
     // Generic response: never reveal whether the email exists.
@@ -1241,7 +1317,19 @@ exports.resetPassword = async (req, res) => {
       { userId: user._id, kind: "user", revokedAt: null },
       { $set: { revokedAt: new Date() } },
     );
+
+    await logAuditEvent({
+      userId: user._id,
+      eventType: "PASSWORD_RESET_COMPLETE",
+      ip: getClientIp(req),
+      userAgent: req.headers["user-agent"] || "unknown",
+    });
+
     clearRefreshCookie(res, "user");
+
+    await sendMailSafely(
+      getPasswordChangeConfirmationMailOptions(user.email, user.name),
+    );
 
     return res
       .status(200)

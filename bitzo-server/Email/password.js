@@ -1,4 +1,4 @@
-export default function getPasswordResetMailOptions(email, name, otp) {
+function getPasswordResetMailOptions(email, name, otp) {
   return {
     from: process.env.EMAIL,
     to: email,
@@ -37,3 +37,5 @@ export default function getPasswordResetMailOptions(email, name, otp) {
     </html>`,
   };
 }
+
+module.exports = getPasswordResetMailOptions;

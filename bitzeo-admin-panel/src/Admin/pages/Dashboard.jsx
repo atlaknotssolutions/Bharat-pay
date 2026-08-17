@@ -12,6 +12,7 @@ import {
   ArrowUpRight,
   Play,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import useDashboardData from "../../hooks/useDashboardData";
 
 const getAdminDisplayName = () => {
@@ -67,6 +68,7 @@ const formatCount = (n) => {
 };
 
 export default function Dashboard() {
+const navigate = useNavigate();
   const { data, generatedAt, loading, error, refetch } = useDashboardData();
 
   if (loading) {
@@ -314,7 +316,10 @@ export default function Dashboard() {
               <UserPlus className="w-5 h-5 text-violet-400" />
               Recent Users
             </h2>
-            <button className="text-sm text-violet-400 hover:text-violet-300 font-medium flex items-center gap-1 transition-colors">
+            <button
+              onClick={() => navigate("/alluser")}
+              className="text-sm text-violet-400 hover:text-violet-300 font-medium flex items-center gap-1 transition-colors"
+            >
               View all <ArrowUpRight className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -358,7 +363,10 @@ export default function Dashboard() {
               <Upload className="w-5 h-5 text-blue-400" />
               Recent Uploads
             </h2>
-            <button className="text-sm text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1 transition-colors">
+            <button
+              onClick={() => navigate("/uploads")}
+              className="text-sm text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1 transition-colors"
+            >
               View all <ArrowUpRight className="w-3.5 h-3.5" />
             </button>
           </div>

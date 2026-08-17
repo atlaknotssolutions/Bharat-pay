@@ -124,6 +124,72 @@ const userSchema = new mongoose.Schema(
       default: 10,
       min: 0,
     },
+
+    // Account status (Phase 1 — User 360°)
+    status: {
+      type: String,
+      enum: ["active", "suspended", "banned", "deleted"],
+      default: "active",
+      index: true,
+    },
+
+    lastLoginAt: {
+      type: Date,
+      default: null,
+    },
+
+    lastActivityAt: {
+      type: Date,
+      default: null,
+    },
+
+    suspendedAt: {
+      type: Date,
+      default: null,
+    },
+
+    suspendedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Admin",
+      default: null,
+    },
+
+    suspendReason: {
+      type: String,
+      default: null,
+    },
+
+    bannedAt: {
+      type: Date,
+      default: null,
+    },
+
+    bannedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Admin",
+      default: null,
+    },
+
+    banReason: {
+      type: String,
+      default: null,
+    },
+
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
+
+    deletedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Admin",
+      default: null,
+    },
+
+    deleteReason: {
+      type: String,
+      default: null,
+    },
   },
   { timestamps: true }
 );

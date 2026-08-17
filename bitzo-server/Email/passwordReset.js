@@ -1,4 +1,4 @@
-export default function getPasswordChangeConfirmationMailOptions(email, name) {
+function getPasswordChangeConfirmationMailOptions(email, name) {
   return {
     from: process.env.EMAIL,
     to: email,
@@ -34,3 +34,5 @@ export default function getPasswordChangeConfirmationMailOptions(email, name) {
 </html>`,
   };
 }
+
+module.exports = getPasswordChangeConfirmationMailOptions;

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import axios from "axios";
 import DataTable from "react-data-table-component";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -17,8 +16,11 @@ import {
   Tv,
   Search,
 } from "lucide-react";
+import API, { API_BASE_URL } from "../../api";
 
-const BASE_URL = "http://localhost:8000/api";
+
+
+const MEDIA_BASE = API_BASE_URL.replace(/\/api\/?$/, "");
 
 export default function ContentManagement({ type = "long" }) {
   const pageType = type === "short" ? "short" : "long";
@@ -56,8 +58,8 @@ export default function ContentManagement({ type = "long" }) {
     try {
       setLoading(true);
       setError(null);
-      const res = await axios.get(
-        `${BASE_URL}/adminvideo?videoType=${pageType}`,
+      const res = await API.get(
+        `/adminvideo?videoType=${pageType}`,
       );
       setVideos(res.data?.videos || []);
     } catch (err) {
@@ -94,15 +96,15 @@ export default function ContentManagement({ type = "long" }) {
       setSubmitting(true);
 
       if (view === "upload") {
-        await axios.post(`${BASE_URL}/adminvideo/upload`, data);
+        await API.post(`/adminvideo/upload`, data);
         toast.success(
           isShorts
             ? "Short uploaded successfully!"
             : "Video uploaded successfully!",
         );
       } else if (view === "update" && selectedVideo) {
-        await axios.put(
-          `${BASE_URL}/adminvideo/update/${selectedVideo._id}`,
+        await API.put(
+          `/adminvideo/update/${selectedVideo._id}`,
           data,
         );
         toast.success("Video updated successfully!");
@@ -131,7 +133,7 @@ export default function ContentManagement({ type = "long" }) {
     if (!window.confirm("Are you sure you want to delete this video?")) return;
 
     try {
-      await axios.delete(`${BASE_URL}/adminvideo/${id}`);
+      await API.delete(`/adminvideo/${id}`);
       toast.success("Video deleted successfully");
       fetchVideos();
       if (view === "player") setView("list");
@@ -161,12 +163,12 @@ export default function ContentManagement({ type = "long" }) {
         const thumbSrc = row.thumbnail
           ? row.thumbnail.startsWith("http")
             ? row.thumbnail
-            : `${BASE_URL.replace("/api", "")}/${row.thumbnail}`
+            : `${MEDIA_BASE}/${row.thumbnail}`
           : null;
 
         const videoSrc = row.videoUrl?.startsWith("http")
           ? row.videoUrl
-          : `${BASE_URL.replace("/api", "")}/${row.videoUrl}`;
+          : `${MEDIA_BASE}/${row.videoUrl}`;
 
         return (
           <div
@@ -403,7 +405,7 @@ export default function ContentManagement({ type = "long" }) {
   if (view === "player" && selectedVideo) {
     const videoSrc = selectedVideo.videoUrl?.startsWith("http")
       ? selectedVideo.videoUrl
-      : `${BASE_URL.replace("/api", "")}/${selectedVideo.videoUrl}`;
+      : `${MEDIA_BASE}/${selectedVideo.videoUrl}`;
 
     const uploader = selectedVideo.uploadedBy;
     const channel = selectedVideo.channel;

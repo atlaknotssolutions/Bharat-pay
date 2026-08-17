@@ -139,6 +139,13 @@ router.post("/auth/google", googleLimiter, async (req, res) => {
     });
     setRefreshCookie(res, refreshTokenValue, "user");
 
+    // Update lastLoginAt and lastActivityAt on successful Google login
+    const now = new Date();
+    await User.updateOne(
+      { _id: user._id },
+      { $set: { lastLoginAt: now, lastActivityAt: now } },
+    );
+
     return res.status(200).json({
       success: true,
       token,
@@ -190,7 +197,8 @@ router.get("/profile", authMiddleware, async (req, res) => {
     });
   }
 });
-router.get("/alluser", requireAdmin, getAllUsers);
+// Deprecated: use /api/admin/alluser instead (has rate limiting + requireAdmin)
+// router.get("/alluser", requireAdmin, getAllUsers);
 
 router.put("/user/:id", authMiddleware, imageUpload.single("avatar"), UserEdit);
 router.put(

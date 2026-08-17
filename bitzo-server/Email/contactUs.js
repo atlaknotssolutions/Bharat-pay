@@ -1,4 +1,4 @@
-export default function getContactMailOptions({ name, email, subject, message }) {
+function getContactMailOptions({ name, email, subject, message }) {
   return {
     from: process.env.EMAIL,
     to: process.env.EMAIL,
@@ -42,3 +42,5 @@ export default function getContactMailOptions({ name, email, subject, message })
       </html>`,
   };
 }
+
+module.exports = getContactMailOptions;

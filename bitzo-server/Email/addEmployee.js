@@ -1,4 +1,4 @@
-export default function getAddEmployeeMailOptions(
+function getAddEmployeeMailOptions(
   email,
   name,
   position,
@@ -51,3 +51,5 @@ export default function getAddEmployeeMailOptions(
 			</html>`,
   };
 }
+
+module.exports = getAddEmployeeMailOptions;

@@ -12,6 +12,7 @@ const {
   createNotification,
   createBulkNotifications,
 } = require("../utils/notificationService");
+const { logAuditEvent } = require("../services/auditEventService");
 
 const ABS_WATCH_SECONDS_CAP = 12 * 60 * 60; // 43200s hard cap per session
 
@@ -105,6 +106,14 @@ const createChannel = async (req, res) => {
     // ✅ Save channel ID into User's channels array
     await User.findByIdAndUpdate(userId, {
       $push: { channels: newChannel._id },
+    });
+
+    await logAuditEvent({
+      userId,
+      eventType: "CHANNEL_CREATE",
+      ip: req.ip,
+      userAgent: req.headers["user-agent"] || "unknown",
+      metadata: { channelId: newChannel._id, channelName: name },
     });
 
     // Populate category name for response
@@ -221,6 +230,20 @@ const uploadVideo = async (req, res) => {
       type: "upload",
       video: newVideo._id,
       channel: channelId,
+    });
+
+    await logAuditEvent({
+      userId: req.user?.userId,
+      eventType: "VIDEO_UPLOAD",
+      ip: req.ip,
+      userAgent: req.headers["user-agent"] || "unknown",
+      metadata: {
+        videoId: newVideo._id,
+        videoTitle: newVideo.title,
+        videoType: newVideo.videoType,
+        channelId,
+        channelName: channel.name,
+      },
     });
 
     res.status(201).json({
@@ -492,6 +515,13 @@ const clearWatchHistory = async (req, res) => {
     user.viewedVideos = [];
     await user.save();
 
+    await logAuditEvent({
+      userId,
+      eventType: "WATCH_HISTORY_CLEAR",
+      ip: req.ip,
+      userAgent: req.headers["user-agent"] || "unknown",
+    });
+
     return res.status(200).json({
       success: true,
       message: "Watch history cleared",
@@ -642,6 +672,15 @@ const deleteChannel = async (req, res) => {
         .json({ success: false, message: "Channel not found or unauthorized" });
     }
     await Video.deleteMany({ channel: id });
+
+    await logAuditEvent({
+      userId,
+      eventType: "CHANNEL_DELETE",
+      ip: req.ip,
+      userAgent: req.headers["user-agent"] || "unknown",
+      metadata: { channelId: id, channelName: channel.name },
+    });
+
     res.status(200).json({
       success: true,
       message: "Channel and associated videos deleted",
@@ -1265,6 +1304,14 @@ const likeVideo = async (req, res) => {
         type: "like",
         video: video._id,
       });
+
+      await logAuditEvent({
+        userId,
+        eventType: "VIDEO_LIKE",
+        ip: req.ip,
+        userAgent: req.headers["user-agent"] || "unknown",
+        metadata: { videoId: normalizedVideoId },
+      });
     }
 
     return res.status(200).json({
@@ -1356,6 +1403,16 @@ const dislikeVideo = async (req, res) => {
 
     await Promise.all([user.save(), video.save()]);
 
+    if (reaction === "dislike") {
+      await logAuditEvent({
+        userId,
+        eventType: "VIDEO_DISLIKE",
+        ip: req.ip,
+        userAgent: req.headers["user-agent"] || "unknown",
+        metadata: { videoId },
+      });
+    }
+
     return res.status(200).json({
       success: true,
       likes: video.likesCount || 0,
@@ -1422,6 +1479,22 @@ const subscribeChannel = async (req, res) => {
         type: "subscribe",
         channel: channel._id,
       });
+
+      await logAuditEvent({
+        userId,
+        eventType: "CHANNEL_SUBSCRIBE",
+        ip: req.ip,
+        userAgent: req.headers["user-agent"] || "unknown",
+        metadata: { channelId, channelName: channel.name },
+      });
+    } else {
+      await logAuditEvent({
+        userId,
+        eventType: "CHANNEL_UNSUBSCRIBE",
+        ip: req.ip,
+        userAgent: req.headers["user-agent"] || "unknown",
+        metadata: { channelId, channelName: channel.name },
+      });
     }
 
     res.status(200).json({
@@ -1476,6 +1549,14 @@ const addComment = async (req, res) => {
         actor: userId,
         type: "comment",
         video: video._id,
+      });
+
+      await logAuditEvent({
+        userId,
+        eventType: "COMMENT_ADD",
+        ip: req.ip,
+        userAgent: req.headers["user-agent"] || "unknown",
+        metadata: { videoId, commentLength: commentText.trim().length },
       });
     }
 
@@ -1561,6 +1642,15 @@ const deleteComment = async (req, res) => {
     }
     video.comments.splice(commentIndex, 1);
     await video.save();
+
+    await logAuditEvent({
+      userId,
+      eventType: "COMMENT_DELETE",
+      ip: req.ip,
+      userAgent: req.headers["user-agent"] || "unknown",
+      metadata: { videoId, commentId },
+    });
+
     res.status(200).json({ success: true, message: "Comment deleted!" });
   } catch (error) {
     console.error("Error in deleteComment:", error);
@@ -1903,6 +1993,14 @@ const RemoveFromWatchLater = async (req, res) => {
 
     await user.save();
 
+    await logAuditEvent({
+      userId,
+      eventType: "WATCH_LATER_REMOVE",
+      ip: req.ip,
+      userAgent: req.headers["user-agent"] || "unknown",
+      metadata: { videoId },
+    });
+
     res.status(200).json({
       success: true,
       message: "Video removed from Watch Later",
@@ -1958,6 +2056,14 @@ const addToWatchLater = async (req, res) => {
     user.watchLaterVideos.push(videoId);
     user.watchLater.push(videoId);
     await user.save();
+
+    await logAuditEvent({
+      userId,
+      eventType: "WATCH_LATER_ADD",
+      ip: req.ip,
+      userAgent: req.headers["user-agent"] || "unknown",
+      metadata: { videoId },
+    });
 
     return res.status(200).json({
       success: true,

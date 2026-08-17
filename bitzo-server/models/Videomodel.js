@@ -91,6 +91,22 @@ const videoSchema = new mongoose.Schema(
 
     
 
+    // Moderation status
+    status: {
+      type: String,
+      enum: ["active", "disabled"],
+      default: "active",
+      index: true,
+    },
+
+    disabledAt: { type: Date, default: null },
+    disabledBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin", default: null },
+    disableReason: { type: String, default: null },
+
+    deletedAt: { type: Date, default: null },
+    deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin", default: null },
+    deleteReason: { type: String, default: null },
+
     // ✅ ANONYMOUS COMMENTS
     comments: [
       {
@@ -123,5 +139,9 @@ const videoSchema = new mongoose.Schema(
 );
 
 videoSchema.index({ createdAt: -1 });
+videoSchema.index({ videoType: 1, createdAt: -1 });
+videoSchema.index({ channel: 1, createdAt: -1 });
+videoSchema.index({ creator: 1, createdAt: -1 });
+videoSchema.index({ uploadedBy: 1, createdAt: -1 });
 
 module.exports = mongoose.model("Video", videoSchema);

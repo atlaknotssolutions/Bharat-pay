@@ -24,6 +24,9 @@ import Shorts from "./Admin/pages/ShortsVideo/Shorts";
 import CategoryManagement from "./Admin/CategoryManagement/Category";
 import AllUsers from "./Admin/Users/AllUser";
 import EmployeeRegister from "./Admin/pages/Auth/EmployeeRegister";
+import User360 from "./Admin/Users/User360";
+import EditUser from "./Admin/Users/EditUser";
+import AllUploads from "./Admin/pages/AllUploads";
 
 // ====================== AUTH CHECK ======================
 const isAuthenticated = () => {
@@ -100,8 +103,12 @@ function App() {
             <Route path="orders" element={<Orders />} />
             <Route path="products" element={<Products />} />
             <Route path="category" element={<CategoryManagement />} />
+            <Route path="uploads" element={<AllUploads />} />
             <Route path="alluser" element={<AllUsers />} />
             <Route path="/create-employee" element={<EmployeeRegister />} />
+            <Route path="users/:userId/edit" element={<EditUser />} />
+            <Route path="users/:userId" element={<User360 />} />
+            <Route path="*" element={<NotFound />} />
           </Route>
         </Route>
         {/* ================= 404 NOT FOUND ================= */}
