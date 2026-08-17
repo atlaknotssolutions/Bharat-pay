@@ -359,7 +359,6 @@ export default function Profile() {
                 >
                   <div className="relative aspect-video w-full sm:w-40 md:w-48 flex-shrink-0 overflow-hidden rounded-lg bg-zinc-800">
                     <img
-                      // src={resolveMediaUrl(video.thumbnail)}
                       src={resolveMediaUrl(video.avatar)}
                       alt={video.title}
                       className="h-full w-full object-cover"

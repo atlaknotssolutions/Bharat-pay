@@ -1,6 +1,7 @@
 const User = require("../../models/admin/AdminModel");
 const AllUser = require("../../models/usermodel");
 const RefreshToken = require("../../models/RefreshToken");
+const imagekit = require("../../utils/imagekit.js");
 const {
   signAccessToken,
   signRefreshToken,
@@ -14,7 +15,6 @@ const {
   clearRefreshCookie,
 } = require("../../utils/refreshCookie");
 const bcrypt = require("bcryptjs");
-
 
 exports.registerUser = async (req, res) => {
   try {
@@ -97,148 +97,6 @@ exports.registerUser = async (req, res) => {
   }
 };
 
-
-
-// exports.getAllUsers = async (req, res) => {
-//   try {
-//     const page = Math.max(1, parseInt(req.query.page) || 1);
-//     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 15));
-//     const skip = (page - 1) * limit;
-
-//     const [users, total] = await Promise.all([
-//       User.find()
-//         .select(
-//           "name email role avatar trustScore rewardPoints createdAt channels videos"
-//         )
-//         .populate({
-//           path: "channels",
-//           select: "name handle channelImage createdAt videos",
-//           populate: {
-//             path: "videos",
-//             select: "title thumbnail likesCount views createdAt videoUrl channel",
-//             options: {
-//               limit: 4,
-//               sort: { createdAt: -1 },
-//             },
-//           },
-//         })
-//         // User ke direct videos bhi (agar chahiye)
-//         .populate({
-//           path: "videos",
-//           select: "title thumbnail likesCount views createdAt videoUrl channel",
-//           options: {
-//             limit: 4,
-//             sort: { createdAt: -1 },
-//           },
-//           populate: {
-//             path: "channel",
-//             select: "name handle",
-//           },
-//         })
-//         .sort({ createdAt: -1 })
-//         .skip(skip)
-//         .limit(limit)
-//         .lean(),
-
-//       User.countDocuments(),
-//     ]);
-
-//     const baseUrl = `${req.protocol}://${req.get("host")}`;
-
-//     const formattedUsers = users.map((user) => {
-//       // Avatar full URL
-//       if (user.avatar && !user.avatar.startsWith("http")) {
-//         user.avatar = `${baseUrl}/${user.avatar}`;
-//       }
-
-//       // ===== Channels formatting =====
-//       if (user.channels?.length) {
-//         user.channels = user.channels.map((channel) => {
-//           // Channel image full URL
-//           if (channel.channelImage && !channel.channelImage.startsWith("http")) {
-//             channel.channelImage = `${baseUrl}/${channel.channelImage}`;
-//           }
-
-//           // Videos ke thumbnail full URL
-//           if (channel.videos?.length) {
-//             channel.videos = channel.videos.map((video) => {
-//               if (video.thumbnail && !video.thumbnail.startsWith("http")) {
-//                 video.thumbnail = `${baseUrl}/${video.thumbnail}`;
-//               }
-//               // Video ke saath channel name attach kar do
-//               video.channelName = channel.name || channel.handle || "—";
-//               return video;
-//             });
-//           }
-
-//           return {
-//             _id: channel._id,
-//             name: channel.name || "Unnamed Channel",
-//             handle: channel.handle || null,
-//             channelImage: channel.channelImage || null,
-//             createdAt: channel.createdAt,
-//             totalVideos: channel.videos?.length || 0,
-//             videos: channel.videos || [],
-//           };
-//         });
-//       }
-
-//       // ===== User ke direct videos formatting =====
-//       if (user.videos?.length) {
-//         user.videos = user.videos.map((video) => {
-//           if (video.thumbnail && !video.thumbnail.startsWith("http")) {
-//             video.thumbnail = `${baseUrl}/${video.thumbnail}`;
-//           }
-//           return {
-//             ...video,
-//             channelName: video.channel?.name || video.channel?.handle || "—",
-//           };
-//         });
-//       }
-
-//       return {
-//         _id: user._id,
-//         name: user.name,
-//         email: user.email,
-//         role: user.role,
-//         avatar: user.avatar,
-//         trustScore: user.trustScore,
-//         rewardPoints: user.rewardPoints,
-//         createdAt: user.createdAt,
-
-//         // ===== Important counts =====
-//         totalChannels: user.channels?.length || 0,
-//         totalVideos: user.videos?.length || 0,
-
-//         // Full channels list with name + videos
-//         channels: user.channels || [],
-
-//         // Latest videos (with channel name)
-//         videos: user.videos || [],
-//       };
-//     });
-
-//     res.status(200).json({
-//       success: true,
-//       pagination: {
-//         page,
-//         limit,
-//         total,
-//         pages: Math.ceil(total / limit),
-//       },
-//       data: formattedUsers,
-//     });
-//   } catch (err) {
-//     console.error("getAllUsers error:", err);
-//     res.status(500).json({
-//       success: false,
-//       message: err.message || "Failed to fetch users",
-//     });
-//   }
-// };
-
-
-
 exports.getAllUsers = async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -258,7 +116,7 @@ exports.getAllUsers = async (req, res) => {
     const [users, total] = await Promise.all([
       AllUser.find(filter)
         .select(
-          "name email role avatar trustScore rewardPoints createdAt channels videos"
+          "name email role avatar trustScore rewardPoints createdAt channels videos",
         )
         .populate({
           path: "channels",
@@ -371,7 +229,7 @@ exports.getUserById = async (req, res) => {
 
     const user = await AllUser.findById(id)
       .select(
-        "name email role avatar trustScore rewardPoints createdAt channels videos"
+        "name email role avatar trustScore rewardPoints createdAt channels videos",
       )
       .populate({
         path: "channels",
@@ -481,7 +339,9 @@ exports.updateUser = async (req, res) => {
 
     const user = await AllUser.findById(id);
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     if (name) user.name = name.trim();
@@ -510,7 +370,9 @@ exports.deleteUser = async (req, res) => {
 
     const user = await AllUser.findByIdAndDelete(id);
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     res.status(200).json({
@@ -566,7 +428,10 @@ exports.loginUser = async (req, res) => {
     });
 
     // Admin refresh session (rotated on refresh), stored httpOnly.
-    const refreshTokenValue = signRefreshToken({ sub: String(user._id), kind: "admin" });
+    const refreshTokenValue = signRefreshToken({
+      sub: String(user._id),
+      kind: "admin",
+    });
     await RefreshToken.create({
       userId: user._id,
       kind: "admin",
@@ -611,15 +476,17 @@ exports.adminRefresh = async (req, res) => {
     try {
       payload = verifyRefreshToken(presented);
     } catch (error) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Unauthorized - Invalid refresh session" });
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized - Invalid refresh session",
+      });
     }
 
     if (!payload.sub) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Unauthorized - Invalid refresh session" });
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized - Invalid refresh session",
+      });
     }
 
     const tokenHash = hashToken(presented);
@@ -627,36 +494,40 @@ exports.adminRefresh = async (req, res) => {
 
     if (!session || session.kind !== kind) {
       clearRefreshCookie(res, "admin");
-      return res
-        .status(401)
-        .json({ success: false, message: "Unauthorized - Refresh session not found" });
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized - Refresh session not found",
+      });
     }
 
     // Rotated token being reused → revoke the whole admin session family.
     if (session.replacedBy) {
       await RefreshToken.updateMany(
         { userId: session.userId, kind },
-        { $set: { revokedAt: new Date() } }
+        { $set: { revokedAt: new Date() } },
       );
       clearRefreshCookie(res, "admin");
-      return res
-        .status(401)
-        .json({ success: false, message: "Unauthorized - Refresh session reused" });
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized - Refresh session reused",
+      });
     }
 
     if (session.revokedAt) {
       clearRefreshCookie(res, "admin");
-      return res
-        .status(401)
-        .json({ success: false, message: "Unauthorized - Refresh session revoked" });
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized - Refresh session revoked",
+      });
     }
 
     if (new Date(session.expiresAt).getTime() < Date.now()) {
       await RefreshToken.deleteOne({ _id: session._id });
       clearRefreshCookie(res, "admin");
-      return res
-        .status(401)
-        .json({ success: false, message: "Unauthorized - Refresh session expired" });
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized - Refresh session expired",
+      });
     }
 
     const admin = await User.findById(session.userId);
@@ -679,7 +550,7 @@ exports.adminRefresh = async (req, res) => {
     });
     await RefreshToken.updateOne(
       { _id: session._id },
-      { $set: { replacedBy: child._id, revokedAt: new Date() } }
+      { $set: { replacedBy: child._id, revokedAt: new Date() } },
     );
 
     const token = signAccessToken({ userId: admin._id, role: admin.role });
@@ -709,7 +580,7 @@ exports.adminLogout = async (req, res) => {
     if (presented) {
       await RefreshToken.updateOne(
         { tokenHash: hashToken(presented), kind: "admin", revokedAt: null },
-        { $set: { revokedAt: new Date() } }
+        { $set: { revokedAt: new Date() } },
       );
     }
 
@@ -730,4 +601,270 @@ exports.adminLogout = async (req, res) => {
   }
 };
 
+const fs = require("fs");
+const path = require("path");
 
+exports.registerEmployee = async (req, res) => {
+  try {
+    const {
+      name,
+      email,
+      password,
+      role = "admin",
+      registerKey,
+      contactNumber,
+      countryCode,
+      dateOfJoining,
+      experienceYears,
+    } = req.body;
+
+    const isDev = process.env.NODE_ENV !== "production";
+    const defaultRegisterKey = "admin123";
+    const envKey =
+      process.env.ADMIN_REGISTER_KEY || (isDev ? defaultRegisterKey : "");
+
+    if (envKey) {
+      if (typeof registerKey !== "string" || registerKey.trim() !== envKey) {
+        return res.status(403).json({
+          success: false,
+          message: "Admin registration requires a valid setup key",
+        });
+      }
+    } else if (!isDev) {
+      return res.status(403).json({
+        success: false,
+        message: "Admin registration requires a valid setup key",
+      });
+    }
+
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "All fields are required",
+      });
+    }
+
+    if (typeof password !== "string" || password.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 8 characters",
+      });
+    }
+
+    const allowedRoles = ["admin", "finance", "support", "read-only"];
+    if (!allowedRoles.includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid role. Allowed: ${allowedRoles.join(", ")}`,
+      });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedContact = (contactNumber || "").trim();
+
+    if (!normalizedContact) {
+      return res.status(400).json({
+        success: false,
+        message: "Contact number is required",
+      });
+    }
+
+    if (!dateOfJoining) {
+      return res.status(400).json({
+        success: false,
+        message: "Date of joining is required",
+      });
+    }
+
+    const parsedExperience = Number(experienceYears ?? 0);
+    if (Number.isNaN(parsedExperience) || parsedExperience < 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Experience years must be a valid number",
+      });
+    }
+
+    const userExists = await User.findOne({ email: normalizedEmail });
+    if (userExists) {
+      return res.status(409).json({
+        success: false,
+        message: "Email already registered",
+      });
+    }
+
+    // ========== Profile Photo → ImageKit ==========
+    let profilePhoto = "";
+
+    if (req.files && req.files.profilePhoto) {
+      const file = req.files.profilePhoto;
+
+      // Validate image type
+      const allowedMimes = [
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "image/webp",
+      ];
+      if (!allowedMimes.includes(file.mimetype)) {
+        return res.status(400).json({
+          success: false,
+          message: "Only JPG, PNG or WEBP images are allowed",
+        });
+      }
+
+      // Max 5MB
+      if (file.size > 5 * 1024 * 1024) {
+        return res.status(400).json({
+          success: false,
+          message: "Image size should be less than 5MB",
+        });
+      }
+
+      try {
+        const uploadResponse = await imagekit.upload({
+          file: file.data, // buffer from express-fileupload / multer
+          fileName: `admin_${Date.now()}_${file.name.replace(/\s+/g, "-")}`,
+          folder: "/admin-profiles",
+        });
+
+        profilePhoto = uploadResponse.url; // full ImageKit CDN URL
+      } catch (uploadErr) {
+        console.error("ImageKit upload error:", uploadErr);
+        return res.status(500).json({
+          success: false,
+          message: "Failed to upload profile photo",
+        });
+      }
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    const user = await User.create({
+      name: name.trim(),
+      email: normalizedEmail,
+      password: hashedPassword,
+      role,
+      contactNumber: normalizedContact,
+      countryCode: (countryCode || "").trim(),
+      dateOfJoining: new Date(dateOfJoining),
+      experienceYears: parsedExperience,
+      profilePhoto,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Employee created successfully",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        contactNumber: user.contactNumber,
+        countryCode: user.countryCode,
+        dateOfJoining: user.dateOfJoining,
+        experienceYears: user.experienceYears,
+        profilePhoto: user.profilePhoto,
+      },
+    });
+  } catch (error) {
+    console.error("Register error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Registration failed",
+    });
+  }
+};
+
+exports.loginEmployee = async (req, res) => {
+  try {
+    const { email, password, role } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and password are required",
+      });
+    }
+
+    // Validate role if provided
+    const validRoles = ["admin", "finance", "support", "read-only"];
+    if (role && !validRoles.includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid role provided",
+      });
+    }
+
+    const user = await User.findOne({
+      email: email.toLowerCase().trim(),
+    }).select("+password");
+
+    if (!user || !user.isActive) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid credentials or account disabled",
+      });
+    }
+
+    // If role is specified, validate that user has this role
+    if (role && user.role !== role) {
+      return res.status(403).json({
+        success: false,
+        message: `User does not have ${role} role. Actual role: ${user.role}`,
+      });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid credentials",
+      });
+    }
+
+    const token = signAccessToken({
+      userId: user._id,
+      role: user.role,
+    });
+
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    const refreshTokenValue = signRefreshToken({
+      sub: String(user._id),
+      kind: "admin",
+    });
+
+    await RefreshToken.create({
+      userId: user._id,
+      kind: "admin",
+      tokenHash: hashToken(refreshTokenValue),
+      expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
+    });
+
+    setRefreshCookie(res, refreshTokenValue, "admin");
+
+    return res.status(200).json({
+      success: true,
+      message: "Login successful",
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        profilePhoto: user.profilePhoto || null,
+      },
+    });
+  } catch (error) {
+    console.error("Admin login error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};

@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
-import API from "../../api";
+import API from "../../../api";
 import toast from "react-hot-toast";
 
-export default function Login() {
+export default function AdminLogin() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -16,7 +16,7 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-const res = await API.post("/admin/login", { email, password });
+      const res = await API.post("/admin/admin-login", { email, password });
 
       if (!res.data.success) {
         throw new Error(res.data.message || "Login failed");
@@ -25,6 +25,10 @@ const res = await API.post("/admin/login", { email, password });
       // Save token & admin info
       localStorage.setItem("adminToken", res.data.token);
       localStorage.setItem("adminUser", JSON.stringify(res.data.user));
+      localStorage.setItem("adminRole", "admin");
+
+      // Dispatch auth event
+      window.dispatchEvent(new Event("auth-change"));
 
       toast.success(res.data.message || "Login successful!", {
         style: {
@@ -61,7 +65,7 @@ const res = await API.post("/admin/login", { email, password });
           <h1 className="text-3xl font-bold text-white tracking-tight">
             Admin<span className="text-indigo-400">X</span>
           </h1>
-          <p className="text-gray-400 mt-2">Admin Login</p>
+          <p className="text-gray-400 mt-2">👨‍💼 Admin Login</p>
         </div>
 
         {/* Form Card */}
@@ -79,7 +83,7 @@ const res = await API.post("/admin/login", { email, password });
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  placeholder="admin@gmail.com"
+                  placeholder="admin@example.com"
                   className="w-full pl-10 pr-4 py-3 bg-gray-800 border border-gray-700 text-gray-100 rounded-lg 
                              placeholder:text-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 
                              outline-none transition"
@@ -160,7 +164,7 @@ const res = await API.post("/admin/login", { email, password });
 
           {/* Register Link */}
           <p className="mt-6 text-center text-sm text-gray-400">
-            Don't have an account?{" "}
+            New admin?{" "}
             <Link
               to="/register"
               className="text-indigo-400 hover:text-indigo-300 font-medium transition"
@@ -168,6 +172,19 @@ const res = await API.post("/admin/login", { email, password });
               Register
             </Link>
           </p>
+
+          {/* Employee Login Link */}
+          <div className="mt-4 pt-4 border-t border-gray-800">
+            <p className="text-center text-sm text-gray-400">
+              Employee login?{" "}
+              <Link
+                to="/employee-login"
+                className="text-amber-400 hover:text-amber-300 font-medium transition"
+              >
+                Staff Portal
+              </Link>
+            </p>
+          </div>
         </div>
       </div>
     </div>

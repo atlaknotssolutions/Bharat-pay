@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -17,6 +18,7 @@ import { clearAdminState } from "../../utils/session";
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/category", icon: FolderOpen, label: "Category" },
+  { to: "/create-employee", icon: Package, label: "Add Employee" },
   { to: "/alluser", icon: Users, label: "Users" },
   { to: "/video", icon: Video, label: "Video" },
   { to: "/shorts", icon: Clapperboard, label: "Shorts" },
@@ -24,18 +26,39 @@ const navItems = [
   { to: "/products", icon: Box, label: "Products" },
 ];
 
+const getAdminDisplayName = () => {
+  try {
+    const savedUser = JSON.parse(localStorage.getItem("adminUser") || "null");
+    return savedUser?.name || "Admin";
+  } catch {
+    return "Admin";
+  }
+};
+
+const getInitials = (name) => {
+  if (!name) return "A";
+  const parts = name.trim().split(/\s+/).slice(0, 2);
+  return parts.map((part) => part[0]?.toUpperCase() || "").join("") || "A";
+};
+
 export default function Sidebar() {
   const navigate = useNavigate();
+  const [userName, setUserName] = useState(getAdminDisplayName());
+
+  useEffect(() => {
+    const syncUser = () => setUserName(getAdminDisplayName());
+    syncUser();
+    window.addEventListener("auth-change", syncUser);
+    return () => window.removeEventListener("auth-change", syncUser);
+  }, []);
 
   const handleLogout = async () => {
     try {
-      // Revoke the admin refresh session server-side and clear its cookie.
       await API.post("/admin/logout", {}).catch(() => {});
     } catch (_) {
       // ignore network errors; always clear local state
     }
 
-    // Clear token & user data
     clearAdminState();
 
     toast.success("Logged out successfully!", {
@@ -51,14 +74,12 @@ export default function Sidebar() {
 
   return (
     <aside className="hidden md:flex md:flex-col md:w-64 md:bg-gray-950 md:border-r md:border-gray-800 md:fixed md:inset-y-0 z-30">
-      {/* Logo */}
       <div className="h-16 flex items-center px-6 border-b border-gray-800 shrink-0">
         <h1 className="text-xl font-bold text-white tracking-tight">
-          Admin<span className="text-indigo-400">X</span>
+          Bharat<span className="text-indigo-400">Play</span>
         </h1>
       </div>
 
-      {/* Nav */}
       <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
         {navItems.map((item) => (
           <NavLink
@@ -79,12 +100,22 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* Bottom - Logout */}
       <div className="p-4 border-t border-gray-800 shrink-0">
+        <div className="flex items-center gap-3 mb-3 rounded-lg bg-gray-900/70 border border-gray-800 px-3 py-2">
+          <div className="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold">
+            {getInitials(userName)}
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-white truncate">
+              {userName}
+            </p>
+            <p className="text-[11px] text-gray-400">Admin</p>
+          </div>
+        </div>
+
         <button
           onClick={handleLogout}
-          className="flex items-center w-full px-3 py-2.5 text-sm font-medium text-red-400 
-                     hover:bg-red-500/10 hover:text-red-300 rounded-lg transition-all duration-200"
+          className="flex items-center w-full px-3 py-2.5 text-sm font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-lg transition-all duration-200"
         >
           <LogOut className="w-5 h-5 mr-3" />
           Logout

@@ -18,7 +18,7 @@ import {
   Search,
 } from "lucide-react";
 
-const BASE_URL = "https://bharat-pay-3.onrender.com/api";
+const BASE_URL = "http://localhost:8000/api";
 
 export default function ContentManagement({ type = "long" }) {
   const pageType = type === "short" ? "short" : "long";
@@ -42,7 +42,15 @@ export default function ContentManagement({ type = "long" }) {
 
   useEffect(() => {
     fetchVideos();
-  }, [pageType]);
+    toast.info(`${isShorts ? "Shorts" : "Videos"} Management loaded`, {
+      position: "top-right",
+      autoClose: 2000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+    });
+  }, [pageType, isShorts]);
 
   const fetchVideos = async () => {
     try {
@@ -306,7 +314,7 @@ export default function ContentManagement({ type = "long" }) {
     },
   ];
 
-  // Dark theme styles for DataTable
+  // Dark theme styles — no white on hover
   const customStyles = {
     table: {
       style: {
@@ -315,7 +323,7 @@ export default function ContentManagement({ type = "long" }) {
     },
     headRow: {
       style: {
-        backgroundColor: "#111827",
+        backgroundColor: "rgba(31, 41, 55, 0.5)",
         borderBottom: "1px solid #1f2937",
         fontWeight: "600",
         fontSize: "13px",
@@ -326,36 +334,67 @@ export default function ContentManagement({ type = "long" }) {
     headCells: {
       style: {
         color: "#9ca3af",
+        paddingLeft: "16px",
+        paddingRight: "16px",
       },
     },
     rows: {
       style: {
-        backgroundColor: "#111827",
+        backgroundColor: "transparent",
         minHeight: "72px",
-        color: "#e5e7eb",
+        color: "#d1d5db",
         borderBottom: "1px solid #1f2937",
         "&:hover": {
-          backgroundColor: "#1f2937",
+          backgroundColor: "rgba(55, 65, 81, 0.4)",
+          color: "#e5e7eb",
           cursor: "pointer",
         },
+      },
+      highlightOnHoverStyle: {
+        backgroundColor: "rgba(55, 65, 81, 0.4)",
+        color: "#e5e7eb",
+        borderBottomColor: "#1f2937",
+        outline: "none",
       },
     },
     cells: {
       style: {
-        color: "#e5e7eb",
+        color: "#d1d5db",
+        paddingLeft: "16px",
+        paddingRight: "16px",
       },
     },
     pagination: {
       style: {
-        backgroundColor: "#111827",
+        backgroundColor: "transparent",
         borderTop: "1px solid #1f2937",
         color: "#9ca3af",
+        minHeight: "56px",
+      },
+      pageButtonsStyle: {
+        color: "#9ca3af",
+        fill: "#9ca3af",
+        backgroundColor: "transparent",
+        borderRadius: "8px",
+        "&:hover:not(:disabled)": {
+          backgroundColor: "#374151",
+          color: "#e5e7eb",
+          fill: "#e5e7eb",
+        },
+        "&:disabled": {
+          opacity: 0.4,
+        },
       },
     },
     noData: {
       style: {
-        backgroundColor: "#111827",
-        color: "#9ca3af",
+        backgroundColor: "transparent",
+        color: "#6b7280",
+      },
+    },
+    progress: {
+      style: {
+        backgroundColor: "transparent",
       },
     },
   };
@@ -647,39 +686,42 @@ export default function ContentManagement({ type = "long" }) {
       <ToastContainer position="top-right" autoClose={3000} theme="dark" />
 
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-white">
+        {/* Header with Title and Search */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-8">
+          {/* Title - Centered on left */}
+          <div className="flex-1 text-center md:text-left">
+            <h1 className="text-4xl font-bold text-white">
               {isShorts ? "Shorts Management" : "Video Management"}
             </h1>
-            <p className="text-gray-400 mt-1">
+            <p className="text-gray-400 mt-2">
               {videos.length} {isShorts ? "shorts" : "videos"} total
             </p>
           </div>
-          <button
-            onClick={() => setView("upload")}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-lg shadow transition"
-          >
-            <Plus size={20} />
-            {isShorts ? "Upload Short" : "Upload Video"}
-          </button>
-        </div>
 
-        {/* Search */}
-        <div className="mb-5 relative max-w-md">
-          <Search
-            size={18}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
-          />
-          <input
-            type="text"
-            placeholder="Search by title, user, email, channel..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-gray-900 border border-gray-700 rounded-lg 
-                       text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-          />
+          {/* Search + Upload Button - Right side */}
+          <div className="flex flex-col md:flex-row gap-3 md:items-center w-full md:w-auto">
+            <div className="flex-1 md:flex-none relative w-full md:w-80">
+              <Search
+                size={18}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
+              />
+              <input
+                type="text"
+                placeholder="Search by title, user, email, channel..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 bg-gray-900 border border-gray-700 rounded-lg 
+                           text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+            <button
+              onClick={() => setView("upload")}
+              className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2.5 rounded-lg shadow transition whitespace-nowrap"
+            >
+              <Plus size={20} />
+              {isShorts ? "Upload Short" : "Upload Video"}
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -707,6 +749,9 @@ export default function ContentManagement({ type = "long" }) {
             paginationPerPage={10}
             paginationRowsPerPageOptions={[5, 10, 20, 50]}
             customStyles={customStyles}
+            highlightOnHover
+            pointerOnHover={false}
+            theme="dark"
             noDataComponent={
               <div className="text-center py-16 text-gray-500 bg-gray-900">
                 <p className="text-xl font-medium text-gray-400">

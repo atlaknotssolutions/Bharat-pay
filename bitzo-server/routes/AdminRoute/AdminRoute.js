@@ -3,6 +3,8 @@ const router = express.Router();
 const {
   registerUser,
   loginUser,
+  registerEmployee,
+  loginEmployee,
   getAllUsers,
   updateUser,
   deleteUser,
@@ -17,12 +19,16 @@ const {
   refreshLimiter,
 } = require("../../middlewares/rateLimit");
 const {
-  getDashboard
+  getDashboard,
 } = require("../../controller/AdminController/adminDashboardController");
 
 // Admin Auth Routes
 router.post("/register", adminRegisterLimiter, registerUser);
-router.post("/login", adminLoginLimiter, loginUser);
+router.post("/login", adminLoginLimiter, loginUser); // Keep for backward compatibility
+router.post("/admin-login", adminLoginLimiter, loginUser); // New: Explicit admin login
+router.post("/employee-login", adminLoginLimiter, loginEmployee); // New: Employee/Staff login
+router.post("/employee/register", adminRegisterLimiter, registerEmployee);
+router.post("/employee/login", adminLoginLimiter, loginEmployee);
 router.post("/refresh", refreshLimiter, adminRefresh);
 router.post("/logout", adminLogout);
 

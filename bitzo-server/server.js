@@ -1,9 +1,9 @@
-
-
 require("dotenv").config(); // ✅ MUST BE FIRST LINE
 
 require("./config/validateEnv")();
-const { startTrustScoreJob } = require("./services/vpn.service/trustScore.job.js");
+const {
+  startTrustScoreJob,
+} = require("./services/vpn.service/trustScore.job.js");
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
@@ -14,7 +14,6 @@ const morgan = require("morgan");
 const dns = require("node:dns");
 
 dns.setServers(["8.8.8.8", "1.1.1.1"]);
-
 
 const authRoutes = require("./routes/authRoute.js");
 const adminRoute = require("./routes/AdminRoute/AdminRoute.js");
@@ -31,7 +30,15 @@ const PORT = process.env.PORT || 8000;
 morgan.token("body", (req) => {
   try {
     const body = { ...(req.body || {}) };
-    for (const key of ["password", "newPassword", "oldPassword", "token", "resetToken", "credential", "registerKey"]) {
+    for (const key of [
+      "password",
+      "newPassword",
+      "oldPassword",
+      "token",
+      "resetToken",
+      "credential",
+      "registerKey",
+    ]) {
       if (body[key] !== undefined) body[key] = "[REDACTED]";
     }
     return JSON.stringify(body);
@@ -39,7 +46,9 @@ morgan.token("body", (req) => {
     return "{}";
   }
 });
-app.use(morgan(":method :url :status :res[content-length] - :response-time ms :body"));
+app.use(
+  morgan(":method :url :status :res[content-length] - :response-time ms :body"),
+);
 
 // ---------- MongoDB ----------
 mongoose
@@ -53,6 +62,13 @@ mongoose
 // ---------- Middlewares ----------
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+app.use(
+  fileUpload({
+    limits: { fileSize: 5 * 1024 * 1024 },
+    abortOnLimit: true,
+    useTempFiles: false,
+  }),
+);
 app.use(cookieParser());
 
 app.use(
@@ -60,7 +76,7 @@ app.use(
     origin: true,
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE"],
-  })
+  }),
 );
 
 // ---------- Static ----------
@@ -77,10 +93,11 @@ app.use("/api/notifications", notificationRoutes);
 
 // temporary test route
 app.use("/test-vpn", async (req, res) => {
-  const ip = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
-             req.headers["x-real-ip"] ||
-             req.ip ||
-             "unknown";
+  const ip =
+    req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+    req.headers["x-real-ip"] ||
+    req.ip ||
+    "unknown";
 
   const result = await detectVPN(ip);
   res.json({ ip, ...result });
