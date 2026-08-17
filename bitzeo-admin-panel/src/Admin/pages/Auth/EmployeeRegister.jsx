@@ -248,7 +248,7 @@
 //                 </label>
 //               </div>
 //               <p className="text-xs text-gray-500 mt-2">
-//                 Profile Photo ΓÇó Max 5MB
+//                 Profile Photo • Max 5MB
 //               </p>
 //             </div>
 
@@ -452,7 +452,7 @@
 //                     onCut={preventCopyPaste}
 //                     required
 //                     autoComplete="new-password"
-//                     placeholder="ΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇó"
+//                     placeholder="••••••••"
 //                     className="w-full pl-10 pr-11 py-2.5 bg-gray-800 border border-gray-700 text-white rounded-lg placeholder:text-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
 //                   />
 //                   <button
@@ -481,7 +481,7 @@
 //                     onCut={preventCopyPaste}
 //                     required
 //                     autoComplete="new-password"
-//                     placeholder="ΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇó"
+//                     placeholder="••••••••"
 //                     className="w-full pl-10 py-2.5 bg-gray-800 border border-gray-700 text-white rounded-lg placeholder:text-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
 //                   />
 //                 </div>
@@ -902,7 +902,7 @@ export default function UsersManagement() {
                           <div>
                             <p className="text-white font-medium">{user.name}</p>
                             <p className="text-xs text-gray-500">
-                              {user.totalChannels || 0} channels ΓÇó {user.totalVideos || 0} videos
+                              {user.totalChannels || 0} channels • {user.totalVideos || 0} videos
                             </p>
                           </div>
                         </div>
@@ -931,7 +931,7 @@ export default function UsersManagement() {
                       </td>
                       <td className="px-6 py-4 text-gray-300">{user.trustScore ?? 50}</td>
                       <td className="px-6 py-4 text-gray-400 text-sm">
-                        {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "ΓÇö"}
+                        {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "—"}
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
@@ -960,7 +960,7 @@ export default function UsersManagement() {
           {pagination.pages > 1 && (
             <div className="flex items-center justify-between px-6 py-4 border-t border-gray-800">
               <p className="text-sm text-gray-400">
-                Page {pagination.page} of {pagination.pages} ΓÇó {pagination.total} users
+                Page {pagination.page} of {pagination.pages} • {pagination.total} users
               </p>
               <div className="flex gap-2">
                 <button
@@ -1183,7 +1183,7 @@ export default function UsersManagement() {
                       onCopy={preventCopyPaste}
                       onPaste={preventCopyPaste}
                       required
-                      placeholder="ΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇó"
+                      placeholder="••••••••"
                       className="w-full pl-9 pr-10 py-2.5 bg-gray-800 border border-gray-700 text-white rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                     />
                     <button
@@ -1207,7 +1207,7 @@ export default function UsersManagement() {
                       onCopy={preventCopyPaste}
                       onPaste={preventCopyPaste}
                       required
-                      placeholder="ΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇó"
+                      placeholder="••••••••"
                       className="w-full pl-9 py-2.5 bg-gray-800 border border-gray-700 text-white rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                     />
                   </div>
