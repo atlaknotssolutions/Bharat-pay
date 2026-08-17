@@ -356,7 +356,7 @@ export default function Navbar({ toggleSidebar }) {
           </button>
           <div className="flex items-center gap-3">
             <span className="text-red-600 text-2xl sm:text-3xl font-bold">
-              Vidoo
+              Bharat Play
             </span>
             <div className="hidden sm:flex items-center gap-1.5 bg-[#272727] px-3 py-1 rounded-full border border-yellow-600/30">
               <Star size={18} className="text-yellow-400 fill-yellow-400" />
@@ -551,7 +551,7 @@ export default function Navbar({ toggleSidebar }) {
                     className="w-full px-5 py-3 text-left hover:bg-[#272727] flex items-center gap-4 transition"
                   >
                     <Video size={20} className="text-gray-300" />
-                    <span>Vidoo Studio</span>
+                    <span>Bharat Play Studio</span>
                   </button>
 
                   <div className="relative">

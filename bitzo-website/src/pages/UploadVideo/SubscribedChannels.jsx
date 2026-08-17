@@ -12,6 +12,13 @@ import { API_ORIGIN as BACKEND_URL } from "../../config/api";
 
 const API_BASE = `${BACKEND_URL}/api/uservideo`;
 
+const formatDuration = (seconds) => {
+  if (!seconds || typeof seconds !== "number" || seconds <= 0) return null;
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+};
+
 export default function SubscribedChannels() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -23,29 +30,29 @@ export default function SubscribedChannels() {
   const [subscribeLoading, setSubscribeLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("Home");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [descExpanded, setDescExpanded] = useState(false);
 
   const tabs = ["Home", "Videos", "Playlists"];
 
   useEffect(() => {
     const fetchChannel = async () => {
       if (!id) {
-        console.log("id is missing!", id);
         setLoading(false);
+        setError("Channel not found.");
         return;
       }
 
       try {
         setLoading(true);
+        setError(null);
         const token = localStorage.getItem("token");
-        console.log("Fetching:", `${API_BASE}/channel/${id}`);
 
         const res = await fetch(`${API_BASE}/channel/${id}`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
 
-        console.log("Status:", res.status);
         const data = await res.json();
-        console.log("API Response:", data);
 
         if (data.success && data.channel) {
           setChannel(data.channel);
@@ -53,12 +60,13 @@ export default function SubscribedChannels() {
           setIsSubscribed(Boolean(data.channel.isSubscribed));
           setVideos(data.videos || []);
         } else {
-          console.warn("Unexpected response structure:", data);
+          setError(data.message || "Channel not found.");
           setChannel(null);
           setVideos([]);
         }
       } catch (err) {
         console.error("Fetch error:", err);
+        setError("Failed to load channel. Please try again.");
         setChannel(null);
         setVideos([]);
       } finally {
@@ -116,18 +124,51 @@ export default function SubscribedChannels() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <div className="min-h-screen bg-[#0f0f0f] flex items-center justify-center">
         <p className="text-gray-400">Loading...</p>
       </div>
     );
   }
 
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[#0f0f0f] flex flex-col items-center justify-center gap-3">
+        <p className="text-gray-300 text-lg">{error}</p>
+        <button
+          onClick={() => navigate(-1)}
+          className="text-red-400 text-sm font-medium hover:underline"
+        >
+          Go back
+        </button>
+      </div>
+    );
+  }
+
+  const channelDescription = channel?.description || "";
+  const showDescription = channelDescription.length > 0;
+  const isDescriptionLong = channelDescription.length > 120;
+  const displayDescription =
+    showDescription && isDescriptionLong && !descExpanded
+      ? channelDescription.slice(0, 120) + "..."
+      : channelDescription;
+
+  const channelLinks = [];
+  if (channel?.videoUrl) {
+    channelLinks.push({ url: channel.videoUrl, label: channel.videoUrl });
+  }
+  if (channel?.contactemail) {
+    channelLinks.push({
+      url: `mailto:${channel.contactemail}`,
+      label: channel.contactemail,
+    });
+  }
+
   return (
-    <div className="min-h-screen bg-[#030712] text-gray-100">
+    <div className="min-h-screen bg-[#0f0f0f] text-gray-100">
       {/* ========== CHANNEL HEADER ========== */}
       <div className="max-w-[1280px] mx-auto px-6 pt-6">
-        <div className="flex gap-6 items-start rounded-2xl border border-white/10 bg-[#0f172a]/80 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.03)]">
-          <div className="w-[120px] h-[120px] rounded-full overflow-hidden bg-[#030712]/95 flex-shrink-0 border border-gray-700">
+        <div className="flex gap-6 items-start rounded-2xl border border-gray-800 bg-[#1a1a1a] p-5">
+          <div className="w-[120px] h-[120px] rounded-full overflow-hidden bg-[#0f0f0f] flex-shrink-0 border border-gray-700">
             <img
               src={
                 channel?.channelImage
@@ -144,43 +185,50 @@ export default function SubscribedChannels() {
           <div className="flex-1 pt-1">
             <div className="flex items-center gap-2">
               <h1 className="text-[28px] font-bold leading-tight text-white">
-                {channel?.name || "Channel Name"}
+                {channel?.name}
               </h1>
-              <svg
-                className="w-5 h-5 text-gray-400"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-              >
-                <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm-1.9 14.7L6 12.6l1.5-1.5 2.6 2.6 6.4-6.4 1.5 1.5-7.9 7.9z" />
-              </svg>
             </div>
 
             <div className="flex items-center gap-1.5 mt-1 text-[14px] text-gray-400">
-              <span>@{channel?.handle || "channel"}</span>
-              <span>ΓÇó</span>
+              <span>@{channel?.handle}</span>
+              <span>•</span>
               <span>{formatCount(subscribersCount)} subscribers</span>
-              <span>ΓÇó</span>
+              <span>•</span>
               <span>
                 {formatCount(channel?.videoCount || videos.length)} videos
               </span>
             </div>
 
-            <p className="mt-2 text-[14px] text-gray-300 max-w-[600px] leading-snug">
-              {channel?.description ||
-                channel?.channeldescription ||
-                "No description available"}
-              <button className="text-indigo-400 font-medium ml-1 hover:underline">
-                ...more
-              </button>
-            </p>
+            {showDescription && (
+              <p className="mt-2 text-[14px] text-gray-300 max-w-[600px] leading-snug">
+                {displayDescription}
+                {isDescriptionLong && (
+                  <button
+                    onClick={() => setDescExpanded((prev) => !prev)}
+                    className="text-red-400 font-medium ml-1 hover:underline"
+                  >
+                    {descExpanded ? "show less" : "...more"}
+                  </button>
+                )}
+              </p>
+            )}
 
-            <div className="mt-1.5 flex items-center gap-1 text-[14px]">
-              <LinkIcon size={16} className="text-indigo-400" />
-              <span className="text-indigo-400 font-medium cursor-pointer hover:underline">
-                YouTube
-              </span>
-              <span className="text-gray-500">and 3 more links</span>
-            </div>
+            {channelLinks.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap items-center gap-3 text-[14px]">
+                {channelLinks.map((link) => (
+                  <a
+                    key={link.url}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-red-400 font-medium cursor-pointer hover:underline"
+                  >
+                    <LinkIcon size={14} />
+                    <span>{link.label}</span>
+                  </a>
+                ))}
+              </div>
+            )}
 
             <div className="mt-4">
               <button
@@ -188,8 +236,8 @@ export default function SubscribedChannels() {
                 disabled={subscribeLoading}
                 className={`inline-flex items-center gap-2 h-9 px-4 rounded-full text-[14px] font-medium transition ${
                   isSubscribed
-                    ? "bg-white/10 hover:bg-white/15 text-gray-200 border border-white/10"
-                    : "bg-indigo-600 hover:bg-indigo-500 text-white"
+                    ? "bg-[#272727] hover:bg-[#3a3a3a] text-gray-200 border border-gray-700"
+                    : "bg-red-600 hover:bg-red-700 text-white"
                 } ${subscribeLoading ? "opacity-70" : ""}`}
               >
                 {isSubscribed ? (
@@ -214,7 +262,7 @@ export default function SubscribedChannels() {
       </div>
 
       {/* ========== TABS ========== */}
-      <div className="border-b border-white/10 mt-5 sticky top-0 bg-[#030712]/95 backdrop-blur z-20">
+      <div className="border-b border-gray-800 mt-5 sticky top-0 bg-[#0f0f0f]/95 backdrop-blur z-20">
         <div className="max-w-[1280px] mx-auto px-6">
           <div className="flex items-center">
             <div className="flex overflow-x-auto scrollbar-hide">
@@ -230,12 +278,12 @@ export default function SubscribedChannels() {
                 >
                   {tab}
                   {activeTab === tab && (
-                    <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-white rounded-t-full" />
+                    <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-red-600 rounded-t-full" />
                   )}
                 </button>
               ))}
             </div>
-            <button className="ml-auto p-2 text-gray-400 hover:bg-[#030712]/95 hover:text-white rounded-full transition">
+            <button className="ml-auto p-2 text-gray-400 hover:bg-[#272727] hover:text-white rounded-full transition">
               <Search size={20} />
             </button>
           </div>
@@ -246,105 +294,117 @@ export default function SubscribedChannels() {
       <div className="max-w-[1280px] mx-auto px-6 py-6">
         <div className="space-y-4">
           {videos.length === 0 ? (
-            <div className="rounded-2xl border border-white/10 bg-[#0f172a]/70 px-6 py-10 text-center">
+            <div className="rounded-2xl border border-gray-800 bg-[#1a1a1a] px-6 py-10 text-center">
               <p className="text-gray-400">No videos found for this channel.</p>
             </div>
           ) : (
-            videos.map((video) => (
-              <div
-                key={video._id}
-                onClick={() => navigate(`/video/${video._id}`)}
-                className="flex gap-4 cursor-pointer group rounded-2xl border border-white/10 bg-[#111827]/80 p-3 transition hover:bg-[#1f2937]/80"
-              >
-                <div className="relative w-[246px] h-[138px] flex-shrink-0 rounded-xl overflow-hidden bg-[#030712]/95">
-                  <img
-                    src={
-                      video.thumbnail
-                        ? video.thumbnail.startsWith("http")
-                          ? video.thumbnail
-                          : `${BACKEND_URL}/${video.thumbnail}`
-                        : "https://via.placeholder.com/246x138"
-                    }
-                    alt={video.title}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute bottom-1 right-1 bg-black/80 text-white text-[12px] font-medium px-1 rounded">
-                    {video.duration || "4:10"}
-                  </div>
-                </div>
-
-                <div className="flex-1 min-w-0 pt-1">
-                  <h3 className="text-[16px] font-medium leading-snug line-clamp-2 text-gray-100 group-hover:text-white">
-                    {video.title}
-                  </h3>
-
-                  <div className="flex items-center gap-1 mt-1.5 text-[13px] text-gray-400">
-                    <span className="font-medium text-gray-200">
-                      {channel?.name}
-                    </span>
-                    <span>ΓÇó</span>
-                    <span>{formatCount(video.views)} views</span>
-                    <span>ΓÇó</span>
-                    <span>
-                      {video.createdAt
-                        ? new Date(video.createdAt).toLocaleDateString()
-                        : "Recently"}
-                    </span>
-                  </div>
-
-                  <p className="mt-1.5 text-[13px] text-gray-500 line-clamp-2 max-w-[600px]">
-                    {video.description || ""}
-                  </p>
-                </div>
-
-                <button
-                  onClick={(e) => e.stopPropagation()}
-                  className="self-start p-1.5 text-gray-400 opacity-0 group-hover:opacity-100 hover:bg-white/10 rounded-full transition"
-                >
-                  <MoreVertical size={20} />
-                </button>
-              </div>
-            ))
-          )}
-        </div>
-
-        {videos.length > 0 && (
-          <div className="mt-10 pt-6 border-t border-white/10">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-[16px] font-medium text-gray-200">
-                {channel?.name} - Playlist
-              </h2>
-              <button className="flex items-center gap-1.5 text-[14px] font-medium px-3 py-1.5 rounded-full text-gray-300 hover:bg-[#030712]/95 transition">
-                <Play size={16} fill="currentColor" />
-                Play all
-              </button>
-            </div>
-
-            <div className="flex gap-3 overflow-x-auto pb-2">
-              {videos.slice(0, 4).map((video) => (
+            videos.map((video) => {
+              const durationText = formatDuration(video.duration);
+              return (
                 <div
-                  key={video._id + "-pl"}
-                  className="w-[210px] flex-shrink-0 cursor-pointer"
+                  key={video._id}
                   onClick={() => navigate(`/video/${video._id}`)}
+                  className="flex gap-4 cursor-pointer group rounded-2xl border border-gray-800 bg-[#1a1a1a] p-3 transition hover:bg-[#272727]"
                 >
-                  <div className="relative rounded-xl overflow-hidden aspect-video bg-[#030712]/95">
+                  <div className="relative w-[246px] h-[138px] flex-shrink-0 rounded-xl overflow-hidden bg-black">
                     <img
                       src={
                         video.thumbnail
                           ? video.thumbnail.startsWith("http")
                             ? video.thumbnail
                             : `${BACKEND_URL}/${video.thumbnail}`
-                          : "https://via.placeholder.com/210x118"
+                          : "https://via.placeholder.com/246x138"
                       }
                       alt={video.title}
                       className="w-full h-full object-cover"
                     />
-                    <div className="absolute bottom-1 right-1 bg-black/80 text-white text-[12px] px-1 rounded">
-                      {video.duration || "4:10"}
+                    {durationText && (
+                      <div className="absolute bottom-1 right-1 bg-black/80 text-white text-[12px] font-medium px-1 rounded">
+                        {durationText}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-w-0 pt-1">
+                    <h3 className="text-[16px] font-medium leading-snug line-clamp-2 text-gray-100 group-hover:text-white">
+                      {video.title}
+                    </h3>
+
+                    <div className="flex items-center gap-1 mt-1.5 text-[13px] text-gray-400">
+                      <span className="font-medium text-gray-200">
+                        {channel?.name}
+                      </span>
+                      <span>•</span>
+                      <span>{formatCount(video.views)} views</span>
+                      <span>•</span>
+                      <span>
+                        {video.createdAt
+                          ? new Date(video.createdAt).toLocaleDateString()
+                          : ""}
+                      </span>
+                    </div>
+
+                    {video.description && (
+                      <p className="mt-1.5 text-[13px] text-gray-500 line-clamp-2 max-w-[600px]">
+                        {video.description}
+                      </p>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={(e) => e.stopPropagation()}
+                    className="self-start p-1.5 text-gray-400 opacity-0 group-hover:opacity-100 hover:bg-[#272727] rounded-full transition"
+                  >
+                    <MoreVertical size={20} />
+                  </button>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {videos.length > 0 && (
+          <div className="mt-10 pt-6 border-t border-gray-800">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-[16px] font-medium text-gray-200">
+                {channel?.name} - Playlist
+              </h2>
+              <button className="flex items-center gap-1.5 text-[14px] font-medium px-3 py-1.5 rounded-full text-gray-300 hover:bg-[#272727] transition">
+                <Play size={16} fill="currentColor" />
+                Play all
+              </button>
+            </div>
+
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {videos.slice(0, 4).map((video) => {
+                const durationText = formatDuration(video.duration);
+                return (
+                  <div
+                    key={video._id + "-pl"}
+                    className="w-[210px] flex-shrink-0 cursor-pointer"
+                    onClick={() => navigate(`/video/${video._id}`)}
+                  >
+                    <div className="relative rounded-xl overflow-hidden aspect-video bg-black">
+                      <img
+                        src={
+                          video.thumbnail
+                            ? video.thumbnail.startsWith("http")
+                              ? video.thumbnail
+                              : `${BACKEND_URL}/${video.thumbnail}`
+                            : "https://via.placeholder.com/210x118"
+                        }
+                        alt={video.title}
+                        className="w-full h-full object-cover"
+                      />
+                      {durationText && (
+                        <div className="absolute bottom-1 right-1 bg-black/80 text-white text-[12px] px-1 rounded">
+                          {durationText}
+                        </div>
+                      )}
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
