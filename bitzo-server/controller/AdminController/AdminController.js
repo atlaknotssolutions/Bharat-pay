@@ -585,24 +585,37 @@ exports.getUserOverview = async (req, res) => {
       createdAt: ch.createdAt,
     }));
 
-    // Fetch all videos by this user (across all their channels)
-    const allVideos = await Video.find({ _id: { $in: user.videos || [] } })
-      .select("title thumbnail views likesCount comments channel createdAt videoType")
-      .sort({ createdAt: -1 })
-      .lean();
+    // Fetch video metrics via aggregation + only 8 recent videos (no full fetch)
+    const videoIds = user.videos || [];
+    const [aggResult, recentVideos] = await Promise.all([
+      videoIds.length
+        ? Video.aggregate([
+            { $match: { _id: { $in: videoIds } } },
+            { $group: {
+                _id: null,
+                videoCount: { $sum: 1 },
+                shortCount: {
+                  $sum: {
+                    $cond: [{ $setIsSubset: [["short"], { $ifNull: ["$videoType", []] }] }, 1, 0],
+                  },
+                },
+                totalViews: { $sum: { $ifNull: ["$views", 0] } },
+                totalLikes: { $sum: { $ifNull: ["$likesCount", 0] } },
+                totalComments: { $sum: { $size: { $ifNull: ["$comments", []] } } },
+            }},
+          ]).then((r) => r[0] || { videoCount: 0, shortCount: 0, totalViews: 0, totalLikes: 0, totalComments: 0 })
+        : Promise.resolve({ videoCount: 0, shortCount: 0, totalViews: 0, totalLikes: 0, totalComments: 0 }),
+      videoIds.length
+        ? Video.find({ _id: { $in: videoIds } })
+            .select("title thumbnail views likesCount comments channel createdAt videoType")
+            .sort({ createdAt: -1 })
+            .limit(8)
+            .lean()
+        : Promise.resolve([]),
+    ]);
 
-    // Compute content metrics
-    const videoCount = allVideos.length;
-    const shortCount = allVideos.filter((v) => {
-      const t = v.videoType;
-      return Array.isArray(t) ? t.includes("short") : t === "short";
-    }).length;
-    const totalViews = allVideos.reduce((sum, v) => sum + (v.views || 0), 0);
-    const totalLikes = allVideos.reduce((sum, v) => sum + (v.likesCount || 0), 0);
-    const totalComments = allVideos.reduce((sum, v) => sum + (v.comments || []).length, 0);
-
-    // Recent videos (latest 8)
-    const recentVideos = allVideos.slice(0, 8).map((v) => ({
+    const { videoCount, shortCount, totalViews, totalLikes, totalComments } = aggResult;
+    const recentVideosMapped = recentVideos.map((v) => ({
       _id: v._id,
       title: v.title,
       thumbnail: v.thumbnail || null,
@@ -657,7 +670,7 @@ exports.getUserOverview = async (req, res) => {
         },
         engagement,
         channels: channelSummaries,
-        recentVideos,
+        recentVideos: recentVideosMapped,
       },
     });
   } catch (err) {
@@ -713,7 +726,7 @@ exports.getAdminUserChannels = async (req, res) => {
           _id: "$channel",
           totalVideos: { $sum: 1 },
           totalShorts: {
-            $sum: { $cond: [{ $in: ["short", "$videoType"] }, 1, 0] },
+            $sum: { $cond: [{ $setIsSubset: [["short"], { $cond: [{ $eq: [{ $type: "$videoType" }, "string"] }, ["$videoType"], { $ifNull: ["$videoType", []] }] }] }, 1, 0] },
           },
           totalViews: { $sum: { $ifNull: ["$views", 0] } },
           totalLikes: { $sum: { $ifNull: ["$likesCount", 0] } },
@@ -799,7 +812,7 @@ exports.getAdminUserVideos = async (req, res) => {
     const skip = (page - 1) * limit;
 
     const userVideoIds = (user.videos || []).filter(Boolean);
-    const filter = { _id: { $in: userVideoIds }, videoType: { $ne: "short" } };
+    const filter = { _id: { $in: userVideoIds }, videoType: { $nin: ["short", ["short"]] } };
 
     // Channel ownership validation
     if (req.query.channelId) {
@@ -907,7 +920,7 @@ exports.getAdminUserShorts = async (req, res) => {
     const skip = (page - 1) * limit;
 
     const userVideoIds = (user.videos || []).filter(Boolean);
-    const filter = { _id: { $in: userVideoIds }, videoType: "short" };
+    const filter = { _id: { $in: userVideoIds }, videoType: { $in: ["short", ["short"]] } };
 
     // Channel ownership validation
     if (req.query.channelId) {

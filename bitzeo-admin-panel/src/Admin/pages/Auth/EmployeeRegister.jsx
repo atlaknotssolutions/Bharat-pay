@@ -936,7 +936,7 @@ export default function UsersManagement() {
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <button
-                            onClick={() => navigate(`/admin/users/${user._id}`)}
+                            onClick={() => navigate(`/users/${user._id}`)}
                             className="p-2 text-gray-400 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition"
                           >
                             <Eye size={16} />

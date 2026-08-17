@@ -7,23 +7,6 @@ import {
   disableAdminShort, enableAdminShort, deleteAdminShort,
 } from "../../api";
 
-export const fetchAdminUser = createAsyncThunk(
-  "adminUser360/fetchAdminUser",
-  async ({ userId, force }, { getState, rejectWithValue }) => {
-    if (!force) {
-      const e = getState().adminUser360.users[userId];
-      if (e?._loaded) return { userId, skip: true };
-    }
-    try {
-      const res = await API.get(`/admin/users/${userId}`);
-      return { userId, data: res.data };
-    } catch (err) {
-      return rejectWithValue({ userId, error: err.response?.data || { message: err.message } });
-    }
-  },
-  { condition: ({ userId }, { getState }) => !getState().adminUser360.users[userId]?._loading }
-);
-
 export const fetchAdminUserOverview = createAsyncThunk(
   "adminUser360/fetchAdminUserOverview",
   async ({ userId, force }, { getState, rejectWithValue }) => {
@@ -449,7 +432,6 @@ function sectionRejected(state, key, userId, error) {
 const adminUser360Slice = createSlice({
   name: "adminUser360",
   initialState: {
-    users: {},
     overview: {},
     channels: {},
     videos: {},
@@ -504,10 +486,6 @@ const adminUser360Slice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchAdminUser.pending, (s, a) => { sectionPending(s, "users", a.meta.arg.userId); })
-      .addCase(fetchAdminUser.fulfilled, (s, a) => { if (!a.payload.skip) sectionFulfilled(s, "users", a.payload.userId, a.payload.data); })
-      .addCase(fetchAdminUser.rejected, (s, a) => { sectionRejected(s, "users", a.meta.arg.userId, a.payload?.error || { message: a.error?.message }); })
-
       .addCase(fetchAdminUserOverview.pending, (s, a) => { sectionPending(s, "overview", a.meta.arg.userId); })
       .addCase(fetchAdminUserOverview.fulfilled, (s, a) => { if (!a.payload.skip) sectionFulfilled(s, "overview", a.payload.userId, a.payload.data); })
       .addCase(fetchAdminUserOverview.rejected, (s, a) => { sectionRejected(s, "overview", a.meta.arg.userId, a.payload?.error || { message: a.error?.message }); })

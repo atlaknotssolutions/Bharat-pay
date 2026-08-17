@@ -92,7 +92,7 @@ export default function User360() {
 
   const [selectedChannelId, setSelectedChannelId] = useState(null);
 
-  const [channelContentTab, setChannelContentTab] = useState(null);
+  const [channelContentTab, setChannelContentTab] = useState("videos");
 
   const [activityFilter, setActivityFilter] = useState("");
   const [fraudFilter, setFraudFilter] = useState("");
@@ -1061,26 +1061,26 @@ function ContentGrid(props) {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="flex flex-col gap-2">
             {items.map((v) => (
-              <div key={v._id} className="bg-gray-800/50 border border-gray-700/50 rounded-xl overflow-hidden hover:border-gray-600 transition">
-                <div className="w-full aspect-video bg-gray-800 overflow-hidden">
+              <div key={v._id} className="flex items-center gap-3 p-2 bg-gray-800/50 border border-gray-700/50 rounded-lg hover:border-gray-600 transition">
+                <div className="w-28 h-16 rounded-lg bg-gray-800 overflow-hidden flex-shrink-0">
                   {v.thumbnail ? (
                     <img src={v.thumbnail} alt={v.title} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                      <Video size={24} className="text-gray-700" />
+                      <Video size={18} className="text-gray-700" />
                     </div>
                   )}
                 </div>
-                <div className="p-3">
-                  <p className="font-medium text-sm text-gray-200 line-clamp-2 mb-2">{v.title}</p>
-                  <div className="flex items-center gap-3 text-xs text-gray-500">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm text-gray-200 truncate">{v.title}</p>
+                  <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
                     <span className="flex items-center gap-1"><Eye size={12} />{(v.views || 0).toLocaleString()}</span>
                     <span className="flex items-center gap-1"><ThumbsUp size={12} />{(v.likesCount || 0).toLocaleString()}</span>
                     <span className="flex items-center gap-1"><MessageSquare size={12} />{v.commentCount || v.comments?.length || 0}</span>
+                    <span className="text-gray-600">{formatDate(v.createdAt)}</span>
                   </div>
-                  <p className="text-xs text-gray-600 mt-1.5">{formatDate(v.createdAt)}</p>
                 </div>
               </div>
             ))}

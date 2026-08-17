@@ -306,7 +306,7 @@ export default function EditUser() {
 
   // ==================== CHANNEL MANAGEMENT ====================
   const [selectedChannelId, setSelectedChannelId] = useState(null);
-  const [channelContentTab, setChannelContentTab] = useState(null);
+  const [channelContentTab, setChannelContentTab] = useState("videos");
   const [contentDialog, setContentDialog] = useState({ open: false, action: null, targetType: null, targetId: null, targetName: "", dialogKey: 0 });
 
   const [channelPage, setChannelPage] = useState(1);
@@ -498,7 +498,7 @@ export default function EditUser() {
   const handleDelete = async () => {
     try {
       setDeleting(true);
-      await deleteAdminUser(userId);
+      await deleteAdminUser(userId, deleteConfirmText || "Admin deleted user");
       toast.success("User deleted successfully");
       navigate("/alluser");
     } catch (err) {

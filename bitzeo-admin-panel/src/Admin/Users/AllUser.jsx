@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import DataTable from "react-data-table-component";
 import { ToastContainer, toast } from "react-toastify";
@@ -138,6 +139,7 @@ const customStyles = {
 };
 
 export default function Users() {
+  const navigate = useNavigate();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -386,7 +388,7 @@ export default function Users() {
         cell: (row) => (
           <div className="flex items-center justify-center gap-2">
             <button
-              onClick={() => openDetail(row._id)}
+              onClick={() => navigate(`/users/${row._id}`)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium 
                          text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 
                          border border-emerald-500/20 rounded-lg transition"
@@ -397,7 +399,7 @@ export default function Users() {
             </button>
 
             <button
-              onClick={() => openEdit(row)}
+              onClick={() => navigate(`/users/${row._id}/edit`)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium 
                          text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 
                          border border-indigo-500/20 rounded-lg transition"
