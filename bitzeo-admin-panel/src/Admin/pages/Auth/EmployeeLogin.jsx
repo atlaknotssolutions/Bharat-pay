@@ -1,13 +1,20 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Mail, Lock, Eye, EyeOff } from "lucide-react";
-import API from "../../api";
+import { Mail, Lock, Eye, EyeOff, Shield } from "lucide-react";
+import API from "../../../api";
 import toast from "react-hot-toast";
 
-export default function AdminLogin() {
+const ROLES = [
+  { value: "finance", label: "💰 Finance Admin", icon: "Finance" },
+  { value: "support", label: "🎧 Support Admin", icon: "Support" },
+  { value: "read-only", label: "👁️ Read-Only Admin", icon: "View" },
+];
+
+export default function EmployeeLogin() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState("finance");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -16,16 +23,20 @@ export default function AdminLogin() {
     setIsLoading(true);
 
     try {
-      const res = await API.post("/admin/admin-login", { email, password });
+      const res = await API.post("/admin/employee-login", {
+        email,
+        password,
+        role,
+      });
 
       if (!res.data.success) {
         throw new Error(res.data.message || "Login failed");
       }
 
-      // Save token & admin info
+      // Save token & employee info
       localStorage.setItem("adminToken", res.data.token);
       localStorage.setItem("adminUser", JSON.stringify(res.data.user));
-      localStorage.setItem("adminRole", "admin");
+      localStorage.setItem("adminRole", role);
 
       // Dispatch auth event
       window.dispatchEvent(new Event("auth-change"));
@@ -38,7 +49,16 @@ export default function AdminLogin() {
         },
       });
 
-      navigate("/", { replace: true });
+      // Route based on role
+      if (role === "finance") {
+        navigate("/finance-dashboard", { replace: true });
+      } else if (role === "support") {
+        navigate("/support-dashboard", { replace: true });
+      } else if (role === "read-only") {
+        navigate("/read-only-dashboard", { replace: true });
+      } else {
+        navigate("/", { replace: true });
+      }
     } catch (err) {
       const message =
         err.response?.data?.message ||
@@ -63,14 +83,38 @@ export default function AdminLogin() {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-white tracking-tight">
-            Admin<span className="text-indigo-400">X</span>
+            Staff<span className="text-amber-400">Portal</span>
           </h1>
-          <p className="text-gray-400 mt-2">👨‍💼 Admin Login</p>
+          <p className="text-gray-400 mt-2">Employee & Staff Login</p>
         </div>
 
         {/* Form Card */}
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 shadow-xl">
           <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Role Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1.5 flex items-center gap-2">
+                <Shield size={16} className="text-amber-400" />
+                Select Role
+              </label>
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 text-gray-100 rounded-lg 
+                           focus:ring-2 focus:ring-amber-500 focus:border-amber-500 
+                           outline-none transition cursor-pointer"
+              >
+                {ROLES.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Select your employee role to access your dashboard
+              </p>
+            </div>
+
             {/* Email */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1.5">
@@ -83,9 +127,9 @@ export default function AdminLogin() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  placeholder="admin@example.com"
+                  placeholder="employee@example.com"
                   className="w-full pl-10 pr-4 py-3 bg-gray-800 border border-gray-700 text-gray-100 rounded-lg 
-                             placeholder:text-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 
+                             placeholder:text-gray-500 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 
                              outline-none transition"
                 />
               </div>
@@ -105,7 +149,7 @@ export default function AdminLogin() {
                   required
                   placeholder="••••••••"
                   className="w-full pl-10 pr-12 py-3 bg-gray-800 border border-gray-700 text-gray-100 rounded-lg 
-                             placeholder:text-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 
+                             placeholder:text-gray-500 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 
                              outline-none transition"
                 />
                 <button
@@ -122,7 +166,7 @@ export default function AdminLogin() {
             <div className="flex justify-end">
               <Link
                 to="/forgot-password"
-                className="text-sm text-indigo-400 hover:text-indigo-300 transition"
+                className="text-sm text-amber-400 hover:text-amber-300 transition"
               >
                 Forgot Password?
               </Link>
@@ -132,7 +176,7 @@ export default function AdminLogin() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-800 
+              className="w-full py-3 px-4 bg-amber-600 hover:bg-amber-500 disabled:bg-amber-800 
                          disabled:cursor-not-allowed text-white font-medium rounded-lg 
                          transition duration-200 flex items-center justify-center"
             >
@@ -164,24 +208,24 @@ export default function AdminLogin() {
 
           {/* Register Link */}
           <p className="mt-6 text-center text-sm text-gray-400">
-            New admin?{" "}
+            New employee?{" "}
             <Link
-              to="/register"
-              className="text-indigo-400 hover:text-indigo-300 font-medium transition"
+              to="/employee-register"
+              className="text-amber-400 hover:text-amber-300 font-medium transition"
             >
-              Register
+              Register Here
             </Link>
           </p>
 
-          {/* Employee Login Link */}
+          {/* Admin Login Link */}
           <div className="mt-4 pt-4 border-t border-gray-800">
             <p className="text-center text-sm text-gray-400">
-              Employee login?{" "}
+              Admin login?{" "}
               <Link
-                to="/employee-login"
-                className="text-amber-400 hover:text-amber-300 font-medium transition"
+                to="/admin-login"
+                className="text-indigo-400 hover:text-indigo-300 font-medium transition"
               >
-                Staff Portal
+                Admin Panel
               </Link>
             </p>
           </div>

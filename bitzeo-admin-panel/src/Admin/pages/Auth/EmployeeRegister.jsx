@@ -14,7 +14,7 @@ import {
   Briefcase,
   ChevronDown,
 } from "lucide-react";
-import API from "../../api";
+import API from "../../../api";
 import toast from "react-hot-toast";
 
 // Country list with dial codes
@@ -209,7 +209,9 @@ export default function EmployeeRegister() {
       <div className="w-full max-w-2xl bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="bg-indigo-600 text-white text-center py-7">
-          <h1 className="text-3xl font-bold tracking-tight">Employee Registration</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Employee Registration
+          </h1>
           <p className="text-indigo-200 mt-1 text-sm">
             Create Employee / Admin Account
           </p>

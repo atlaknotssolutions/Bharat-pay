@@ -1,5 +1,5 @@
 import { Eye, Users, Video, TrendingUp, Clock } from "lucide-react";
-import useDashboardData from "../../hooks/useDashboardData";
+import useDashboardData from "../../../hooks/useDashboardData";
 
 const StatCard = ({ title, value, icon: Icon, color, bg }) => (
   <div className="bg-gray-900 p-5 rounded-2xl border border-gray-800">

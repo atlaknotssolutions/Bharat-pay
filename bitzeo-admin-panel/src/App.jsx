@@ -9,22 +9,21 @@ import {
 import { Toaster } from "react-hot-toast";
 
 import Layout from "./components/layout/Layout";
-import AdminLogin from "./Admin/pages/AdminLogin";
-import EmployeeLogin from "./Admin/pages/EmployeeLogin";
-import Register from "./Admin/pages/Register";
-import ForgotPassword from "./Admin/pages/ForgotPassword";
+import AdminLogin from "./Admin/pages/Auth/AdminLogin";
+import EmployeeLogin from "./Admin/pages/Auth/EmployeeLogin";
+import ForgotPassword from "./Admin/pages/Auth/ForgotPassword";
 import Dashboard from "./Admin/pages/Dashboard";
 import FinanceDashboard from "./FinanceAdmin/Pages/FinanceDashboard";
-import SupportDashboard from "./Admin/pages/SupportDashboard";
-import ReadOnlyDashboard from "./Admin/pages/ReadOnlyDashboard";
+import SupportDashboard from "./Admin/pages/Support/SupportDashboard";
+import ReadOnlyDashboard from "./Admin/pages/ReadOnlyDashbaord/ReadOnlyDashboard";
 import Orders from "./Admin/pages/Orders";
 import Products from "./Admin/pages/Products";
 import NotFound from "./Admin/pages/NotFound";
-import VideoUpload from "./Admin/pages/VideoUpload";
-import Shorts from "./Admin/pages/Shorts";
+import VideoUpload from "./Admin/pages/LongVideo/VideoUpload";
+import Shorts from "./Admin/pages/ShortsVideo/Shorts";
 import CategoryManagement from "./Admin/CategoryManagement/Category";
 import AllUsers from "./Admin/Users/AllUser";
-import EmployeeRegister from "./Admin/pages/EmployeeRegister";
+import EmployeeRegister from "./Admin/pages/Auth/EmployeeRegister";
 
 // ====================== AUTH CHECK ======================
 const isAuthenticated = () => {
@@ -74,11 +73,10 @@ function App() {
         <Route element={<PublicOnlyRoute />}>
           <Route path="/login" element={<AdminLogin />} />
           <Route path="/admin-login" element={<AdminLogin />} />
-          <Route path="/register" element={<Register />} />
+          <Route path="/register" element={<EmployeeRegister />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/employee-login" element={<EmployeeLogin />} />
           <Route path="/Employeelogin" element={<EmployeeLogin />} />
-        
         </Route>
 
         {/* ================= PROTECTED ADMIN ROUTES ================= */}
@@ -103,7 +101,7 @@ function App() {
             <Route path="products" element={<Products />} />
             <Route path="category" element={<CategoryManagement />} />
             <Route path="alluser" element={<AllUsers />} />
-              <Route path="/create-employee" element={<EmployeeRegister />} />
+            <Route path="/create-employee" element={<EmployeeRegister />} />
           </Route>
         </Route>
         {/* ================= 404 NOT FOUND ================= */}
