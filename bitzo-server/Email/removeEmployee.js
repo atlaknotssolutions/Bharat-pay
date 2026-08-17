@@ -1,4 +1,4 @@
-export default function getRemoveEmployeeMailOptions(
+module.exports = function getRemoveEmployeeMailOptions(
   email,
   name,
   position,
@@ -41,4 +41,4 @@ export default function getRemoveEmployeeMailOptions(
       </body>
       </html>`,
   };
-}
+};

@@ -1166,10 +1166,9 @@ exports.forgotPassword = async (req, res) => {
         },
       );
 
-      // NOTE: no email provider is configured in this project. In production,
-      // send a reset link containing the RAW resetToken to the user's email
-      // here. The raw token is never logged and only its hash is persisted.
-      // console.log(resetToken)  // ❌ NEVER DO THIS
+      await sendMailSafely(
+        getPasswordResetMailOptions(user.email, user.name, resetToken),
+      );
     }
 
     // Generic response: never reveal whether the email exists.
@@ -1242,6 +1241,10 @@ exports.resetPassword = async (req, res) => {
       { $set: { revokedAt: new Date() } },
     );
     clearRefreshCookie(res, "user");
+
+    await sendMailSafely(
+      getPasswordChangeConfirmationMailOptions(user.email, user.name),
+    );
 
     return res
       .status(200)

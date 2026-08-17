@@ -2,6 +2,12 @@ const User = require("../../models/admin/AdminModel");
 const AllUser = require("../../models/usermodel");
 const RefreshToken = require("../../models/RefreshToken");
 const imagekit = require("../../utils/imagekit.js");
+const transporter = require("../../Email/nodemailer.js");
+const getAddEmployeeMailOptions = require("../../Email/addEmployee.js");
+const getRemoveEmployeeMailOptions = require("../../Email/removeEmployee.js");
+const getPasswordResetMailOptions = require("../../Email/password.js");
+const getPasswordChangeConfirmationMailOptions = require("../../Email/passwordReset.js");
+const getLoginMailOptions = require("../../Email/login.js");
 const {
   signAccessToken,
   signRefreshToken,
@@ -15,6 +21,20 @@ const {
   clearRefreshCookie,
 } = require("../../utils/refreshCookie");
 const bcrypt = require("bcryptjs");
+
+const sendMailSafely = async (mailOptions) => {
+  if (!mailOptions?.to || !transporter?.sendMail) {
+    return { sent: false, reason: "mailer-not-configured" };
+  }
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { sent: true };
+  } catch (error) {
+    console.error("Email send failed:", error.message);
+    return { sent: false, reason: error.message };
+  }
+};
 
 exports.registerUser = async (req, res) => {
   try {
@@ -375,6 +395,19 @@ exports.deleteUser = async (req, res) => {
         .json({ success: false, message: "User not found" });
     }
 
+    try {
+      await sendMailSafely(
+        getRemoveEmployeeMailOptions(
+          user.email,
+          user.name,
+          user.role || "Employee",
+          "BharatPay",
+        ),
+      );
+    } catch (mailError) {
+      console.error("Delete user mail error:", mailError.message);
+    }
+
     res.status(200).json({
       success: true,
       message: "User deleted successfully",
@@ -439,6 +472,8 @@ exports.loginUser = async (req, res) => {
       expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
     });
     setRefreshCookie(res, refreshTokenValue, "admin");
+
+    await sendMailSafely(getLoginMailOptions(user.email, user.name));
 
     return res.status(200).json({
       success: true,
@@ -751,6 +786,17 @@ exports.registerEmployee = async (req, res) => {
       profilePhoto,
     });
 
+    await sendMailSafely(
+      getAddEmployeeMailOptions(
+        user.email,
+        user.name,
+        user.role,
+        "BharatPay",
+        user.experienceYears || "N/A",
+        password,
+      ),
+    );
+
     return res.status(201).json({
       success: true,
       message: "Employee created successfully",
@@ -848,6 +894,8 @@ exports.loginEmployee = async (req, res) => {
 
     setRefreshCookie(res, refreshTokenValue, "admin");
 
+    await sendMailSafely(getLoginMailOptions(user.email, user.name));
+
     return res.status(200).json({
       success: true,
       message: "Login successful",
@@ -865,6 +913,40 @@ exports.loginEmployee = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Server error",
+    });
+  }
+};
+
+// ================== GET ALLOWED ROLES ==================
+
+
+
+exports.getAllowedRoles = async (req, res) => {
+  try {
+    // Get the enum values directly from the schema (single source of truth)
+    const roleEnum = User.schema.path("role").enumValues;
+
+    // Optional: richer response (recommended)
+    const roles = roleEnum.map((role) => ({
+      value: role,
+      label: role
+        .split("-")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" "),
+      // You can add more metadata here later if needed
+      // description: "...",
+      // permissions: [...]
+    }));
+
+    return res.status(200).json({
+      success: true,
+      roles, // now returns array of objects instead of plain strings
+    });
+  } catch (error) {
+    console.error("getAllowedRoles error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch roles",
     });
   }
 };
