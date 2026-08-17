@@ -15,7 +15,8 @@ const requireAdmin = async (req, res, next) => {
     if (!authHeader.startsWith("Bearer ")) {
       return res.status(401).json({
         success: false,
-        message: "Unauthorized - Invalid authorization format (use Bearer token)",
+        message:
+          "Unauthorized - Invalid authorization format (use Bearer token)",
       });
     }
 
@@ -40,6 +41,7 @@ const requireAdmin = async (req, res, next) => {
     }
 
     req.admin = admin;
+    req.user = admin;
     next();
   } catch (error) {
     console.error("requireAdmin error:", error.message);

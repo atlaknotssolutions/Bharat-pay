@@ -1,21 +1,13 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Mail, Lock, Eye, EyeOff, Shield } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import API from "../../api";
 import toast from "react-hot-toast";
 
-const ROLES = [
-  { value: "admin", label: "Admin - Full Access", icon: "👨‍💼" },
-  { value: "finance", label: "Finance - Finance Module", icon: "💰" },
-  { value: "support", label: "Support - Support Module", icon: "🎧" },
-  { value: "read-only", label: "Read-Only - View Only", icon: "👁️" },
-];
-
-export default function Login() {
+export default function AdminLogin() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("admin");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -24,18 +16,18 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      const res = await API.post("/admin/login", { email, password, role });
+      const res = await API.post("/admin/admin-login", { email, password });
 
       if (!res.data.success) {
         throw new Error(res.data.message || "Login failed");
       }
 
-      // Save token & admin info with role
+      // Save token & admin info
       localStorage.setItem("adminToken", res.data.token);
       localStorage.setItem("adminUser", JSON.stringify(res.data.user));
-      localStorage.setItem("adminRole", res.data.user.role || role);
+      localStorage.setItem("adminRole", "admin");
 
-      // Dispatch auth event to sync header/sidebar
+      // Dispatch auth event
       window.dispatchEvent(new Event("auth-change"));
 
       toast.success(res.data.message || "Login successful!", {
@@ -46,17 +38,7 @@ export default function Login() {
         },
       });
 
-      // Route based on role
-      const userRole = res.data.user.role || role;
-      if (userRole === "finance") {
-        navigate("/finance-dashboard", { replace: true });
-      } else if (userRole === "support") {
-        navigate("/support-dashboard", { replace: true });
-      } else if (userRole === "read-only") {
-        navigate("/read-only-dashboard", { replace: true });
-      } else {
-        navigate("/", { replace: true });
-      }
+      navigate("/", { replace: true });
     } catch (err) {
       const message =
         err.response?.data?.message ||
@@ -83,7 +65,7 @@ export default function Login() {
           <h1 className="text-3xl font-bold text-white tracking-tight">
             Admin<span className="text-indigo-400">X</span>
           </h1>
-          <p className="text-gray-400 mt-2">Admin Login</p>
+          <p className="text-gray-400 mt-2">👨‍💼 Admin Login</p>
         </div>
 
         {/* Form Card */}
@@ -101,36 +83,12 @@ export default function Login() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  placeholder="admin@gmail.com"
+                  placeholder="admin@example.com"
                   className="w-full pl-10 pr-4 py-3 bg-gray-800 border border-gray-700 text-gray-100 rounded-lg 
                              placeholder:text-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 
                              outline-none transition"
                 />
               </div>
-            </div>
-
-            {/* Role Selection */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1.5 flex items-center gap-2">
-                <Shield size={16} className="text-indigo-400" />
-                Login Role
-              </label>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 text-gray-100 rounded-lg 
-                           focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 
-                           outline-none transition cursor-pointer"
-              >
-                {ROLES.map((r) => (
-                  <option key={r.value} value={r.value}>
-                    {r.icon} {r.label}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-gray-500 mt-1">
-                Select your role to access the corresponding dashboard
-              </p>
             </div>
 
             {/* Password */}
@@ -206,7 +164,7 @@ export default function Login() {
 
           {/* Register Link */}
           <p className="mt-6 text-center text-sm text-gray-400">
-            Don't have an account?{" "}
+            New admin?{" "}
             <Link
               to="/register"
               className="text-indigo-400 hover:text-indigo-300 font-medium transition"
@@ -214,6 +172,19 @@ export default function Login() {
               Register
             </Link>
           </p>
+
+          {/* Employee Login Link */}
+          <div className="mt-4 pt-4 border-t border-gray-800">
+            <p className="text-center text-sm text-gray-400">
+              Employee login?{" "}
+              <Link
+                to="/employee-login"
+                className="text-amber-400 hover:text-amber-300 font-medium transition"
+              >
+                Staff Portal
+              </Link>
+            </p>
+          </div>
         </div>
       </div>
     </div>
