@@ -2626,32 +2626,28 @@ exports.loginEmployee = async (req, res) => {
 
 
 
-exports.getAllowedRoles = async (req, res) => {
+exports.getEmployees = async (req, res) => {
   try {
-    // Get the enum values directly from the schema (single source of truth)
-    const roleEnum = User.schema.path("role").enumValues;
+    const employees = await User.find({ 
+      role: { $in: ["admin", "finance", "support", "read-only"] } 
+    })
+      .select("name email role contactNumber countryCode dateOfJoining experienceYears profilePhoto isActive createdAt")
+      .sort({ createdAt: -1 })
+      .lean();
 
-    // Optional: richer response (recommended)
-    const roles = roleEnum.map((role) => ({
-      value: role,
-      label: role
-        .split("-")
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(" "),
-      // You can add more metadata here later if needed
-      // description: "...",
-      // permissions: [...]
-    }));
+    console.log("Employees fetched:", employees);
 
     return res.status(200).json({
       success: true,
-      roles, // now returns array of objects instead of plain strings
+      data: employees,
+      // optional pagination if you need it later
+      // pagination: { page: 1, limit: employees.length, total: employees.length, pages: 1 }
     });
   } catch (error) {
-    console.error("getAllowedRoles error:", error);
+    console.error("Get employees error:", error);
     return res.status(500).json({
       success: false,
-      message: "Failed to fetch roles",
+      message: "Failed to fetch employees",
     });
   }
 };
