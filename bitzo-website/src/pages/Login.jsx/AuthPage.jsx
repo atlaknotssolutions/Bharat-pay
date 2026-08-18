@@ -111,7 +111,7 @@ export default function AuthPage() {
       return;
     }
 
-    if (isLogin && otpRequired && !otp) {
+    if (otpRequired && !otp) {
       setError("Please enter the OTP sent to your email.");
       setLoading(false);
       return;
@@ -119,13 +119,15 @@ export default function AuthPage() {
 
     try {
       const endpoint = isLogin ? "/login" : "/register";
-      const body = isLogin
-        ? {
-            email: formData.email,
-            password: formData.password,
-            ...(otpRequired ? { otp } : {}),
-          }
-        : { ...formData };
+      const body = {
+        ...(isLogin
+          ? {
+              email: formData.email,
+              password: formData.password,
+            }
+          : { ...formData }),
+        ...(otpRequired ? { otp } : {}),
+      };
 
       const res = await fetch(`${API_BASE}${endpoint}`, {
         method: "POST",
@@ -147,11 +149,15 @@ export default function AuthPage() {
         throw new Error(data.message || "Authentication failed");
       }
 
-      if (isLogin && data.requiresOtp) {
+      if (data.requiresOtp) {
         setOtpRequired(true);
         setOtp("");
         startOtpCountdown(60);
-        setError("OTP sent to your email. Enter the 6-digit code to continue.");
+        setError(
+          isLogin
+            ? "OTP sent to your email. Enter the 6-digit code to continue."
+            : "OTP sent to your email. Verify it to complete registration.",
+        );
         toast.info("OTP sent to your email. Please verify it.");
         return;
       }
@@ -166,7 +172,7 @@ export default function AuthPage() {
   };
 
   const handleResendOtp = async () => {
-    if (!isLogin || !formData.email || !formData.password || otpCountdown > 0) {
+    if (!formData.email || otpCountdown > 0) {
       return;
     }
 
@@ -174,14 +180,20 @@ export default function AuthPage() {
     setError("");
 
     try {
-      const res = await fetch(`${API_BASE}/login`, {
+      const endpoint = isLogin ? "/login" : "/register";
+      const payload = isLogin
+        ? { email: formData.email, password: formData.password }
+        : {
+            name: formData.name,
+            email: formData.email,
+            password: formData.password,
+          };
+
+      const res = await fetch(`${API_BASE}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
@@ -468,7 +480,7 @@ export default function AuthPage() {
                 </button>
               </div>
 
-              {otpRequired && isLogin && (
+              {otpRequired && (
                 <div className="space-y-3">
                   <div className="relative">
                     <input
@@ -511,8 +523,10 @@ export default function AuthPage() {
               >
                 {loading
                   ? "Processing..."
-                  : otpRequired && isLogin
-                    ? "Verify OTP & Sign In"
+                  : otpRequired
+                    ? isLogin
+                      ? "Verify OTP & Sign In"
+                      : "Verify OTP & Create Account"
                     : isLogin
                       ? "Sign In"
                       : "Create Account"}

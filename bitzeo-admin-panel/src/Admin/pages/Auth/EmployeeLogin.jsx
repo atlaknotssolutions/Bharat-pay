@@ -17,14 +17,27 @@ export default function EmployeeLogin() {
   const [role, setRole] = useState("finance");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [loginError, setLoginError] = useState("");
+
+  const getErrorMessage = (err) => {
+    const data = err?.response?.data;
+    return (
+      data?.message ||
+      data?.error ||
+      data?.details ||
+      err?.message ||
+      "Login failed. Please try again."
+    );
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
+    setLoginError("");
 
     try {
       const res = await API.post("/admin/employee-login", {
-        email,
+        email: email.trim().toLowerCase(),
         password,
         role,
       });
@@ -49,7 +62,7 @@ export default function EmployeeLogin() {
         },
       });
 
-      // Route based on role
+      // ========== SUCCESS NAVIGATION ==========
       if (role === "finance") {
         navigate("/finance-dashboard", { replace: true });
       } else if (role === "support") {
@@ -60,10 +73,9 @@ export default function EmployeeLogin() {
         navigate("/", { replace: true });
       }
     } catch (err) {
-      const message =
-        err.response?.data?.message ||
-        err.message ||
-        "Login failed. Please try again.";
+      // ========== ERROR → STAY ON SAME PAGE ==========
+      const message = getErrorMessage(err);
+      setLoginError(message);
 
       toast.error(message, {
         style: {
@@ -72,6 +84,8 @@ export default function EmployeeLogin() {
           border: "1px solid #374151",
         },
       });
+
+      // Important: No navigate() here → user same login page pe rahega
     } finally {
       setIsLoading(false);
     }
@@ -171,6 +185,13 @@ export default function EmployeeLogin() {
                 Forgot Password?
               </Link>
             </div>
+
+            {/* Error Message */}
+            {loginError && (
+              <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+                {loginError}
+              </div>
+            )}
 
             {/* Submit Button */}
             <button

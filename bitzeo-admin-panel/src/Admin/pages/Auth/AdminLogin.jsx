@@ -10,10 +10,23 @@ export default function AdminLogin() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [loginError, setLoginError] = useState("");
+
+  const getErrorMessage = (err) => {
+    const data = err?.response?.data;
+    return (
+      data?.message ||
+      data?.error ||
+      data?.details ||
+      err?.message ||
+      "Login failed. Please try again."
+    );
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
+    setLoginError("");
 
     try {
       const res = await API.post("/admin/admin-login", { email, password });
@@ -40,10 +53,8 @@ export default function AdminLogin() {
 
       navigate("/", { replace: true });
     } catch (err) {
-      const message =
-        err.response?.data?.message ||
-        err.message ||
-        "Login failed. Please try again.";
+      const message = getErrorMessage(err);
+      setLoginError(message);
 
       toast.error(message, {
         style: {
@@ -127,6 +138,12 @@ export default function AdminLogin() {
                 Forgot Password?
               </Link>
             </div>
+
+            {loginError && (
+              <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+                {loginError}
+              </div>
+            )}
 
             {/* Submit Button */}
             <button

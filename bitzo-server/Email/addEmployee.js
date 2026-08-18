@@ -1,9 +1,9 @@
 module.exports = function getAddEmployeeMailOptions(
   email,
   name,
-  position,
-  department,
-  salary,
+  role,
+  team,
+  experience,
   password,
 ) {
   return {
@@ -17,12 +17,12 @@ module.exports = function getAddEmployeeMailOptions(
         <title>Welcome to BharatPlay</title>
         <style>
           body { font-family: Arial, sans-serif; background: #f6f8fa; margin: 0; padding: 0; }
-          .container { max-width: 520px; margin: 40px auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); padding: 32px; }
+          .container { max-width: 520px; margin: 40px auto; background: #fff; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); padding: 32px; }
           .header { text-align: center; }
-          .title { font-size: 1.5rem; color: #1976d2; margin: 16px 0 8px; }
-          .details { background: #e3f2fd; border-radius: 6px; padding: 16px; margin: 16px 0; }
-          .details p { margin: 8px 0; font-size: 1rem; color: #333; }
-          .footer { color: #888; font-size: 0.9rem; text-align: center; margin-top: 32px; }
+          .title { font-size: 1.6rem; color: #d72638; margin: 16px 0 8px; }
+          .details { background: #fff1f2; border: 1px solid #fecdd3; border-radius: 8px; padding: 16px; margin: 18px 0; }
+          .details p { margin: 8px 0; font-size: 1rem; color: #374151; }
+          .footer { color: #6b7280; font-size: 0.9rem; text-align: center; margin-top: 32px; }
         </style>
       </head>
       <body>
@@ -32,19 +32,19 @@ module.exports = function getAddEmployeeMailOptions(
           </div>
           <div class="content">
             <p>Hi <strong>${name}</strong>,</p>
-            <p>You have been added to the BharatPlay as a new employee. Below are your account details:</p>
+            <p>You have been added to BharatPlay as a new employee. Below are your account details:</p>
             <div class="details">
               <p><strong>Email:</strong> ${email}</p>
-              <p><strong>Position:</strong> ${position}</p>
-              <p><strong>Department:</strong> ${department}</p>
-              <p><strong>Salary:</strong> $${salary}</p>
-              <p><strong>Temporary Password:</strong> <span style="color:#d32f2f;">${password}</span></p>
+              <p><strong>Role:</strong> ${role}</p>
+              <p><strong>Team / Department:</strong> ${team}</p>
+              <p><strong>Experience:</strong> ${experience} years</p>
+              <p><strong>Temporary Password:</strong> <span style="color:#b91c1c; font-weight:700;">${password}</span></p>
             </div>
             <p>Please use these credentials to log in for the first time. You can change your password after logging in.</p>
-            <p>If you have any questions, feel free to contact HR.</p>
+            <p>If you have any questions, feel free to contact the admin team.</p>
           </div>
           <div class="footer">
-            &copy; 2025 AI Knots System. All rights reserved.
+            &copy; 2026 BharatPlay. All rights reserved.
           </div>
         </div>
       </body>

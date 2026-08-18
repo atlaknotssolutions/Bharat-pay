@@ -41,6 +41,7 @@ const {
   enableShort,
   deleteShort,
   getEmployees,
+  toggleUserStatus,
 } = require("../../controller/AdminController/AdminController");
 const requireAdmin = require("../../middlewares/requireAdmin");
 const { requirePermission } = require("../../middlewares/checkAdminPermission");
@@ -134,4 +135,9 @@ router.delete("/users/:id/shorts/:videoId", requireAdmin, requirePermission("mod
 router.get("/search/videos", requireAdmin, searchVideos);
 router.get("/search/users", requireAdmin, searchUsers);
 
+router.patch("/users/:id/status", requireAdmin, toggleUserStatus);
+router.get("/users/:id", requireAdmin, getUserById);
+router.get("/alluser", requireAdmin, getAllUsers);
+router.put("/users/:id", requireAdmin, updateUser);
+router.delete("/users/:id", requireAdmin, deleteUser);
 module.exports = router;

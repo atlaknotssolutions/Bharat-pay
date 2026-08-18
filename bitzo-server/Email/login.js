@@ -1,17 +1,17 @@
 function getLoginMailOptions(email, name, otp) {
   const otpMarkup = otp
-    ? `<p>Your login OTP is <strong>${otp}</strong>. Enter it on BharatPay to complete your sign-in securely.</p>`
-    : "<p>Your BharatPay account was just accessed. If this was not you, please reset your password immediately.</p>";
+    ? `<p>Your login OTP is <strong>${otp}</strong>. Enter it on BharatPlay to complete your sign-in securely.</p>`
+    : "<p>Your BharatPlay account was just accessed. If this was not you, please reset your password immediately.</p>";
 
   return {
     from: process.env.EMAIL,
     to: email,
-    subject: "BharatPay Login Verification",
+    subject: "BharatPlay Login Verification",
     html: `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>BharatPay Login Verification</title>
+  <title>BharatPlay Login Verification</title>
   <style>
     body { font-family: Arial, sans-serif; background: #f6f8fa; margin: 0; padding: 0; }
     .container { max-width: 520px; margin: 40px auto; background: #fff; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); padding: 32px; }
@@ -24,14 +24,14 @@ function getLoginMailOptions(email, name, otp) {
 </head>
 <body>
   <div class="container">
-    <div class="brand">BharatPay</div>
+    <div class="brand">BharatPlay</div>
     <div class="title">Login Verification</div>
     <div class="content">
       <p>Hi <strong>${name}</strong>,</p>
-      ${otp ? `<p>Use the code below to continue signing in to BharatPay.</p><div class="otp-box">${otp}</div>` : otpMarkup}
+      ${otp ? `<p>Use the code below to continue signing in to BharatPlay.</p><div class="otp-box">${otp}</div>` : otpMarkup}
     </div>
     <div class="footer">
-      &copy; 2026 BharatPay. All rights reserved.
+      &copy; 2026 BharatPlay. All rights reserved.
     </div>
   </div>
 </body>

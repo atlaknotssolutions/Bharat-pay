@@ -99,24 +99,28 @@ const issueOtpToDevice = async ({ deviceId, user, purpose = "login" }) => {
 /* ===================== REGISTER ===================== */
 exports.registerUser = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, otp } = req.body;
+    const normalizedEmail =
+      typeof email === "string" ? email.trim().toLowerCase() : "";
 
-    if (!name || !email || !password) {
+    if (!name || !normalizedEmail || !password) {
       return res.status(400).json({
         success: false,
         message: "All fields are required",
       });
     }
 
-    if (password.length < 8) {
+    if (String(password).length < 8) {
       return res.status(400).json({
         success: false,
         message: "Password must be at least 8 characters",
       });
     }
 
-    // Device lock (server-issued device id from HttpOnly cookie)
     const deviceId = resolveDeviceId(req, res);
+    const ip = getClientIp(req);
+    const ua = req.headers["user-agent"] || "unknown";
+
     const deviceExists = await User.findOne({ deviceId });
     if (deviceExists) {
       return res.status(400).json({
@@ -125,8 +129,7 @@ exports.registerUser = async (req, res) => {
       });
     }
 
-    // Email check
-    const userExists = await User.findOne({ email });
+    const userExists = await User.findOne({ email: normalizedEmail });
     if (userExists) {
       return res.status(400).json({
         success: false,
@@ -134,11 +137,7 @@ exports.registerUser = async (req, res) => {
       });
     }
 
-    // ΓöÇΓöÇΓöÇ VPN / Proxy hard block ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-    const ip = getClientIp(req);
-    const ua = req.headers["user-agent"] || "unknown";
     const vpnInfo = await detectVPN(ip);
-
     if (vpnInfo.isVPN || vpnInfo.isProxy) {
       await logFraudEvent({
         userId: null,
@@ -163,66 +162,110 @@ exports.registerUser = async (req, res) => {
           "Registration is not allowed over VPN or proxy. Please disable it and try again.",
       });
     }
-    // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
-    // ≡ƒöÉ HASH PASSWORD IN CONTROLLER
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    if (otp) {
+      const fingerprintRecord = await DeviceFingerprint.findOne({ deviceId });
+      if (
+        !fingerprintRecord ||
+        !fingerprintRecord.pendingOtp ||
+        fingerprintRecord.otpPurpose !== "register"
+      ) {
+        return res.status(401).json({
+          success: false,
+          message: "OTP session expired. Please register again.",
+        });
+      }
 
-    const user = await User.create({
-      name,
-      email,
-      password: hashedPassword,
+      const otpMatches = String(fingerprintRecord.pendingOtp) === String(otp);
+      const otpExpired =
+        !fingerprintRecord.otpExpiresAt ||
+        new Date(fingerprintRecord.otpExpiresAt).getTime() < Date.now();
+
+      if (!otpMatches || otpExpired) {
+        return res.status(401).json({
+          success: false,
+          message: "Invalid or expired OTP.",
+        });
+      }
+
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(password, salt);
+
+      const user = await User.create({
+        name: String(name).trim(),
+        email: normalizedEmail,
+        password: hashedPassword,
+        deviceId,
+      });
+
+      await DeviceFingerprint.updateOne(
+        { deviceId },
+        {
+          $set: {
+            userId: user._id,
+            lastIp: ip,
+            userAgent: ua,
+            lastSeen: new Date(),
+          },
+          $addToSet: { associatedUsers: user._id },
+          $unset: { pendingOtp: 1, otpExpiresAt: 1, otpPurpose: 1 },
+        },
+      );
+
+      await logFraudEvent({
+        userId: user._id,
+        eventType: "REGISTER",
+        severity: "low",
+        ip,
+        deviceId,
+        userAgent: ua,
+        isVPN: false,
+        isProxy: false,
+        riskScoreImpact: 0,
+        metadata: { country: vpnInfo.country },
+      });
+
+      await sendMailSafely(getRegisterMailOptions(user.email, user.name));
+
+      const token = signAccessToken({ userId: user._id, role: user.role });
+      const refreshToken = await createAuthSession(user._id, "user");
+      setRefreshCookie(res, refreshToken, "user");
+
+      return res.status(201).json({
+        success: true,
+        message: "User registered successfully",
+        token,
+        user: {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          trustScore: user.trustScore,
+          avatar: user.avatar || null,
+        },
+      });
+    }
+
+    const otpCode = await issueOtpToDevice({
       deviceId,
-    });
-
-    await logFraudEvent({
-      userId: user._id,
-      eventType: "REGISTER",
-      severity: "low",
-      ip,
-      deviceId,
-      userAgent: ua,
-      isVPN: false,
-      isProxy: false,
-      riskScoreImpact: 0,
-      metadata: { country: vpnInfo.country },
-    });
-
-    await sendMailSafely(getRegisterMailOptions(user.email, user.name));
-    await issueOtpToDevice({ deviceId, user, purpose: "register" });
-
-    await logAuditEvent({
-      userId: user._id,
-      eventType: "USER_REGISTER",
-      ip,
-      deviceId,
-      userAgent: ua,
-      metadata: { email, name },
-    });
-
-    // Auto-login: issue access token + refresh session (rotated on refresh)
-    const token = signAccessToken({ userId: user._id, role: user.role });
-    const refreshToken = await createAuthSession(user._id, "user");
-    setRefreshCookie(res, refreshToken, "user");
-
-    res.status(201).json({
-      success: true,
-      message: "User registered successfully",
-      token,
       user: {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        trustScore: user.trustScore,
-        avatar: user.avatar || null,
+        email: normalizedEmail,
+        name: String(name).trim(),
       },
+      purpose: "register",
+    });
+
+    return res.status(200).json({
+      success: true,
+      requiresOtp: true,
+      message:
+        "OTP has been sent to your email. Verify it to complete registration.",
+      otpCode: process.env.NODE_ENV !== "production" ? otpCode : undefined,
     });
   } catch (error) {
     console.error("Register error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Registration failed",
     });
