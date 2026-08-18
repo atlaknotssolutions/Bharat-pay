@@ -10,21 +10,30 @@ import {
   Video,
   Box,
   Clapperboard,
+  Shield,
+  DollarSign,
+  Headphones,
+  Eye,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import API from "../../api";
 import { clearAdminState } from "../../utils/session";
+import { getNavItems, getRoleMeta, getCurrentRole } from "../../config/roleConfig";
 
-const navItems = [
-  { to: "/", icon: LayoutDashboard, label: "Dashboard" },
-  { to: "/category", icon: FolderOpen, label: "Category" },
-  { to: "/create-employee", icon: Package, label: "Add Employee" },
-  { to: "/alluser", icon: Users, label: "Users" },
-  { to: "/video", icon: Video, label: "Video" },
-  { to: "/shorts", icon: Clapperboard, label: "Shorts" },
-  { to: "/orders", icon: ShoppingBag, label: "Orders" },
-  { to: "/products", icon: Box, label: "Products" },
-];
+const ICON_MAP = {
+  LayoutDashboard,
+  Users,
+  ShoppingBag,
+  Package,
+  FolderOpen,
+  Video,
+  Box,
+  Clapperboard,
+  Shield,
+  DollarSign,
+  Headphones,
+  Eye,
+};
 
 const getAdminDisplayName = () => {
   try {
@@ -44,20 +53,25 @@ const getInitials = (name) => {
 export default function Sidebar() {
   const navigate = useNavigate();
   const [userName, setUserName] = useState(getAdminDisplayName());
+  const [role, setRole] = useState(getCurrentRole());
 
   useEffect(() => {
-    const syncUser = () => setUserName(getAdminDisplayName());
+    const syncUser = () => {
+      setUserName(getAdminDisplayName());
+      setRole(getCurrentRole());
+    };
     syncUser();
     window.addEventListener("auth-change", syncUser);
     return () => window.removeEventListener("auth-change", syncUser);
   }, []);
 
+  const roleMeta = getRoleMeta(role);
+  const navItems = getNavItems();
+
   const handleLogout = async () => {
     try {
       await API.post("/admin/logout", {}).catch(() => {});
-    } catch (_) {
-      // ignore network errors; always clear local state
-    }
+    } catch (_) {}
 
     clearAdminState();
 
@@ -81,23 +95,26 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.to === "/"}
-            className={({ isActive }) =>
-              `flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-all duration-200 ${
-                isActive
-                  ? "bg-indigo-600/20 text-indigo-400 border border-indigo-500/30"
-                  : "text-gray-400 hover:bg-gray-800/70 hover:text-gray-200 border border-transparent"
-              }`
-            }
-          >
-            <item.icon className="w-5 h-5 mr-3 shrink-0" />
-            {item.label}
-          </NavLink>
-        ))}
+        {navItems.map((item) => {
+          const Icon = typeof item.icon === "string" ? ICON_MAP[item.icon] : item.icon;
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.to === "/"}
+              className={({ isActive }) =>
+                `flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-all duration-200 ${
+                  isActive
+                    ? "bg-indigo-600/20 text-indigo-400 border border-indigo-500/30"
+                    : "text-gray-400 hover:bg-gray-800/70 hover:text-gray-200 border border-transparent"
+                }`
+              }
+            >
+              {Icon && <Icon className="w-5 h-5 mr-3 shrink-0" />}
+              {item.label}
+            </NavLink>
+          );
+        })}
       </nav>
 
       <div className="p-4 border-t border-gray-800 shrink-0">
@@ -109,7 +126,12 @@ export default function Sidebar() {
             <p className="text-sm font-medium text-white truncate">
               {userName}
             </p>
-            <p className="text-[11px] text-gray-400">Admin</p>
+            <div className="flex items-center gap-1.5">
+              {roleMeta.icon && <roleMeta.icon className={`w-3 h-3 ${roleMeta.color}`} />}
+              <p className={`text-[11px] font-medium ${roleMeta.color}`}>
+                {roleMeta.displayName}
+              </p>
+            </div>
           </div>
         </div>
 

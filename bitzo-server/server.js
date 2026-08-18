@@ -4,6 +4,9 @@ require("./config/validateEnv")();
 const {
   startTrustScoreJob,
 } = require("./services/vpn.service/trustScore.job.js");
+const {
+  startStrikeExpiryJob,
+} = require("./jobs/strikeExpiryJob.js");
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
@@ -22,6 +25,8 @@ const userRoutes = require("./routes/userVideoRoute.js");
 const categoryRouter = require("./routes/categoryRoute/category.route.js");
 const leaderboardRoute = require("./routes/leaderboardRoute.js");
 const notificationRoutes = require("./routes/notificationRoute.js");
+const copyrightRoutes = require("./routes/CopyrightRoutes/CopyrightRoutes.js");
+const userCopyrightRoutes = require("./routes/CopyrightRoutes/UserCopyrightRoutes.js");
 const { detectVPN } = require("./services/vpn.service/vpn.service.js");
 
 const app = express();
@@ -86,6 +91,8 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/api", authRoutes);
 app.use("/api/category", categoryRouter);
 app.use("/api/admin", adminRoute);
+app.use("/api/admin/copyright", copyrightRoutes);
+app.use("/api/copyright", userCopyrightRoutes);
 app.use("/api/adminvideo", videoRoutes);
 app.use("/api/uservideo", userRoutes);
 app.use("/api/leaderboard", leaderboardRoute);
@@ -126,6 +133,7 @@ app.use((err, req, res, next) => {
 
 // ---------- Listen ----------
 startTrustScoreJob();
+startStrikeExpiryJob();
 app.listen(PORT, () => {
   console.log(`🌐 Server running on port ${PORT}`);
 });

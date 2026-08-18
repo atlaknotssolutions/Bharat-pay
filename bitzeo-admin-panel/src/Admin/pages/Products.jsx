@@ -1,4 +1,5 @@
 import { Search, Plus, Edit, Trash2, MoreVertical } from 'lucide-react'
+import { hasFeature } from "../../config/roleConfig";
 
 const fakeProducts = [
   { id: 1, name: "Wireless Earbuds Pro", category: "Electronics", price: "₹2,499", stock: 84, status: "Active" },
@@ -25,10 +26,12 @@ export default function Products() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           </div>
           
-          <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-            <Plus size={18} />
-            Add Product
-          </button>
+          {hasFeature("canManageProducts") && (
+            <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+              <Plus size={18} />
+              Add Product
+            </button>
+          )}
         </div>
       </div>
 
@@ -54,9 +57,11 @@ export default function Products() {
               </div>
 
               <div className="flex gap-2">
-                <button className="flex-1 py-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100">
-                  Edit
-                </button>
+                {hasFeature("canManageProducts") && (
+                  <button className="flex-1 py-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100">
+                    Edit
+                  </button>
+                )}
                 <button className="p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100">
                   <MoreVertical size={18} />
                 </button>

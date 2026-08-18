@@ -24,6 +24,7 @@ import {
   PhoneCall,
   ArrowLeft,
   X,
+  Shield,
 } from "lucide-react";
 import { useRewards } from "../../context/RewardContext";
 import { useSelector, useDispatch } from "react-redux";
@@ -43,6 +44,7 @@ export default function Navbar({ toggleSidebar }) {
   const dispatch = useDispatch();
   const unreadCount = useSelector((state) => state.notifications.unreadCount);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [copyrightOpen, setCopyrightOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(
@@ -647,6 +649,38 @@ export default function Navbar({ toggleSidebar }) {
                     <MessageCircle size={20} className="text-gray-300" />
                     <span>Feedback</span>
                   </button>
+                  <div className="relative">
+                    <button
+                      onClick={() => setCopyrightOpen(!copyrightOpen)}
+                      className="w-full px-5 py-3 text-left hover:bg-[#272727] flex items-center gap-4 transition"
+                    >
+                      <Shield size={20} className="text-gray-300" />
+                      <span className="flex-1">Copyright</span>
+                      {copyrightOpen ? (
+                        <ChevronDown size={16} className="text-gray-500" />
+                      ) : (
+                        <ChevronRight size={16} className="text-gray-500" />
+                      )}
+                    </button>
+                    {copyrightOpen && (
+                      <div className="bg-[#1a1a1a] border-t border-b border-gray-800">
+                        <Link
+                          to="/copyright"
+                          onClick={() => { setIsDropdownOpen(false); setCopyrightOpen(false); }}
+                          className="w-full pl-14 pr-5 py-2.5 text-left hover:bg-[#272727] flex items-center gap-3 transition text-sm text-gray-300"
+                        >
+                          Copyright Center
+                        </Link>
+                        <Link
+                          to="/copyright/my-claims"
+                          onClick={() => { setIsDropdownOpen(false); setCopyrightOpen(false); }}
+                          className="w-full pl-14 pr-5 py-2.5 text-left hover:bg-[#272727] flex items-center gap-3 transition text-sm text-gray-300"
+                        >
+                          My Claims
+                        </Link>
+                      </div>
+                    )}
+                  </div>
                   <button className="w-full px-5 py-3 text-left hover:bg-[#272727] flex items-center gap-4 transition">
                     <PhoneCall size={20} className="text-gray-300" />
                     <span>Customer Support</span>

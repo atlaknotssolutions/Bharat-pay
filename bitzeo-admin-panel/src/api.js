@@ -157,3 +157,41 @@ export const enableAdminShort = (userId, videoId) =>
   API.post(`/admin/users/${userId}/shorts/${videoId}/enable`);
 export const deleteAdminShort = (userId, videoId, reason) =>
   API.delete(`/admin/users/${userId}/shorts/${videoId}`, { data: { reason } });
+
+// Copyright Management
+export const fetchCopyrightCases = (params) =>
+  API.get("/admin/copyright/cases", { params });
+export const fetchCopyrightCaseById = (id) =>
+  API.get(`/admin/copyright/cases/${id}`);
+export const createCopyrightCase = (data) =>
+  API.post("/admin/copyright/cases", data);
+export const updateCopyrightCaseStatus = (id, data) =>
+  API.put(`/admin/copyright/cases/${id}/status`, data);
+export const assignCopyrightCase = (id, data) =>
+  API.put(`/admin/copyright/cases/${id}/assign`, data);
+export const addCopyrightEvidence = (id, data) =>
+  API.post(`/admin/copyright/cases/${id}/evidence`, data);
+export const addCopyrightNote = (id, data) =>
+  API.post(`/admin/copyright/cases/${id}/notes`, data);
+
+// Copyright Strikes
+export const fetchCopyrightStrikes = (params) =>
+  API.get("/admin/copyright/strikes", { params });
+export const fetchCopyrightStrikeById = (id) =>
+  API.get(`/admin/copyright/strikes/${id}`);
+export const disputeCopyrightStrike = (id, data) =>
+  API.post(`/admin/copyright/strikes/${id}/dispute`, data);
+export const resolveCopyrightStrikeDispute = (id, data) =>
+  API.put(`/admin/copyright/strikes/${id}/resolve`, data);
+export const fetchUserCopyrightStrikes = (userId) =>
+  API.get(`/admin/copyright/strikes/user/${userId}`);
+
+// Copyright Stats
+export const fetchCopyrightStats = () =>
+  API.get("/admin/copyright/stats");
+
+// Search (for copyright create form etc.)
+export const searchVideos = (q) =>
+  API.get("/admin/search/videos", { params: { q } });
+export const searchUsers = (q) =>
+  API.get("/admin/search/users", { params: { q } });

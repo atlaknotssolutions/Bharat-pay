@@ -8,7 +8,8 @@ const createNotification = async ({
   channel = null,
 }) => {
   try {
-    if (!recipient || !actor || String(recipient) === String(actor)) return null;
+    if (!recipient) return null;
+    if (String(recipient) === String(actor)) return null;
 
     const notification = await Notification.create({
       recipient,

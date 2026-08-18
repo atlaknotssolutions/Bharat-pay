@@ -4,6 +4,7 @@ const riskCheck = require("../middlewares/riskCheck.middleware");
 const { videoAndThumbnailUpload: upload } = require("../middlewares/multer");
 const isAuthenticated = require("../middlewares/isAuthenticated");
 const requireAdmin = require("../middlewares/requireAdmin");
+const { requirePermission } = require("../middlewares/checkAdminPermission");
 const { adminUserListLimiter } = require("../middlewares/rateLimit");
 const { uploadVideo, getAllVideos, deleteVideo, updateVideoupdated, getMyVideos, editMyVideo, deleteMyVideo } = require("../controller/videoController");
 
@@ -28,7 +29,7 @@ router.delete(
   deleteMyVideo
 );
 
-router.get("/", requireAdmin, adminUserListLimiter, getAllVideos);
+router.get("/", requireAdmin, requirePermission("content:read"), adminUserListLimiter, getAllVideos);
 
 router.delete("/:id", isAuthenticated, deleteVideo);
 

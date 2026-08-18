@@ -25,6 +25,9 @@ import Leaderboard from "../pages/Settings/Leaderboard";
 import SubscribedChannels from "../pages/UploadVideo/SubscribedChannels";
 import ViewAll from "../pages/ViewAll";
 import SearchPage from "../pages/SearchPage";
+import CopyrightPage from "../pages/CopyrightPage";
+import CopyrightClaimPage from "../pages/CopyrightClaimPage";
+import MyClaimsPage from "../pages/MyClaimsPage";
 
 function ViewAllRoute() {
   const { type } = useParams();
@@ -63,6 +66,9 @@ export default function AppRoutes() {
           <Route path="/withdraw" element={<WithdrawPage />} />
           <Route path="/channel/:id" element={<ChannelPage />} />
           <Route path="/channel/customize" element={<ChannelCustomization />} />
+          <Route path="/copyright" element={<CopyrightPage />} />
+          <Route path="/copyright/claim" element={<CopyrightClaimPage />} />
+          <Route path="/copyright/my-claims" element={<MyClaimsPage />} />
         </Route>
       </Route>
 

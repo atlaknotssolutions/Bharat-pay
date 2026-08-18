@@ -206,8 +206,8 @@ export default function EmployeeLogin() {
             </button>
           </form>
 
-          {/* Register Link */}
-          <p className="mt-6 text-center text-sm text-gray-400">
+          {/* Register Link - Disabled for now */}
+          {/* <p className="mt-6 text-center text-sm text-gray-400">
             New employee?{" "}
             <Link
               to="/employee-register"
@@ -215,7 +215,7 @@ export default function EmployeeLogin() {
             >
               Register Here
             </Link>
-          </p>
+          </p> */}
 
           {/* Admin Login Link */}
           <div className="mt-4 pt-4 border-t border-gray-800">

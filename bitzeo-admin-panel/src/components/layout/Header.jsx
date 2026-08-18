@@ -1,5 +1,6 @@
 import { Bell, Menu } from "lucide-react";
 import { useEffect, useState } from "react";
+import { getCurrentRole, getRoleMeta } from "../../config/roleConfig";
 
 const getAdminDisplayName = () => {
   try {
@@ -18,13 +19,19 @@ const getInitials = (name) => {
 
 export default function Header({ toggleSidebar }) {
   const [userName, setUserName] = useState(getAdminDisplayName());
+  const [role, setRole] = useState(getCurrentRole());
 
   useEffect(() => {
-    const syncUser = () => setUserName(getAdminDisplayName());
+    const syncUser = () => {
+      setUserName(getAdminDisplayName());
+      setRole(getCurrentRole());
+    };
     syncUser();
     window.addEventListener("auth-change", syncUser);
     return () => window.removeEventListener("auth-change", syncUser);
   }, []);
+
+  const roleMeta = getRoleMeta(role);
 
   return (
     <header className="bg-gray-950 border-b border-gray-800 sticky top-0 z-20">
@@ -37,6 +44,12 @@ export default function Header({ toggleSidebar }) {
         </button>
 
         <div className="flex items-center gap-3 ml-auto">
+          {/* Role Badge */}
+          <div className={`hidden sm:flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-full border ${roleMeta.bg} ${roleMeta.color} ${roleMeta.borderColor}`}>
+            {roleMeta.icon && <roleMeta.icon className="w-3.5 h-3.5" />}
+            {roleMeta.label}
+          </div>
+
           <button
             className="relative p-2 rounded-full text-gray-300 hover:text-white hover:bg-gray-800 transition-colors"
             aria-label="Notifications"

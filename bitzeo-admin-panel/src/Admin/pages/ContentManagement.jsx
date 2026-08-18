@@ -17,6 +17,7 @@ import {
   Search,
 } from "lucide-react";
 import API, { API_BASE_URL } from "../../api";
+import { hasFeature } from "../../config/roleConfig";
 
 
 
@@ -284,33 +285,37 @@ export default function ContentManagement({ type = "long" }) {
           >
             <Play size={16} />
           </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setSelectedVideo(row);
-              setFormData({
-                title: row.title,
-                description: row.description || "",
-                type: pageType,
-                duration: row.duration || "",
-              });
-              setView("update");
-            }}
-            className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/20 transition"
-            title="Edit"
-          >
-            <Edit size={16} />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDelete(row._id);
-            }}
-            className="p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 transition"
-            title="Delete"
-          >
-            <Trash2 size={16} />
-          </button>
+          {hasFeature("canUploadVideo") && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedVideo(row);
+                setFormData({
+                  title: row.title,
+                  description: row.description || "",
+                  type: pageType,
+                  duration: row.duration || "",
+                });
+                setView("update");
+              }}
+              className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/20 transition"
+              title="Edit"
+            >
+              <Edit size={16} />
+            </button>
+          )}
+          {hasFeature("canModerateContent") && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete(row._id);
+              }}
+              className="p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 transition"
+              title="Delete"
+            >
+              <Trash2 size={16} />
+            </button>
+          )}
         </div>
       ),
     },
@@ -515,28 +520,32 @@ export default function ContentManagement({ type = "long" }) {
             </div>
 
             <div className="mt-8 flex flex-wrap gap-4">
-              <button
-                onClick={() => {
-                  setFormData({
-                    title: selectedVideo.title,
-                    description: selectedVideo.description || "",
-                    type: pageType,
-                    duration: selectedVideo.duration || "",
-                  });
-                  setView("update");
-                }}
-                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 px-6 py-3 rounded-lg transition"
-              >
-                <Edit size={18} />
-                Edit Video
-              </button>
-              <button
-                onClick={() => handleDelete(selectedVideo._id)}
-                className="flex items-center gap-2 bg-red-600 hover:bg-red-500 px-6 py-3 rounded-lg transition"
-              >
-                <Trash2 size={18} />
-                Delete Video
-              </button>
+              {hasFeature("canUploadVideo") && (
+                <button
+                  onClick={() => {
+                    setFormData({
+                      title: selectedVideo.title,
+                      description: selectedVideo.description || "",
+                      type: pageType,
+                      duration: selectedVideo.duration || "",
+                    });
+                    setView("update");
+                  }}
+                  className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 px-6 py-3 rounded-lg transition"
+                >
+                  <Edit size={18} />
+                  Edit Video
+                </button>
+              )}
+              {hasFeature("canModerateContent") && (
+                <button
+                  onClick={() => handleDelete(selectedVideo._id)}
+                  className="flex items-center gap-2 bg-red-600 hover:bg-red-500 px-6 py-3 rounded-lg transition"
+                >
+                  <Trash2 size={18} />
+                  Delete Video
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -644,26 +653,28 @@ export default function ContentManagement({ type = "long" }) {
             </div>
 
             <div className="flex gap-4 pt-4">
-              <button
-                type="submit"
-                disabled={submitting}
-                className={`flex-1 py-3 rounded-lg font-semibold transition flex items-center justify-center gap-2 ${
-                  submitting
-                    ? "bg-gray-700 cursor-not-allowed text-gray-400"
-                    : "bg-indigo-600 hover:bg-indigo-500 text-white"
-                }`}
-              >
-                {submitting && <Loader2 size={18} className="animate-spin" />}
-                {submitting
-                  ? isUpdate
-                    ? "Updating..."
-                    : "Uploading..."
-                  : isUpdate
-                    ? "Update Video"
-                    : isShorts
-                      ? "Upload Short"
-                      : "Upload Video"}
-              </button>
+              {hasFeature("canUploadVideo") && (
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className={`flex-1 py-3 rounded-lg font-semibold transition flex items-center justify-center gap-2 ${
+                    submitting
+                      ? "bg-gray-700 cursor-not-allowed text-gray-400"
+                      : "bg-indigo-600 hover:bg-indigo-500 text-white"
+                  }`}
+                >
+                  {submitting && <Loader2 size={18} className="animate-spin" />}
+                  {submitting
+                    ? isUpdate
+                      ? "Updating..."
+                      : "Uploading..."
+                    : isUpdate
+                      ? "Update Video"
+                      : isShorts
+                        ? "Upload Short"
+                        : "Upload Video"}
+                </button>
+              )}
 
               <button
                 type="button"
@@ -716,13 +727,15 @@ export default function ContentManagement({ type = "long" }) {
                            text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               />
             </div>
-            <button
-              onClick={() => setView("upload")}
-              className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2.5 rounded-lg shadow transition whitespace-nowrap"
-            >
-              <Plus size={20} />
-              {isShorts ? "Upload Short" : "Upload Video"}
-            </button>
+            {hasFeature("canUploadVideo") && (
+              <button
+                onClick={() => setView("upload")}
+                className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2.5 rounded-lg shadow transition whitespace-nowrap"
+              >
+                <Plus size={20} />
+                {isShorts ? "Upload Short" : "Upload Video"}
+              </button>
+            )}
           </div>
         </div>
 

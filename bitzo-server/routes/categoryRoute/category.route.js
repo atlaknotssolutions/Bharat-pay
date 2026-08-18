@@ -7,13 +7,14 @@ const {
   deleteCategory,
 } = require("../../controller/categorycontroller/catgeory.controller");
 const requireAdmin = require("../../middlewares/requireAdmin");
+const { requirePermission } = require("../../middlewares/checkAdminPermission");
 
 const router = express.Router();
 
 router.get("/", getAllCategorys);
 router.get("/:id", getCategoryById);
-router.post("/", requireAdmin, createCategory);
-router.put("/:id", requireAdmin, updateCategory);
-router.delete("/:id", requireAdmin, deleteCategory);
+router.post("/", requireAdmin, requirePermission("settings:write"), createCategory);
+router.put("/:id", requireAdmin, requirePermission("settings:write"), updateCategory);
+router.delete("/:id", requireAdmin, requirePermission("settings:write"), deleteCategory);
 
 module.exports = router;

@@ -40,6 +40,13 @@ const requireAdmin = async (req, res, next) => {
       });
     }
 
+    if (admin.isActive === false) {
+      return res.status(403).json({
+        success: false,
+        message: "Account has been deactivated",
+      });
+    }
+
     req.admin = admin;
     req.user = admin;
     next();

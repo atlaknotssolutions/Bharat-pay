@@ -120,6 +120,24 @@ const adminDestructiveLimiter = rateLimit({
   message: jsonMessage("Too many destructive operations. Please try again later."),
 });
 
+// Public copyright claim submission (unauthenticated, strict limit)
+const publicClaimLimiter = rateLimit({
+  windowMs: 1 * HOUR,
+  limit: 5,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: jsonMessage("Too many copyright claim submissions. Please try again later."),
+});
+
+// Public copyright claim status lookup (unauthenticated, generous)
+const claimLookupLimiter = rateLimit({
+  windowMs: 15 * MINUTE,
+  limit: 30,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: jsonMessage("Too many requests. Please try again later."),
+});
+
 module.exports = {
   loginLimiter,
   adminLoginLimiter,
@@ -134,4 +152,6 @@ module.exports = {
   adminUserListLimiter,
   adminUserLimiter,
   adminDestructiveLimiter,
+  publicClaimLimiter,
+  claimLookupLimiter,
 };

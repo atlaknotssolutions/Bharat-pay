@@ -68,29 +68,52 @@ const sendMailSafely = async (mailOptions) => {
   }
 };
 
+exports.registrationStatus = async (_req, res) => {
+  try {
+    const envKey = process.env.ADMIN_REGISTER_KEY;
+    const isDev = process.env.NODE_ENV !== "production";
+
+    const available = !!envKey || isDev;
+
+    return res.status(200).json({
+      success: true,
+      registrationAvailable: available,
+    });
+  } catch (error) {
+    return res.status(200).json({
+      success: true,
+      registrationAvailable: false,
+    });
+  }
+};
+
 exports.registerUser = async (req, res) => {
   try {
     const { name, email, password, registerKey } = req.body;
 
     // Admin registration gate:
-    // - Production: ADMIN_REGISTER_KEY is mandatory.
-    // - Development: allowed only when no key is configured.
-    // A configured key must always match, even in development.
+    // Production requires ADMIN_REGISTER_KEY to be configured in the environment.
+    // The key's existence IS the gate — its value is never sent to the client.
+    // Backward compatibility: if registerKey is provided, validate it against the env key.
     const envKey = process.env.ADMIN_REGISTER_KEY;
     const isDev = process.env.NODE_ENV !== "production";
 
-    if (envKey) {
+    if (registerKey !== undefined && registerKey !== "") {
+      // Legacy flow: client sends the key explicitly
       if (typeof registerKey !== "string" || registerKey !== envKey) {
         return res.status(403).json({
           success: false,
           message: "Admin registration requires a valid setup key",
         });
       }
-    } else if (!isDev) {
-      return res.status(403).json({
-        success: false,
-        message: "Admin registration requires a valid setup key",
-      });
+    } else {
+      // New flow: key existence in env is the gate
+      if (!envKey && !isDev) {
+        return res.status(403).json({
+          success: false,
+          message: "Admin registration is not configured. Contact your system administrator.",
+        });
+      }
     }
 
     // 1. Validation
@@ -2351,31 +2374,11 @@ exports.registerEmployee = async (req, res) => {
       email,
       password,
       role = "admin",
-      registerKey,
       contactNumber,
       countryCode,
       dateOfJoining,
       experienceYears,
     } = req.body;
-
-    const isDev = process.env.NODE_ENV !== "production";
-    const defaultRegisterKey = "admin123";
-    const envKey =
-      process.env.ADMIN_REGISTER_KEY || (isDev ? defaultRegisterKey : "");
-
-    if (envKey) {
-      if (typeof registerKey !== "string" || registerKey.trim() !== envKey) {
-        return res.status(403).json({
-          success: false,
-          message: "Admin registration requires a valid setup key",
-        });
-      }
-    } else if (!isDev) {
-      return res.status(403).json({
-        success: false,
-        message: "Admin registration requires a valid setup key",
-      });
-    }
 
     if (!name || !email || !password) {
       return res.status(400).json({

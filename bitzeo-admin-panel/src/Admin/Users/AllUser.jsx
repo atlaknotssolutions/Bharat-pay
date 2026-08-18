@@ -20,6 +20,7 @@ import {
   Check,
   Clapperboard,
 } from "lucide-react";
+import { hasFeature } from "../../config/roleConfig";
 
 const BASE_URL = "http://localhost:8000/api";
 const LIMIT = 15;
@@ -398,26 +399,29 @@ export default function Users() {
               
             </button>
 
-            <button
-              onClick={() => navigate(`/users/${row._id}/edit`)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium 
-                         text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 
-                         border border-indigo-500/20 rounded-lg transition"
-              title="Edit User"
-            >
-              <Edit size={16} />
-       
-            </button>
+            {hasFeature("canEditUsers") && (
+              <button
+                onClick={() => navigate(`/users/${row._id}/edit`)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium 
+                           text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 
+                           border border-indigo-500/20 rounded-lg transition"
+                title="Edit User"
+              >
+                <Edit size={16} />
+              </button>
+            )}
 
-            <button
-              onClick={() => handleDelete(row._id)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium 
-                         text-red-400 bg-red-500/10 hover:bg-red-500/20 
-                         border border-red-500/20 rounded-lg transition"
-              title="Delete User"
-            >
-              <Trash2 size={16} />
-            </button>
+            {hasFeature("canDeleteUsers") && (
+              <button
+                onClick={() => handleDelete(row._id)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium 
+                           text-red-400 bg-red-500/10 hover:bg-red-500/20 
+                           border border-red-500/20 rounded-lg transition"
+                title="Delete User"
+              >
+                <Trash2 size={16} />
+              </button>
+            )}
           </div>
         ),
       },
@@ -674,13 +678,15 @@ export default function Users() {
                 </div>
 
                 <div className="pt-2 border-t border-gray-800">
-                  <button
-                    onClick={openEditFromDetail}
-                    className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-medium flex items-center justify-center gap-2 transition"
-                  >
-                    <Edit size={18} />
-                    Update User
-                  </button>
+                  {hasFeature("canEditUsers") && (
+                    <button
+                      onClick={openEditFromDetail}
+                      className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-medium flex items-center justify-center gap-2 transition"
+                    >
+                      <Edit size={18} />
+                      Update User
+                    </button>
+                  )}
                 </div>
               </div>
             ) : (
@@ -797,15 +803,17 @@ export default function Users() {
               </div>
 
               <div className="flex gap-3 pt-2">
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg 
-                             font-medium flex items-center justify-center gap-2 disabled:opacity-60 transition"
-                >
-                  {submitting && <Loader2 size={16} className="animate-spin" />}
-                  Save Changes
-                </button>
+                {hasFeature("canEditUsers") && (
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg 
+                               font-medium flex items-center justify-center gap-2 disabled:opacity-60 transition"
+                  >
+                    {submitting && <Loader2 size={16} className="animate-spin" />}
+                    Save Changes
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setEditModal(false)}

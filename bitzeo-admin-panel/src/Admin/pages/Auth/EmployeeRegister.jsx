@@ -13,7 +13,6 @@ import {
   X,
   User,
   Lock,
-  KeyRound,
   EyeOff,
   BriefcaseBusiness,
   Phone,
@@ -26,6 +25,7 @@ import {
 } from "lucide-react";
 import API from "../../../api";
 import toast from "react-hot-toast";
+import { hasFeature } from "../../../config/roleConfig";
 
 // Country list
 const countries = [
@@ -111,7 +111,6 @@ export default function UsersManagement() {
     password: "",
     confirmPassword: "",
     role: "admin",
-    registerKey: "ajhfgahg76873468gsjhfgjhsfhsdgfjh4654684621",
     contactNumber: "",
     dateOfJoining: "",
     experienceYears: "",
@@ -123,7 +122,6 @@ export default function UsersManagement() {
   const [profilePhoto, setProfilePhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
-  const [showKey, setShowKey] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const filteredCountries = countries.filter(
@@ -205,7 +203,6 @@ export default function UsersManagement() {
       password: "",
       confirmPassword: "",
       role: "admin",
-      registerKey: "ajhfgahg76873468gsjhfgjhsfhsdgfjh4654684621",
       contactNumber: "",
       dateOfJoining: "",
       experienceYears: "",
@@ -214,7 +211,6 @@ export default function UsersManagement() {
     setPhotoPreview(null);
     setSelectedCountry(countries[0]);
     setShowPassword(false);
-    setShowKey(false);
   };
 
   const handleSubmit = async (e) => {
@@ -242,7 +238,6 @@ export default function UsersManagement() {
       data.append("email", formData.email);
       data.append("password", formData.password);
       data.append("role", formData.role);
-      data.append("registerKey", formData.registerKey.trim());
       data.append("contactNumber", fullContact);
       data.append("countryCode", selectedCountry.dial);
       data.append("dateOfJoining", formData.dateOfJoining);
@@ -304,13 +299,15 @@ export default function UsersManagement() {
             </p>
           </div>
 
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-lg font-medium transition shadow-lg shadow-indigo-900/30"
-          >
-            <UserPlus size={18} />
-            Add Employee
-          </button>
+          {hasFeature("canCreateEmployee") && (
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-lg font-medium transition shadow-lg shadow-indigo-900/30"
+            >
+              <UserPlus size={18} />
+              Add Employee
+            </button>
+          )}
         </div>
 
         {/* Search */}
@@ -444,13 +441,15 @@ export default function UsersManagement() {
                           >
                             <Eye size={16} />
                           </button>
-                          <button
-                            onClick={() => handleDelete(user._id)}
-                            className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition"
-                            title="Delete Employee"
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                          {hasFeature("canCreateEmployee") && (
+                            <button
+                              onClick={() => handleDelete(user._id)}
+                              className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition"
+                              title="Delete Employee"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -919,34 +918,6 @@ export default function UsersManagement() {
                 </div>
               </div>
 
-              {/* Setup Key */}
-              <div>
-                <label className="block text-sm text-gray-300 mb-1">
-                  Setup Key
-                </label>
-                <div className="relative">
-                  <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4" />
-                  <input
-                    type={showKey ? "text" : "password"}
-                    name="registerKey"
-                    value={formData.registerKey}
-                    onChange={handleChange}
-                    onCopy={preventCopyPaste}
-                    onPaste={preventCopyPaste}
-                    required
-                    placeholder="Admin setup key"
-                    className="w-full pl-9 pr-10 py-2.5 bg-gray-800 border border-gray-700 text-white rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowKey(!showKey)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
-                  >
-                    {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-              </div>
-
               {/* Submit */}
               <div className="flex gap-3 pt-2">
                 <button
@@ -959,13 +930,15 @@ export default function UsersManagement() {
                 >
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-800 text-white rounded-lg font-medium transition"
-                >
-                  {isSubmitting ? "Creating..." : "Create Employee"}
-                </button>
+                {hasFeature("canCreateEmployee") && (
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-800 text-white rounded-lg font-medium transition"
+                  >
+                    {isSubmitting ? "Creating..." : "Create Employee"}
+                  </button>
+                )}
               </div>
             </form>
           </div>

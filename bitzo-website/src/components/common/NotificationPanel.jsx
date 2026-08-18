@@ -18,7 +18,7 @@ const resolveUrl = (url) =>
     : null;
 
 const getNotificationText = (notification) => {
-  const actorName = notification.actor?.name || "Someone";
+  const actorName = notification.actor?.name || "System";
   const videoTitle = notification.video?.title || "your video";
 
   switch (notification.type) {
@@ -30,6 +30,18 @@ const getNotificationText = (notification) => {
       return `${actorName} commented on your video "${videoTitle}"`;
     case "upload":
       return `${actorName} uploaded a new video "${videoTitle}"`;
+    case "copyright_takedown_approved":
+      return `Your video "${videoTitle}" has been removed due to a copyright takedown`;
+    case "copyright_takedown_rejected":
+      return `A copyright takedown request on "${videoTitle}" was rejected`;
+    case "copyright_dispute_filed":
+      return `A dispute has been filed for the copyright claim on "${videoTitle}"`;
+    case "copyright_dispute_resolved":
+      return `Your copyright dispute for "${videoTitle}" has been resolved`;
+    case "copyright_case_resolved":
+      return `A copyright case involving "${videoTitle}" has been resolved`;
+    case "copyright_case_created":
+      return `A new copyright claim has been filed on "${videoTitle}"`;
     default:
       return "You have a new notification";
   }
@@ -39,6 +51,9 @@ const getNotificationTarget = (notification) => {
   if (notification.type === "subscribe") {
     const channelId = notification.channel?._id || notification.channel;
     return channelId ? `/channel/${channelId}` : null;
+  }
+  if (notification.type?.startsWith("copyright_")) {
+    return "/copyright";
   }
   const videoId = notification.video?._id || notification.video;
   return videoId ? `/video/${videoId}` : null;

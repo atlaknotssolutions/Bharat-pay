@@ -27,6 +27,7 @@ import {
   Play,
   MonitorPlay,
 } from "lucide-react";
+import { hasFeature } from "../../config/roleConfig";
 import {
   fetchAdminUserOverview,
   fetchAdminUserActivity,
@@ -385,12 +386,14 @@ export default function User360() {
               <p className="text-xs text-gray-500">Points</p>
             </div>
           </div>
-          <button
-            onClick={() => navigate(`/users/${userId}/edit`)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-300 bg-gray-800/50 hover:bg-gray-800 border border-gray-700/50 rounded-lg transition flex-shrink-0"
-          >
-            Edit
-          </button>
+          {hasFeature("canEditUsers") && (
+            <button
+              onClick={() => navigate(`/users/${userId}/edit`)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-300 bg-gray-800/50 hover:bg-gray-800 border border-gray-700/50 rounded-lg transition flex-shrink-0"
+            >
+              Edit
+            </button>
+          )}
         </div>
       </div>
 

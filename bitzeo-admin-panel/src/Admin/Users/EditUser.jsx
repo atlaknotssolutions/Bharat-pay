@@ -56,6 +56,7 @@ import {
   clearShortModerationResult,
 } from "../../redux/slices/adminUser360Slice";
 import ModerationDialog from "./ModerationDialog";
+import { hasFeature } from "../../config/roleConfig";
 
 const VALID_ROLES = ["viewer", "creator", "admin"];
 
@@ -855,7 +856,7 @@ export default function EditUser() {
             )}
 
             <div className="flex flex-wrap gap-2">
-              {canSuspend && (
+              {canSuspend && hasFeature("canSuspendUsers") && (
                 <button
                   type="button"
                   onClick={() => openModerationDialog("suspend")}
@@ -866,7 +867,7 @@ export default function EditUser() {
                   Suspend
                 </button>
               )}
-              {canBan && (
+              {canBan && hasFeature("canBanUsers") && (
                 <button
                   type="button"
                   onClick={() => openModerationDialog("ban")}
@@ -877,7 +878,7 @@ export default function EditUser() {
                   Ban
                 </button>
               )}
-              {canRestore && (
+              {canRestore && hasFeature("canSuspendUsers") && (
                 <button
                   type="button"
                   onClick={() => openModerationDialog("restore")}
@@ -1060,20 +1061,20 @@ export default function EditUser() {
                   <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-gray-700/50" onClick={(e) => e.stopPropagation()}>
                     {(selectedChannel.status || "active") === "active" && (
                       <>
-                        <ChannelActionBtn icon={PowerOff} label="Disable" color="amber" onClick={() => openContentDialog("disableChannel", "channel", selectedChannel._id, selectedChannel.name)} />
-                        <ChannelActionBtn icon={Ban} label="Ban" color="red" onClick={() => openContentDialog("banChannel", "channel", selectedChannel._id, selectedChannel.name)} />
+                        {hasFeature("canModerateContent") && <ChannelActionBtn icon={PowerOff} label="Disable" color="amber" onClick={() => openContentDialog("disableChannel", "channel", selectedChannel._id, selectedChannel.name)} />}
+                        {hasFeature("canBanUsers") && <ChannelActionBtn icon={Ban} label="Ban" color="red" onClick={() => openContentDialog("banChannel", "channel", selectedChannel._id, selectedChannel.name)} />}
                       </>
                     )}
                     {(selectedChannel.status || "active") === "disabled" && (
                       <>
-                        <ChannelActionBtn icon={Power} label="Enable" color="emerald" onClick={() => openContentDialog("enableChannel", "channel", selectedChannel._id, selectedChannel.name)} />
-                        <ChannelActionBtn icon={Ban} label="Ban" color="red" onClick={() => openContentDialog("banChannel", "channel", selectedChannel._id, selectedChannel.name)} />
+                        {hasFeature("canModerateContent") && <ChannelActionBtn icon={Power} label="Enable" color="emerald" onClick={() => openContentDialog("enableChannel", "channel", selectedChannel._id, selectedChannel.name)} />}
+                        {hasFeature("canBanUsers") && <ChannelActionBtn icon={Ban} label="Ban" color="red" onClick={() => openContentDialog("banChannel", "channel", selectedChannel._id, selectedChannel.name)} />}
                       </>
                     )}
                     {(selectedChannel.status || "active") === "banned" && (
                       <ChannelActionBtn icon={RotateCcw} label="Restore" color="emerald" onClick={() => openContentDialog("restoreChannel", "channel", selectedChannel._id, selectedChannel.name)} />
                     )}
-                    <ChannelActionBtn icon={Trash2} label="Delete" color="red" onClick={() => openContentDialog("deleteChannel", "channel", selectedChannel._id, selectedChannel.name)} />
+                    {hasFeature("canDeleteUsers") && <ChannelActionBtn icon={Trash2} label="Delete" color="red" onClick={() => openContentDialog("deleteChannel", "channel", selectedChannel._id, selectedChannel.name)} />}
                   </div>
                 </div>
 
@@ -1170,7 +1171,8 @@ export default function EditUser() {
           <p className="text-sm text-gray-400 mb-4">
             Permanently delete this user and all associated data. This action cannot be undone.
           </p>
-          {!showDeleteConfirm ? (
+          {hasFeature("canDeleteUsers") && (
+            !showDeleteConfirm ? (
             <button
               type="button"
               onClick={() => setShowDeleteConfirm(true)}
@@ -1193,6 +1195,7 @@ export default function EditUser() {
                 autoFocus
               />
               <div className="flex gap-2">
+                {hasFeature("canDeleteUsers") && (
                 <button
                   type="button"
                   onClick={handleDelete}
@@ -1202,6 +1205,7 @@ export default function EditUser() {
                   {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
                   {deleting ? "Deleting..." : "Confirm Delete"}
                 </button>
+                )}
                 <button
                   type="button"
                   onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText(""); }}
@@ -1211,11 +1215,12 @@ export default function EditUser() {
                 </button>
               </div>
             </div>
-          )}
+          ))}
         </div>
 
         {/* ACTION FOOTER */}
         <div className="flex items-center gap-3 pt-2 pb-4">
+          {hasFeature("canEditUsers") && (
           <button
             type="submit"
             disabled={saving || !dirty}
@@ -1228,6 +1233,7 @@ export default function EditUser() {
             )}
             {saving ? "Saving..." : "Save Changes"}
           </button>
+          )}
           <button
             type="button"
             onClick={handleCancel}
@@ -1508,7 +1514,7 @@ function ContentTable({
                     <td className="py-2.5 pr-3"><ChannelStatusBadge status={itemStatus} /></td>
                     <td className="py-2.5 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        {itemStatus === "active" && (
+                        {itemStatus === "active" && hasFeature("canModerateContent") && (
                           <button
                             type="button"
                             onClick={() => onAction(disableAction, item)}
@@ -1518,7 +1524,7 @@ function ContentTable({
                             <PowerOff size={11} />
                           </button>
                         )}
-                        {itemStatus === "disabled" && (
+                        {itemStatus === "disabled" && hasFeature("canModerateContent") && (
                           <button
                             type="button"
                             onClick={() => onAction(enableAction, item)}
@@ -1528,6 +1534,7 @@ function ContentTable({
                             <Power size={11} />
                           </button>
                         )}
+                        {hasFeature("canModerateContent") && (
                         <button
                           type="button"
                           onClick={() => onAction(deleteAction, item)}
@@ -1536,6 +1543,7 @@ function ContentTable({
                         >
                           <Trash2 size={11} />
                         </button>
+                        )}
                       </div>
                     </td>
                   </tr>

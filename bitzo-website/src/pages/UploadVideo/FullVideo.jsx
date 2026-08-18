@@ -15,6 +15,7 @@ import {
   MoreHorizontal,
   RotateCcw,
   Send,
+  Shield,
   Share2,
   SkipForward,
   ThumbsDown,
@@ -1063,6 +1064,17 @@ export default function YouTubeLikeVideoPage() {
                         className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left hover:bg-white/10 transition-colors"
                       >
                         <Copy size={16} /> Copy link
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMoreMenuOpen(false);
+                          const title = videoDetails?.title || videoData.title || "";
+                          navigate(`/copyright/claim?videoId=${id}&title=${encodeURIComponent(title)}`);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left hover:bg-white/10 transition-colors"
+                      >
+                        <Shield size={16} /> Report Copyright
                       </button>
                     </div>
                   </>
