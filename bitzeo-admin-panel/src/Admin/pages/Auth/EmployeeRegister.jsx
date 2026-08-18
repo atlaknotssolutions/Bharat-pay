@@ -677,9 +677,7 @@ export default function UsersManagement() {
   const fetchUsers = async (pageNum = 1, searchTerm = "") => {
     try {
       setLoading(true);
-      const res = await API.get("/admin/roles", {
-        params: { page: pageNum, limit: 15, search: searchTerm },
-      });
+      const res = await API.get("/admin/roles");
       if (res.data.success) {
         setUsers(res.data.data || []);
         setPagination(res.data.pagination || {});

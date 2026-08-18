@@ -11,7 +11,7 @@ const {
   getUserById,
   adminRefresh,
   adminLogout,
-  getAllowedRoles,
+  getEmployees,
 } = require("../../controller/AdminController/AdminController");
 const requireAdmin = require("../../middlewares/requireAdmin");
 const {
@@ -32,7 +32,7 @@ router.post("/employee/register", adminRegisterLimiter, registerEmployee);
 router.post("/employee/login", adminLoginLimiter, loginEmployee);
 router.post("/refresh", refreshLimiter, adminRefresh);
 router.post("/logout", adminLogout);
-router.get("/roles", getAllowedRoles); // public ya auth ke according
+router.get("/roles", getEmployees); // public ya auth ke according
 // Protected Admin Routes
 router.get("/dashboard", requireAdmin, getDashboard);
 router.get("/users", requireAdmin, getAllUsers);
