@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "http://localhost:8000/api/admin", // change to your backend URL
+  baseURL: `${import.meta.env.VITE_API_BASE_URL || "https://bharat-pay-3.onrender.com/api"}/admin`,
   withCredentials: true, // important for cookies
 });
 

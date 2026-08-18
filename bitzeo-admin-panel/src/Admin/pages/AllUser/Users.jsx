@@ -21,8 +21,9 @@ import {
   Eye,
 } from "lucide-react";
 import { hasFeature } from "../../config/roleConfig";
+import { API_BASE_URL } from "../../api";
 
-const BASE_URL = "http://localhost:8000/api";
+const BASE_URL = API_BASE_URL;
 
 export default function Users() {
   const [users, setUsers] = useState([]);
