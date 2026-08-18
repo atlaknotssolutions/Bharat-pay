@@ -40,6 +40,13 @@ const requireAdmin = async (req, res, next) => {
       });
     }
 
+    if (admin.isActive === false) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized - Admin account is disabled",
+      });
+    }
+
     req.admin = admin;
     req.user = admin;
     next();

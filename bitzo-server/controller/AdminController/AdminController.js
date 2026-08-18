@@ -1031,6 +1031,13 @@ exports.loginUser = async (req, res) => {
       });
     }
 
+    if (user.isActive === false) {
+      return res.status(401).json({
+        success: false,
+        message: "Your account is disabled. Please contact the admin.",
+      });
+    }
+
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({
@@ -2550,10 +2557,17 @@ exports.loginEmployee = async (req, res) => {
       email: email.toLowerCase().trim(),
     }).select("+password");
 
-    if (!user || !user.isActive) {
+    if (!user) {
       return res.status(401).json({
         success: false,
-        message: "Invalid credentials or account disabled",
+        message: "Invalid credentials",
+      });
+    }
+
+    if (user.isActive === false) {
+      return res.status(401).json({
+        success: false,
+        message: "Your account is disabled. Please contact the admin.",
       });
     }
 
@@ -2622,16 +2636,73 @@ exports.loginEmployee = async (req, res) => {
   }
 };
 
+// ==================== TOGGLE USER STATUS (Enable / Disable) ====================
+exports.toggleUserStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isActive } = req.body;
+
+    if (typeof isActive !== "boolean") {
+      return res.status(400).json({
+        success: false,
+        message: "isActive must be a boolean (true or false)",
+      });
+    }
+
+    const user = await User.findById(id); // or Admin.findById if model name is Admin
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Optional: Prevent disabling yourself
+    if (
+      req.user &&
+      String(req.user.userId) === String(user._id) &&
+      isActive === false
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "You cannot disable your own account",
+      });
+    }
+
+    user.isActive = isActive;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: isActive
+        ? "User enabled successfully"
+        : "User disabled successfully",
+      data: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        isActive: user.isActive,
+      },
+    });
+  } catch (error) {
+    console.error("Toggle user status error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
 // ================== GET ALLOWED ROLES ==================
-
-
 
 exports.getEmployees = async (req, res) => {
   try {
-    const employees = await User.find({ 
-      role: { $in: ["admin", "finance", "support", "read-only"] } 
+    const employees = await User.find({
+      role: { $in: ["admin", "finance", "support", "read-only"] },
     })
-      .select("name email role contactNumber countryCode dateOfJoining experienceYears profilePhoto isActive createdAt")
+      .select(
+        "name email role contactNumber countryCode dateOfJoining experienceYears profilePhoto isActive createdAt",
+      )
       .sort({ createdAt: -1 })
       .lean();
 

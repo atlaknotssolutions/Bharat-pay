@@ -40,6 +40,7 @@ const {
   enableShort,
   deleteShort,
   getEmployees,
+  toggleUserStatus,
 } = require("../../controller/AdminController/AdminController");
 const requireAdmin = require("../../middlewares/requireAdmin");
 const {
@@ -70,6 +71,7 @@ router.get("/roles", getEmployees); // public ya auth ke according
 // Protected Admin Routes
 router.get("/dashboard", requireAdmin, getDashboard);
 router.get("/users", requireAdmin, getAllUsers);
+// <<<<<<< HEAD
 router.get("/uploads", requireAdmin, adminUserListLimiter, getAdminUploads);
 router.get("/alluser", requireAdmin, adminUserListLimiter, getAllUsers);
 router.get("/users/:id", requireAdmin, adminUserLimiter, getUserById);
@@ -112,4 +114,9 @@ router.post("/users/:id/shorts/:videoId/disable", requireAdmin, adminUserLimiter
 router.post("/users/:id/shorts/:videoId/enable", requireAdmin, adminUserLimiter, enableShort);
 router.delete("/users/:id/shorts/:videoId", requireAdmin, adminDestructiveLimiter, deleteShort);
 
+router.patch("/users/:id/status", requireAdmin, toggleUserStatus);
+router.get("/users/:id", requireAdmin, getUserById);
+router.get("/alluser", requireAdmin, getAllUsers);
+router.put("/users/:id", requireAdmin, updateUser);
+router.delete("/users/:id", requireAdmin, deleteUser);
 module.exports = router;
