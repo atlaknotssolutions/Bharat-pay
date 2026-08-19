@@ -24,6 +24,7 @@ import VideoUpload from "./Admin/pages/LongVideo/VideoUpload";
 import Shorts from "./Admin/pages/ShortsVideo/Shorts";
 import CategoryManagement from "./Admin/CategoryManagement/Category";
 import AllUsers from "./Admin/Users/AllUser";
+import DeletedUsers from "./Admin/Users/DeletedUsers";
 import EmployeeRegister from "./Admin/pages/Auth/EmployeeRegister";
 import Register from "./Admin/pages/Auth/Register";
 import User360 from "./Admin/Users/User360";
@@ -125,6 +126,7 @@ function App() {
             {/* ── User Management Routes ── */}
             <Route element={<RoleGuard />}>
               <Route path="alluser" element={<AllUsers />} />
+              <Route path="deleted-users" element={<DeletedUsers />} />
               <Route path="users/:userId" element={<User360 />} />
             </Route>
 

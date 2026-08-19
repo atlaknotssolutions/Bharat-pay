@@ -195,3 +195,9 @@ export const searchVideos = (q) =>
   API.get("/admin/search/videos", { params: { q } });
 export const searchUsers = (q) =>
   API.get("/admin/search/users", { params: { q } });
+
+// Deleted Users
+export const fetchDeletedUsers = (params) =>
+  API.get("/admin/deleted-users", { params });
+export const hardDeleteUser = (id) =>
+  API.delete(`/admin/users/${id}/permanent`);

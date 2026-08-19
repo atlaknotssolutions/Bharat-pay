@@ -24,6 +24,7 @@ const ALL_NAV_ITEMS = [
   { to: "/category", icon: FolderOpen, label: "Category", roles: ["admin"] },
   { to: "/create-employee", icon: Package, label: "Add Employee", roles: ["admin"] },
   { to: "/alluser", icon: Users, label: "Users", roles: ["admin", "finance", "support", "read-only"] },
+  { to: "/deleted-users", icon: Users, label: "Deleted Users", roles: ["admin"] },
   { to: "/video", icon: Video, label: "Video", roles: ["admin", "support", "read-only"] },
   { to: "/shorts", icon: Clapperboard, label: "Shorts", roles: ["admin", "support", "read-only"] },
   { to: "/copyright", icon: Shield, label: "Copyright", roles: ["admin", "finance", "support", "read-only"] },
@@ -96,6 +97,7 @@ const FEATURE_FLAGS = {
   admin: {
     canEditUsers: true,
     canDeleteUsers: true,
+    canHardDeleteUsers: true,
     canSuspendUsers: true,
     canBanUsers: true,
     canCreateEmployee: true,

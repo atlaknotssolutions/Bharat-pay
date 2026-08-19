@@ -42,6 +42,8 @@ const {
   deleteShort,
   getEmployees,
   toggleUserStatus,
+  getDeletedUsers,
+  hardDeleteUser,
 } = require("../../controller/AdminController/AdminController");
 const requireAdmin = require("../../middlewares/requireAdmin");
 const { requirePermission } = require("../../middlewares/checkAdminPermission");
@@ -107,7 +109,11 @@ router.get("/uploads", requireAdmin, requirePermission("content:read"), adminUse
 router.put("/users/:id", requireAdmin, requirePermission("users:write"), adminUserLimiter, updateUser);
 
 // ====================== PROTECTED: USER DELETE ======================
+router.delete("/users/:id/permanent", requireAdmin, requirePermission("users:delete"), adminDestructiveLimiter, hardDeleteUser);
 router.delete("/users/:id", requireAdmin, requirePermission("users:delete"), adminDestructiveLimiter, deleteUser);
+
+// ====================== DELETED USERS ======================
+router.get("/deleted-users", requireAdmin, requirePermission("users:read"), adminUserListLimiter, getDeletedUsers);
 
 // ====================== PROTECTED: USER MODERATION ======================
 router.post("/users/:id/suspend", requireAdmin, requirePermission("moderation:write"), adminDestructiveLimiter, suspendUser);

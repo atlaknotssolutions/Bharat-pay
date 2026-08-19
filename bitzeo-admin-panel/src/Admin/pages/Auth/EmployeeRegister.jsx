@@ -1175,6 +1175,7 @@ import {
 import API from "../../../api";
 import toast from "react-hot-toast";
 import { hasFeature } from "../../../config/roleConfig";
+import tableCustomStyles from "../../../utils/tableStyles";
 
 // Country list
 const countries = [
@@ -1654,98 +1655,12 @@ export default function UsersManagement() {
           </button>
         </div>
       ),
-      right: true,
       ignoreRowClick: true,
       allowOverflow: true,
-      button: true,
+      style: { justifyContent: "flex-end" },
       minWidth: "140px",
     },
   ];
-
-  // ========== Custom Dark Theme ==========
-  const customStyles = {
-    table: {
-      style: {
-        backgroundColor: "transparent",
-      },
-    },
-    headRow: {
-      style: {
-        backgroundColor: "rgba(31, 41, 55, 0.8)",
-        borderBottom: "1px solid #1f2937",
-        color: "#d1d5db",
-        fontSize: "0.875rem",
-        fontWeight: 500,
-        minHeight: "52px",
-      },
-    },
-    headCells: {
-      style: {
-        paddingLeft: "24px",
-        paddingRight: "24px",
-      },
-    },
-    rows: {
-      style: {
-        backgroundColor: "transparent",
-        color: "#e5e7eb",
-        borderBottom: "1px solid #1f2937",
-        minHeight: "64px",
-        "&:hover": {
-          backgroundColor: "rgba(31, 41, 55, 0.4)",
-        },
-      },
-    },
-    cells: {
-      style: {
-        paddingLeft: "24px",
-        paddingRight: "24px",
-      },
-    },
-    pagination: {
-      style: {
-        backgroundColor: "transparent",
-        borderTop: "1px solid #1f2937",
-        color: "#9ca3af",
-        minHeight: "56px",
-      },
-      pageButtonsStyle: {
-        borderRadius: "8px",
-        height: "36px",
-        width: "36px",
-        padding: "4px",
-        margin: "0 4px",
-        cursor: "pointer",
-        transition: "0.2s",
-        color: "#d1d5db",
-        fill: "#d1d5db",
-        backgroundColor: "#1f2937",
-        "&:disabled": {
-          cursor: "not-allowed",
-          opacity: 0.4,
-        },
-        "&:hover:not(:disabled)": {
-          backgroundColor: "#374151",
-        },
-        "&:focus": {
-          outline: "none",
-        },
-      },
-    },
-    noData: {
-      style: {
-        backgroundColor: "transparent",
-        color: "#6b7280",
-        padding: "48px",
-      },
-    },
-    progress: {
-      style: {
-        backgroundColor: "transparent",
-        color: "#818cf8",
-      },
-    },
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-indigo-950 p-4 md:p-8">
@@ -1826,8 +1741,8 @@ export default function UsersManagement() {
             paginationPerPage={10}
             paginationRowsPerPageOptions={[5, 10, 15, 25, 50]}
             highlightOnHover
-            pointerOnHover
-            customStyles={customStyles}
+            pointerOnHover={false}
+            customStyles={tableCustomStyles}
             noDataComponent={
               <div className="py-12 text-center text-gray-500">
                 No users found

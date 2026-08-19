@@ -1169,7 +1169,7 @@ export default function EditUser() {
             Danger Zone
           </h2>
           <p className="text-sm text-gray-400 mb-4">
-            Permanently delete this user and all associated data. This action cannot be undone.
+            Delete this user. The user will be moved to Deleted Users and can be restored later.
           </p>
           {hasFeature("canDeleteUsers") && (
             !showDeleteConfirm ? (

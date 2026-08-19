@@ -43,6 +43,7 @@ const auditEventSchema = new mongoose.Schema(
         "ADMIN_USER_SUSPEND",
         "ADMIN_USER_RESTORE",
         "ADMIN_USER_BAN",
+        "ADMIN_USER_HARD_DELETE",
 
         // Admin content moderation events
         "ADMIN_CHANNEL_DISABLE",

@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { hasFeature } from "../../config/roleConfig";
 import { API_BASE_URL } from "../../api";
+import tableCustomStyles from "../../utils/tableStyles";
 
 const BASE_URL = API_BASE_URL;
 const LIMIT = 15;
@@ -53,92 +54,6 @@ function VideoListItem({ video }) {
     </div>
   );
 }
-
-const customStyles = {
-  table: {
-    style: {
-      backgroundColor: "transparent",
-    },
-  },
-  headRow: {
-    style: {
-      backgroundColor: "rgba(31, 41, 55, 0.5)",
-      borderBottom: "1px solid #1f2937",
-      minHeight: "48px",
-    },
-  },
-  headCells: {
-    style: {
-      color: "#9ca3af",
-      fontSize: "12px",
-      fontWeight: "600",
-      textTransform: "uppercase",
-      letterSpacing: "0.05em",
-      paddingLeft: "20px",
-      paddingRight: "20px",
-    },
-  },
-  rows: {
-    style: {
-      backgroundColor: "transparent",
-      borderBottom: "1px solid #1f2937",
-      minHeight: "64px",
-      color: "#d1d5db",
-      "&:hover": {
-        backgroundColor: "rgba(55, 65, 81, 0.4)",
-        color: "#e5e7eb",
-        cursor: "default",
-      },
-    },
-    highlightOnHoverStyle: {
-      backgroundColor: "rgba(55, 65, 81, 0.4)",
-      color: "#e5e7eb",
-      borderBottomColor: "#1f2937",
-      outline: "none",
-    },
-  },
-  cells: {
-    style: {
-      paddingLeft: "20px",
-      paddingRight: "20px",
-      color: "#d1d5db",
-    },
-  },
-  pagination: {
-    style: {
-      backgroundColor: "transparent",
-      borderTop: "1px solid #1f2937",
-      color: "#9ca3af",
-      minHeight: "56px",
-    },
-    pageButtonsStyle: {
-      color: "#9ca3af",
-      fill: "#9ca3af",
-      backgroundColor: "transparent",
-      borderRadius: "8px",
-      "&:hover:not(:disabled)": {
-        backgroundColor: "#374151",
-        color: "#e5e7eb",
-        fill: "#e5e7eb",
-      },
-      "&:disabled": {
-        opacity: 0.4,
-      },
-    },
-  },
-  noData: {
-    style: {
-      backgroundColor: "transparent",
-      color: "#6b7280",
-      padding: "48px",
-    },
-  },
-  progress: {
-    style: {
-      backgroundColor: "transparent",
-    },
-  },
-};
 
 export default function Users() {
   const navigate = useNavigate();
@@ -412,7 +327,7 @@ export default function Users() {
               </button>
             )}
 
-            {hasFeature("canDeleteUsers") && (
+            {/* {hasFeature("canDeleteUsers") && (
               <button
                 onClick={() => handleDelete(row._id)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium 
@@ -422,7 +337,7 @@ export default function Users() {
               >
                 <Trash2 size={16} />
               </button>
-            )}
+            )} */}
           </div>
         ),
       },
@@ -460,7 +375,7 @@ export default function Users() {
         <DataTable
           columns={columns}
           data={users}
-          customStyles={customStyles}
+          customStyles={tableCustomStyles}
           progressPending={loading}
           progressComponent={
             <div className="flex flex-col items-center justify-center py-20">

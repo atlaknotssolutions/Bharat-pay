@@ -180,14 +180,17 @@ exports.getAllUsers = async (req, res) => {
     const rawSearch = (req.query.search || "").slice(0, MAX_SEARCH_LENGTH);
     const search = rawSearch.trim();
 
-    const filter = search
-      ? {
-          $or: [
-            { name: { $regex: escapeRegex(search), $options: "i" } },
-            { email: { $regex: escapeRegex(search), $options: "i" } },
-          ],
-        }
-      : {};
+    const filter = {
+      status: { $ne: "deleted" },
+      ...(search
+        ? {
+            $or: [
+              { name: { $regex: escapeRegex(search), $options: "i" } },
+              { email: { $regex: escapeRegex(search), $options: "i" } },
+            ],
+          }
+        : {}),
+    };
 
     const [users, total] = await Promise.all([
       AllUser.find(filter)
@@ -567,6 +570,182 @@ exports.deleteUser = async (req, res) => {
   } catch (err) {
     console.error("deleteUser error:", err);
     res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ================== GET DELETED USERS ==================
+exports.getDeletedUsers = async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 15));
+    const skip = (page - 1) * limit;
+    const rawSearch = (req.query.search || "").slice(0, MAX_SEARCH_LENGTH);
+    const search = rawSearch.trim();
+
+    const filter = {
+      status: "deleted",
+      ...(search
+        ? {
+            $or: [
+              { name: { $regex: escapeRegex(search), $options: "i" } },
+              { email: { $regex: escapeRegex(search), $options: "i" } },
+            ],
+          }
+        : {}),
+    };
+
+    const [users, total] = await Promise.all([
+      AllUser.find(filter)
+        .select(
+          "name email role avatar trustScore rewardPoints createdAt status deletedAt deletedBy deleteReason",
+        )
+        .sort({ deletedAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+
+      AllUser.countDocuments(filter),
+    ]);
+
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+
+    const formattedUsers = users.map((user) => {
+      if (user.avatar && !user.avatar.startsWith("http")) {
+        user.avatar = `${baseUrl}/${user.avatar}`;
+      }
+
+      return {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        avatar: user.avatar,
+        trustScore: user.trustScore ?? 50,
+        rewardPoints: user.rewardPoints ?? 0,
+        createdAt: user.createdAt,
+        deletedAt: user.deletedAt || null,
+        deletedBy: user.deletedBy || null,
+        deleteReason: user.deleteReason || null,
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+      data: formattedUsers,
+    });
+  } catch (err) {
+    console.error("getDeletedUsers error:", err);
+    res.status(500).json({
+      success: false,
+      message: err.message || "Failed to fetch deleted users",
+    });
+  }
+};
+
+// ================== HARD DELETE USER (permanent) ==================
+exports.hardDeleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const adminId = req.admin && req.admin._id;
+
+    if (!id || !/^[0-9a-fA-F]{24}$/.test(id)) {
+      return res.status(400).json({ success: false, message: "Invalid user ID format" });
+    }
+
+    if (adminId && adminId.toString() === id) {
+      return res.status(400).json({ success: false, message: "You cannot delete your own account" });
+    }
+
+    const user = await AllUser.findOne({ _id: id, status: "deleted" });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found or not soft-deleted",
+      });
+    }
+
+    const userSnapshot = {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      createdAt: user.createdAt,
+      deletedAt: user.deletedAt,
+    };
+
+    // Clean up related references
+    const channelIds = (user.channels || []).filter(Boolean);
+    if (channelIds.length > 0) {
+      await Channel.deleteMany({ _id: { $in: channelIds } });
+    }
+
+    const videoIds = (user.videos || []).filter(Boolean);
+    if (videoIds.length > 0) {
+      await Video.deleteMany({ _id: { $in: videoIds } });
+      // Remove video references from channels that still exist
+      await Channel.updateMany(
+        { videos: { $in: videoIds } },
+        { $pull: { videos: { $in: videoIds } } },
+      );
+    }
+
+    // Remove user references from other users (subscriptions, likes, etc.)
+    await AllUser.updateMany(
+      { subscribedChannels: { $in: channelIds } },
+      { $pull: { subscribedChannels: { $in: channelIds } } },
+    );
+    await AllUser.updateMany(
+      { likedVideos: { $in: videoIds } },
+      { $pull: { likedVideos: { $in: videoIds } } },
+    );
+    await AllUser.updateMany(
+      { dislikedVideos: { $in: videoIds } },
+      { $pull: { dislikedVideos: { $in: videoIds } } },
+    );
+    await AllUser.updateMany(
+      { watchLaterVideos: { $in: videoIds } },
+      { $pull: { watchLaterVideos: { $in: videoIds } } },
+    );
+    await AllUser.updateMany(
+      { viewedVideos: { $in: videoIds } },
+      { $pull: { viewedVideos: { $in: videoIds } } },
+    );
+
+    // Revoke all refresh tokens
+    await RefreshToken.deleteMany({ userId: user._id });
+
+    // Delete the user document
+    await AllUser.deleteOne({ _id: id });
+
+    // Audit log
+    logAuditEvent({
+      userId: user._id,
+      eventType: "ADMIN_USER_HARD_DELETE",
+      ip: req.ip,
+      userAgent: req.get("user-agent"),
+      metadata: {
+        adminId,
+        userName: userSnapshot.name,
+        userEmail: userSnapshot.email,
+        userRole: userSnapshot.role,
+        userCreatedAt: userSnapshot.createdAt,
+        userDeletedAt: userSnapshot.deletedAt,
+      },
+    }).catch(() => {});
+
+    res.status(200).json({
+      success: true,
+      message: "User permanently deleted",
+    });
+  } catch (err) {
+    console.error("hardDeleteUser error:", err);
+    res.status(500).json({ success: false, message: err.message || "Failed to permanently delete user" });
   }
 };
 
@@ -1610,7 +1789,7 @@ const VALID_TRANSITIONS = {
   active: ["suspended", "banned", "deleted"],
   suspended: ["active", "banned", "deleted"],
   banned: ["active", "deleted"],
-  deleted: [],
+  deleted: ["active"],
 };
 
 // ================== MODERATION: SUSPEND ==================
@@ -1708,6 +1887,11 @@ exports.restoreUser = async (req, res) => {
     user.bannedAt = null;
     user.bannedBy = null;
     user.banReason = null;
+
+    // Clear deleted fields
+    user.deletedAt = null;
+    user.deletedBy = null;
+    user.deleteReason = null;
 
     await user.save();
 

@@ -18,10 +18,28 @@ import {
 } from "lucide-react";
 import API, { API_BASE_URL } from "../../api";
 import { hasFeature } from "../../config/roleConfig";
+import tableCustomStyles from "../../utils/tableStyles";
 
 
 
 const MEDIA_BASE = API_BASE_URL.replace(/\/api\/?$/, "");
+
+const contentTableStyles = {
+  ...tableCustomStyles,
+  rows: {
+    ...tableCustomStyles.rows,
+    style: {
+      ...tableCustomStyles.rows.style,
+      marginTop: "4px",
+      marginBottom: "4px",
+      borderRadius: "8px",
+    },
+    highlightOnHoverStyle: {
+      ...tableCustomStyles.rows.highlightOnHoverStyle,
+      borderRadius: "8px",
+    },
+  },
+};
 
 export default function ContentManagement({ type = "long" }) {
   const pageType = type === "short" ? "short" : "long";
@@ -320,91 +338,6 @@ export default function ContentManagement({ type = "long" }) {
       ),
     },
   ];
-
-  // Dark theme styles — no white on hover
-  const customStyles = {
-    table: {
-      style: {
-        backgroundColor: "transparent",
-      },
-    },
-    headRow: {
-      style: {
-        backgroundColor: "rgba(31, 41, 55, 0.5)",
-        borderBottom: "1px solid #1f2937",
-        fontWeight: "600",
-        fontSize: "13px",
-        color: "#9ca3af",
-        minHeight: "48px",
-      },
-    },
-    headCells: {
-      style: {
-        color: "#9ca3af",
-        paddingLeft: "16px",
-        paddingRight: "16px",
-      },
-    },
-    rows: {
-      style: {
-        backgroundColor: "transparent",
-        minHeight: "72px",
-        color: "#d1d5db",
-        borderBottom: "1px solid #1f2937",
-        "&:hover": {
-          backgroundColor: "rgba(55, 65, 81, 0.4)",
-          color: "#e5e7eb",
-          cursor: "pointer",
-        },
-      },
-      highlightOnHoverStyle: {
-        backgroundColor: "rgba(55, 65, 81, 0.4)",
-        color: "#e5e7eb",
-        borderBottomColor: "#1f2937",
-        outline: "none",
-      },
-    },
-    cells: {
-      style: {
-        color: "#d1d5db",
-        paddingLeft: "16px",
-        paddingRight: "16px",
-      },
-    },
-    pagination: {
-      style: {
-        backgroundColor: "transparent",
-        borderTop: "1px solid #1f2937",
-        color: "#9ca3af",
-        minHeight: "56px",
-      },
-      pageButtonsStyle: {
-        color: "#9ca3af",
-        fill: "#9ca3af",
-        backgroundColor: "transparent",
-        borderRadius: "8px",
-        "&:hover:not(:disabled)": {
-          backgroundColor: "#374151",
-          color: "#e5e7eb",
-          fill: "#e5e7eb",
-        },
-        "&:disabled": {
-          opacity: 0.4,
-        },
-      },
-    },
-    noData: {
-      style: {
-        backgroundColor: "transparent",
-        color: "#6b7280",
-      },
-    },
-    progress: {
-      style: {
-        backgroundColor: "transparent",
-      },
-    },
-  };
 
   // ================= VIDEO PLAYER VIEW =================
   if (view === "player" && selectedVideo) {
@@ -763,7 +696,7 @@ export default function ContentManagement({ type = "long" }) {
             pagination
             paginationPerPage={10}
             paginationRowsPerPageOptions={[5, 10, 20, 50]}
-            customStyles={customStyles}
+            customStyles={contentTableStyles}
             highlightOnHover
             pointerOnHover={false}
             theme="dark"
