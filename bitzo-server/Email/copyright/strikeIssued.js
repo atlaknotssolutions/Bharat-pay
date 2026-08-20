@@ -35,7 +35,7 @@ function getCopyrightStrikeIssuedMailOptions(userEmail, userName, { caseNumber, 
 </head>
 <body>
   <div class="container">
-    <div class="brand">BharatPay</div>
+    <div class="brand">Bharat Play</div>
     <div style="text-align:center"><span class="badge">Copyright Strike</span></div>
     <div class="title">A Copyright Strike Has Been Issued</div>
     <div class="content">
@@ -68,10 +68,10 @@ function getCopyrightStrikeIssuedMailOptions(userEmail, userName, { caseNumber, 
           <span class="detail-value">${expiryFormatted}</span>
         </div>
       </div>
-      <a href="${process.env.WEBSITE_URL || "https://bharatpay.com"}/copyright" class="cta">Manage This Strike</a>
+      <a href="${process.env.WEBSITE_URL || "https://bharatplay.com"}/copyright" class="cta">Manage This Strike</a>
     </div>
     <div class="footer">
-      &copy; 2026 BharatPay. All rights reserved.
+      &copy; 2026 Bharat Play. All rights reserved.
     </div>
   </div>
 </body>

@@ -83,6 +83,14 @@ const resetPasswordLimiter = rateLimit({
   message: jsonMessage("Too many reset attempts. Please try again later."),
 });
 
+const verifyResetOtpLimiter = rateLimit({
+  windowMs: 15 * MINUTE,
+  limit: 10,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: jsonMessage("Too many verification attempts. Please try again later."),
+});
+
 // Generous limit: watchSession.js flushes view events periodically
 // (~30s) per open session, so the limit must not break normal playback.
 const viewLimiter = rateLimit({
@@ -148,6 +156,7 @@ module.exports = {
   refreshLimiter,
   forgotPasswordLimiter,
   resetPasswordLimiter,
+  verifyResetOtpLimiter,
   viewLimiter,
   adminUserListLimiter,
   adminUserLimiter,

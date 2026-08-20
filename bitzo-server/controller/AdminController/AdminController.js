@@ -557,7 +557,7 @@ exports.deleteUser = async (req, res) => {
           user.email,
           user.name,
           user.role || "Employee",
-          "BharatPay",
+          "Bharat Play",
         ),
       );
     } catch (mailError) {
@@ -2690,7 +2690,7 @@ exports.registerEmployee = async (req, res) => {
         user.email,
         user.name,
         user.role,
-        "BharatPay",
+        "Bharat Play",
         user.experienceYears || "N/A",
         password,
       ),

@@ -28,7 +28,7 @@ function getCopyrightClaimReceivedMailOptions(adminEmail, adminName, { caseNumbe
 </head>
 <body>
   <div class="container">
-    <div class="brand">BharatPay</div>
+    <div class="brand">Bharat Play</div>
     <div style="text-align:center"><span class="badge">Copyright</span></div>
     <div class="title">New Copyright Claim Received</div>
     <div class="content">
@@ -48,10 +48,10 @@ function getCopyrightClaimReceivedMailOptions(adminEmail, adminName, { caseNumbe
           <span class="detail-value">${videoTitle || "Untitled"}</span>
         </div>
       </div>
-      <a href="${process.env.ADMIN_URL || "https://admin.bharatpay.com"}/copyright/cases" class="cta">Review Claim</a>
+      <a href="${process.env.ADMIN_URL || "https://admin.bharatplay.com"}/copyright/cases" class="cta">Review Claim</a>
     </div>
     <div class="footer">
-      &copy; 2026 BharatPay. All rights reserved.
+      &copy; 2026 Bharat Play. All rights reserved.
     </div>
   </div>
 </body>

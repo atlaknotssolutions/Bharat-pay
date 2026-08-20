@@ -49,6 +49,21 @@ const userSchema = new mongoose.Schema(
       default: null,
     },
 
+    // Forgot Password OTP (stored as SHA-256 hash)
+    resetOtpHash: {
+      type: String,
+      default: null,
+      select: false,
+    },
+    resetOtpExpires: {
+      type: Date,
+      default: null,
+    },
+    resetOtpAttempts: {
+      type: Number,
+      default: 0,
+    },
+
     // Avatar
     avatar: {
       type: String, // URL

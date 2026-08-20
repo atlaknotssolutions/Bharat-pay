@@ -19,7 +19,7 @@ export default function BottomInfo({ short, formattedViews, onSubscribe }) {
     raw.channelName ||
     uploadedBy?.name ||
     creator?.name ||
-    "Bitzo Creator";
+    "Bharat Play Creator";
 
   const avatar = resolveImage(
     channel?.channelImage ||

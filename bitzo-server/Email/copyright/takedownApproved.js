@@ -28,7 +28,7 @@ function getCopyrightTakedownApprovedMailOptions(userEmail, userName, { caseNumb
 </head>
 <body>
   <div class="container">
-    <div class="brand">BharatPay</div>
+    <div class="brand">Bharat Play</div>
     <div style="text-align:center"><span class="badge">Copyright Takedown</span></div>
     <div class="title">Your Video Has Been Taken Down</div>
     <div class="content">
@@ -49,10 +49,10 @@ function getCopyrightTakedownApprovedMailOptions(userEmail, userName, { caseNumb
         </div>` : ""}
       </div>
       <p>If you believe this action was taken in error, you have the right to file a counter-notification. You can manage this from your copyright dashboard.</p>
-      <a href="${process.env.WEBSITE_URL || "https://bharatpay.com"}/copyright" class="cta">View Your Copyright Dashboard</a>
+      <a href="${process.env.WEBSITE_URL || "https://bharatplay.com"}/copyright" class="cta">View Your Copyright Dashboard</a>
     </div>
     <div class="footer">
-      &copy; 2026 BharatPay. All rights reserved.
+      &copy; 2026 Bharat Play. All rights reserved.
     </div>
   </div>
 </body>

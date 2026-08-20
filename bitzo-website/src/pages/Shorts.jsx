@@ -714,10 +714,10 @@ export default function Shorts() {
     try {
       if (navigator.share) {
         await navigator.share({
-          title: short.title || "Bitzo Short",
+          title: short.title || "Bharat Play Short",
           text: short.title
-            ? `${short.title} - Watch on Bitzo`
-            : "Watch on Bitzo",
+            ? `${short.title} - Watch on Bharat Play`
+            : "Watch on Bharat Play",
           url: shareUrl,
         });
         return;

@@ -5,7 +5,7 @@ const RewardContext = createContext();
 
 export function RewardProvider({ children }) {
   const [points, setPoints] = useState(() => {
-    const saved = localStorage.getItem('bitzoRewardPoints');
+    const saved = localStorage.getItem('bharatPlayRewardPoints');
     if (saved !== null) {
       const parsed = parseFloat(saved);
       return isNaN(parsed) ? 70 : parsed;
@@ -13,7 +13,7 @@ export function RewardProvider({ children }) {
     return 70;
   });
   useEffect(() => {
-    localStorage.setItem('bitzoRewardPoints', points.toFixed(2));
+    localStorage.setItem('bharatPlayRewardPoints', points.toFixed(2));
   }, [points]);
 
   const addPoints = (amount) => {

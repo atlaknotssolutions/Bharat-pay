@@ -75,7 +75,7 @@ export default function WithdrawPage() {
             <Wallet size={48} className="text-yellow-400 opacity-80" />
           </div>
           <p className="text-sm text-gray-500">
-            ≈ {points.toFixed(2)} Bitzo Points (1 point = $0.01)
+            ≈ {points.toFixed(2)} Bharat Play Points (1 point = $0.01)
           </p>
         </div>
 

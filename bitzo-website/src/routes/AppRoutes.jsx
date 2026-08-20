@@ -14,7 +14,12 @@ import Profile from "../pages/MyProfile";
 import ReelPlayerPage from "../components/common/ReelPlayerPage";
 import FullVideo from "../pages/UploadVideo/FullVideo";
 
-import AuthPage from "../pages/Login.jsx/AuthPage";
+// OLD LOGIN DESIGN — KEPT FOR EASY ROLLBACK
+// import AuthPage from "../pages/Login.jsx/AuthPage";
+
+// NEW LOGIN DESIGN — 3D + GLASSMORPHISM
+import AuthPageV2 from "../pages/LoginV2/AuthPageV2";
+import ForgotPassword from "../pages/LoginV2/ForgotPassword";
 import WatchHistoryTab from "../pages/Settings/WatchHistoryTab";
 import LikedVideosTab from "../pages/Settings/LikedVideosTab";
 import YourVideosTab from "../pages/Settings/YourVideosTab";
@@ -40,7 +45,12 @@ function ViewAllRoute() {
 export default function AppRoutes() {
   return (
     <Routes>
-      <Route path="/login" element={<AuthPage />} />
+      {/* OLD LOGIN DESIGN — KEPT FOR EASY ROLLBACK */}
+      {/* <Route path="/login" element={<AuthPage />} /> */}
+
+      {/* NEW LOGIN DESIGN — 3D + GLASSMORPHISM */}
+      <Route path="/login" element={<AuthPageV2 />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
 
       <Route element={<ProtectedLayout />}>
         <Route element={<MainLayout />}>

@@ -1256,21 +1256,26 @@ exports.forgotPassword = async (req, res) => {
     const normalizedEmail =
       typeof email === "string" ? email.trim().toLowerCase() : "";
 
-    const user = normalizedEmail
-      ? await User.findOne({ email: normalizedEmail })
-      : null;
+    if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Please enter a valid email address." });
+    }
+
+    const user = await User.findOne({ email: normalizedEmail });
 
     if (user) {
-      // Cryptographically secure, single-use, short-lived reset token.
-      const resetToken = crypto.randomBytes(32).toString("hex");
-      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+      const otp = crypto.randomInt(100000, 1000000).toString();
+      const otpHash = await bcrypt.hash(otp, 10);
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
       await User.updateOne(
         { _id: user._id },
         {
           $set: {
-            resetTokenHash: hashToken(resetToken),
-            resetTokenExpires: expiresAt,
+            resetOtpHash: otpHash,
+            resetOtpExpires: expiresAt,
+            resetOtpAttempts: 0,
           },
         },
       );
@@ -1283,22 +1288,124 @@ exports.forgotPassword = async (req, res) => {
         metadata: { email: normalizedEmail },
       });
 
-      // Send the reset link containing the RAW resetToken to the user's email.
-      // The raw token is never logged and only its hash is persisted.
-      // sendMailSafely safely no-ops when no mailer is configured.
       await sendMailSafely(
-        getPasswordResetMailOptions(user.email, user.name, resetToken),
+        getPasswordResetMailOptions(user.email, user.name, otp),
       );
     }
 
     // Generic response: never reveal whether the email exists.
     return res.status(200).json({
       success: true,
-      message:
-        "If an account exists for this email, a password reset link has been sent.",
+      message: "If an account exists with this email, a verification code has been sent.",
     });
   } catch (error) {
     console.error("Forgot password error:", error.message);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+/* ===================== VERIFY RESET OTP ===================== */
+exports.verifyResetOtp = async (req, res) => {
+  try {
+    const { email, otp } = req.body || {};
+    const normalizedEmail =
+      typeof email === "string" ? email.trim().toLowerCase() : "";
+
+    if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Please enter a valid email address." });
+    }
+
+    if (typeof otp !== "string" || !/^\d{6}$/.test(otp)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Please enter a valid 6-digit verification code." });
+    }
+
+    const user = await User.findOne({ email: normalizedEmail }).select(
+      "+resetOtpHash",
+    );
+
+    if (!user || !user.resetOtpHash) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired verification code. Please request a new one.",
+      });
+    }
+
+    if (
+      !user.resetOtpExpires ||
+      new Date(user.resetOtpExpires).getTime() < Date.now()
+    ) {
+      await User.updateOne(
+        { _id: user._id },
+        { $unset: { resetOtpHash: 1, resetOtpExpires: 1, resetOtpAttempts: 1 } },
+      );
+      return res.status(400).json({
+        success: false,
+        message: "This verification code has expired. Please request a new one.",
+      });
+    }
+
+    if (user.resetOtpAttempts >= 5) {
+      await User.updateOne(
+        { _id: user._id },
+        { $unset: { resetOtpHash: 1, resetOtpExpires: 1, resetOtpAttempts: 1 } },
+      );
+      return res.status(400).json({
+        success: false,
+        message: "Too many incorrect attempts. Please request a new code.",
+      });
+    }
+
+    const otpValid = await bcrypt.compare(otp, user.resetOtpHash);
+
+    if (!otpValid) {
+      const newAttempts = (user.resetOtpAttempts || 0) + 1;
+      if (newAttempts >= 5) {
+        await User.updateOne(
+          { _id: user._id },
+          { $unset: { resetOtpHash: 1, resetOtpExpires: 1, resetOtpAttempts: 1 } },
+        );
+        return res.status(400).json({
+          success: false,
+          message: "Too many incorrect attempts. Please request a new code.",
+        });
+      }
+      await User.updateOne(
+        { _id: user._id },
+        { $set: { resetOtpAttempts: newAttempts } },
+      );
+      return res.status(400).json({
+        success: false,
+        message: "The verification code is incorrect.",
+      });
+    }
+
+    // OTP verified — generate a short-lived, single-use reset token.
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const resetTokenHashVal = hashToken(resetToken);
+    const resetTokenExpiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+
+    await User.updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          resetTokenHash: resetTokenHashVal,
+          resetTokenExpires: resetTokenExpiresAt,
+        },
+        $unset: { resetOtpHash: 1, resetOtpExpires: 1, resetOtpAttempts: 1 },
+      },
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "OTP verified successfully.",
+      resetToken,
+    });
+  } catch (error) {
+    console.error("Verify reset OTP error:", error.message);
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
@@ -1329,7 +1436,7 @@ exports.resetPassword = async (req, res) => {
     if (!user) {
       return res
         .status(400)
-        .json({ success: false, message: "Invalid or expired reset token" });
+        .json({ success: false, message: "Your password reset session has expired. Please start again." });
     }
 
     if (
@@ -1339,11 +1446,11 @@ exports.resetPassword = async (req, res) => {
       // Expired token: clear it so it cannot be reused.
       await User.updateOne(
         { _id: user._id },
-        { $unset: { resetTokenHash: 1, resetTokenExpires: 1 } },
+        { $unset: { resetTokenHash: 1, resetTokenExpires: 1, resetOtpHash: 1, resetOtpExpires: 1, resetOtpAttempts: 1 } },
       );
       return res
         .status(400)
-        .json({ success: false, message: "Invalid or expired reset token" });
+        .json({ success: false, message: "Your password reset session has expired. Please start again." });
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -1351,7 +1458,13 @@ exports.resetPassword = async (req, res) => {
       { _id: user._id },
       {
         $set: { password: hashedPassword },
-        $unset: { resetTokenHash: 1, resetTokenExpires: 1 },
+        $unset: {
+          resetTokenHash: 1,
+          resetTokenExpires: 1,
+          resetOtpHash: 1,
+          resetOtpExpires: 1,
+          resetOtpAttempts: 1,
+        },
       },
     );
 

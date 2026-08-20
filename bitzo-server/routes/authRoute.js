@@ -22,6 +22,7 @@ const {
   refreshLimiter,
   forgotPasswordLimiter,
   resetPasswordLimiter,
+  verifyResetOtpLimiter,
 } = require("../middlewares/rateLimit");
 const {
   registerUser,
@@ -36,6 +37,7 @@ const {
   logoutAll,
   forgotPassword,
   resetPassword,
+  verifyResetOtp,
 } = require("../controller/authController");
 const {
   getAllUsers,
@@ -54,6 +56,7 @@ router.post("/refresh", refreshLimiter, refreshToken);
 router.post("/logout", logout);
 router.post("/logout-all", authMiddleware, logoutAll);
 router.post("/forgot-password", forgotPasswordLimiter, forgotPassword);
+router.post("/verify-reset-otp", verifyResetOtpLimiter, verifyResetOtp);
 router.post("/reset-password", resetPasswordLimiter, resetPassword);
 
 router.post("/auth/google", googleLimiter, async (req, res) => {

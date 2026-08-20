@@ -1,42 +1,71 @@
-function getLoginMailOptions(email, name, otp) {
-  const otpMarkup = otp
-    ? `<p>Your login OTP is <strong>${otp}</strong>. Enter it on BharatPlay to complete your sign-in securely.</p>`
-    : "<p>Your BharatPlay account was just accessed. If this was not you, please reset your password immediately.</p>";
-
+module.exports = function getLoginMailOptions(email, name, otp) {
   return {
     from: process.env.EMAIL,
     to: email,
-    subject: "BharatPlay Login Verification",
+    subject: "Bharat Play — Login Verification",
     html: `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>BharatPlay Login Verification</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login Verification</title>
   <style>
-    body { font-family: Arial, sans-serif; background: #f6f8fa; margin: 0; padding: 0; }
-    .container { max-width: 520px; margin: 40px auto; background: #fff; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); padding: 32px; }
-    .brand { font-size: 1.6rem; font-weight: 700; color: #d72638; letter-spacing: 0.04em; margin-bottom: 8px; text-align: center; }
-    .title { font-size: 1.45rem; color: #111827; margin: 16px 0 8px; text-align: center; }
-    .content { color: #374151; font-size: 1rem; margin-bottom: 24px; text-align: center; }
-    .otp-box { display: inline-block; background: #fff1f2; border: 1px solid #fecdd3; color: #881337; font-weight: 700; font-size: 2rem; letter-spacing: 0.22em; padding: 14px 20px; border-radius: 10px; margin: 12px 0; }
-    .footer { color: #6b7280; font-size: 0.9rem; text-align: center; margin-top: 30px; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #f4f4f7; margin: 0; padding: 0; }
+    .wrapper { width: 100%; background: #f4f4f7; padding: 40px 0; }
+    .container { max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+    .header { background: linear-gradient(135deg, #dc2626, #b91c1c); padding: 32px 32px 28px; text-align: center; }
+    .header h1 { color: #ffffff; font-size: 1.5rem; margin: 0; font-weight: 700; letter-spacing: -0.3px; }
+    .header p { color: rgba(255,255,255,0.85); font-size: 0.9rem; margin: 6px 0 0; }
+    .body { padding: 32px; text-align: center; }
+    .greeting { color: #1f2937; font-size: 1rem; margin: 0 0 8px; }
+    .subtitle { color: #6b7280; font-size: 0.9rem; margin: 0 0 24px; }
+    .otp-box { background: #f9fafb; border: 2px dashed #dc2626; border-radius: 10px; padding: 20px 24px; margin: 0 0 24px; }
+    .otp-label { color: #6b7280; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 8px; }
+    .otp-value { color: #1f2937; font-size: 2rem; font-weight: 700; letter-spacing: 8px; margin: 0; font-family: 'Courier New', monospace; }
+    .body p { color: #374151; font-size: 0.95rem; line-height: 1.6; margin: 0 0 16px; }
+    .body strong { color: #1f2937; }
+    .warning { background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 6px; padding: 14px 16px; text-align: left; margin: 0 0 24px; }
+    .warning p { color: #92400e; font-size: 0.85rem; margin: 0; line-height: 1.5; }
+    .footer { padding: 20px 32px; background: #f9fafb; border-top: 1px solid #e5e7eb; text-align: center; }
+    .footer p { color: #9ca3af; font-size: 0.78rem; margin: 0; line-height: 1.5; }
+    @media only screen and (max-width: 480px) {
+      .wrapper { padding: 20px 0; }
+      .container { margin: 0 12px; }
+      .header { padding: 24px 20px 20px; }
+      .body { padding: 24px 20px; }
+      .otp-value { font-size: 1.6rem; letter-spacing: 6px; }
+    }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="brand">BharatPlay</div>
-    <div class="title">Login Verification</div>
-    <div class="content">
-      <p>Hi <strong>${name}</strong>,</p>
-      ${otp ? `<p>Use the code below to continue signing in to BharatPlay.</p><div class="otp-box">${otp}</div>` : otpMarkup}
-    </div>
-    <div class="footer">
-      &copy; 2026 BharatPlay. All rights reserved.
+  <div class="wrapper">
+    <div class="container">
+      <div class="header">
+        <h1>Bharat Play</h1>
+        <p>Login Verification</p>
+      </div>
+      <div class="body">
+        <p class="greeting">Hi <strong>${name || "there"}</strong>,</p>
+        ${
+          otp
+            ? `<p class="subtitle">Use the code below to continue signing in to Bharat Play.</p>
+              <div class="otp-box">
+                <p class="otp-label">Your verification code</p>
+                <p class="otp-value">${otp}</p>
+              </div>
+              <p style="color:#9ca3af; font-size:0.82rem;">If you did not request this, you can safely ignore this email.</p>`
+            : `<p>Your Bharat Play account was just accessed. If this was not you, please reset your password immediately.</p>
+              <div class="warning">
+                <p>Did not recognize this activity? Reset your password now to secure your account.</p>
+              </div>`
+        }
+      </div>
+      <div class="footer">
+        <p>&copy; ${new Date().getFullYear()} Bharat Play. All rights reserved.</p>
+      </div>
     </div>
   </div>
 </body>
 </html>`,
   };
-}
-
-module.exports = getLoginMailOptions;
+};
