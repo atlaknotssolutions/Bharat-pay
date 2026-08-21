@@ -27,7 +27,7 @@ exports.updateVideoupdated = async (req, res) => {
       });
     }
 
-    if (!video.creator || video.creator.toString() !== String(req.user.id)) {
+    if (video.uploadedBy?.toString() !== String(req.user.id)) {
       return res.status(403).json({
         success: false,
         message: "You are not authorized to update this video",
@@ -201,7 +201,7 @@ exports.getAllVideos = async (req, res) => {
 exports.editMyVideo = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user._id;
+    const userId = req.user.id;
 
     const {
       title,
@@ -212,10 +212,9 @@ exports.editMyVideo = async (req, res) => {
       subCategory,
     } = req.body;
 
-    // 🔒 Find video owned by logged-in user
     const video = await Video.findOne({
       _id: id,
-      creator: userId,
+      $or: [{ uploadedBy: userId }, { creator: userId }],
     });
 
     if (!video) {
@@ -264,12 +263,11 @@ exports.editMyVideo = async (req, res) => {
 exports.deleteMyVideo = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user._id;
+    const userId = req.user.id;
 
-    // 🔒 Find only user's video
     const video = await Video.findOne({
       _id: id,
-      creator: userId,
+      $or: [{ uploadedBy: userId }, { creator: userId }],
     });
 
     if (!video) {
@@ -303,9 +301,9 @@ exports.deleteMyVideo = async (req, res) => {
 
 exports.getMyVideos = async (req, res) => {
   try {
-    const userId = req.user._id; // ✅ current user
+    const userId = req.user.id;
 
-    const videos = await Video.find({ creator: userId })
+    const videos = await Video.find({ $or: [{ uploadedBy: userId }, { creator: userId }] })
       .populate("category", "name")
       .populate("subCategory", "name")
       .sort({ createdAt: -1 });
@@ -377,7 +375,7 @@ exports.deleteVideo = async (req, res) => {
       });
     }
 
-    if (!video.creator || video.creator.toString() !== String(req.user.id)) {
+    if (video.uploadedBy?.toString() !== String(req.user.id)) {
       return res.status(403).json({
         success: false,
         message: "You are not authorized to delete this video"

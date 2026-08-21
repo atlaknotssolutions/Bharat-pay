@@ -1,26 +1,50 @@
-import React, { useEffect, useState } from "react";
-import { Bookmark, Clock, X } from "lucide-react";
+import React, { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import { Bookmark, X } from "lucide-react";
 import { toast } from "react-toastify";
 import { formatTime } from "../../components/player/utils";
 import { API_USERVIDEO as API_BASE } from "../../config/api";
+import { authFetch } from "../../utils/session";
+import {
+  SettingsPageShell,
+  SettingsPageHeader,
+  VideoRowCard,
+  VideoRowCardSkeletonStack,
+  SettingsPagination,
+  SettingsEmptyState,
+  SettingsErrorState,
+  SettingsAuthState,
+} from "../../components/common/SettingsShared";
+
+const PAGE_SIZE = 20;
 
 export default function WatchLaterTab({ openDetail }) {
+  const navigate = useNavigate();
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
 
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      setVideos([]);
-      setLoading(false);
-      return;
-    }
+  const totalPages = Math.max(Math.ceil(total / PAGE_SIZE), 1);
 
-    fetch(`${API_BASE}/watch-later`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((data) => {
+  const fetchWatchLater = useCallback(
+    async (pageNum) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await authFetch(
+          `${API_BASE}/watch-later?page=${pageNum}&limit=${PAGE_SIZE}`,
+        );
+        if (res.status === 401 || res.status === 403) {
+          setError("auth");
+          return;
+        }
+        if (!res.ok) {
+          setError("server");
+          return;
+        }
+        const data = await res.json();
         const normalizedVideos = Array.isArray(data.videos)
           ? data.videos.map((video) => ({
               ...video,
@@ -29,115 +53,122 @@ export default function WatchLaterTab({ openDetail }) {
                   ? video.channel
                   : {
                       name:
-                        video.channelName || video.channel || "Unknown channel",
+                        video.channelName ||
+                        video.channel ||
+                        "Unknown channel",
                     },
             }))
           : [];
-
         setVideos(normalizedVideos);
-      })
-      .catch(() => setVideos([]))
-      .finally(() => setLoading(false));
-  }, []);
+        setTotal(data.total ?? 0);
+      } catch {
+        setError("network");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    fetchWatchLater(page);
+  }, [page, fetchWatchLater]);
+
+  const handleOpen = (video) => {
+    if (typeof openDetail === "function") {
+      openDetail(video);
+      return;
+    }
+    navigate(`/video/${video._id || video.id}`, { state: { video } });
+  };
 
   const handleRemove = async (videoId) => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-
     try {
-      const res = await fetch(`${API_BASE}/watch-later/${videoId}`, {
+      const res = await authFetch(`${API_BASE}/watch-later/${videoId}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
       });
-
+      if (!res.ok) {
+        toast.error("Failed to remove from Watch Later");
+        return;
+      }
       const data = await res.json();
       if (data.success) {
         const targetId = String(videoId);
         setVideos((prev) =>
           prev.filter((v) => String(v._id || v.id) !== targetId),
         );
+        setTotal((prev) => Math.max(prev - 1, 0));
         toast.success("Removed from Watch Later");
       } else {
         toast.error(data.message || "Failed to remove from Watch Later");
       }
-    } catch (error) {
-      console.error("Failed to remove from Watch Later:", error);
+    } catch {
       toast.error("Something went wrong");
     }
   };
 
   return (
-    <div className="space-y-5 md:space-y-6 px-3 sm:px-4 md:px-0 ml-5 mt-5">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg md:text-xl font-semibold">Watch Later</h3>
-        <span className="text-sm text-zinc-500">{videos.length} videos</span>
-      </div>
+    <SettingsPageShell>
+      <SettingsPageHeader
+        icon={Bookmark}
+        title="Watch Later"
+        count={!loading && !error ? videos.length : undefined}
+      />
 
-      {loading ? (
-        <div className="text-center py-16 md:py-24 text-zinc-500">
-          Loading...
-        </div>
-      ) : videos.length === 0 ? (
-        <div className="text-center py-16 md:py-24 text-zinc-500">
-          <Bookmark
-            size={48}
-            className="mx-auto mb-4 text-zinc-600"
-            strokeWidth={1.5}
+      <div className="mt-5">
+        {loading ? (
+          <VideoRowCardSkeletonStack count={4} />
+        ) : error === "auth" ? (
+          <SettingsAuthState
+            icon={Bookmark}
+            title="Sign in to see your watch later list"
           />
-          <p className="text-xl md:text-2xl font-medium">
-            Watch Later is empty
-          </p>
-          <p className="mt-3 text-sm md:text-base">Save videos for later</p>
-        </div>
-      ) : (
-        <div className="space-y-4 max-h-[calc(100vh-180px)] overflow-y-auto pb-6 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-zinc-900">
-          {videos.map((video) => (
-            <div
-              key={video._id || video.id}
-              onClick={() => openDetail(video)}
-              className="bg-zinc-900/80 border border-zinc-800 rounded-xl overflow-hidden hover:border-zinc-600 transition-all cursor-pointer active:scale-[0.995] group relative"
-            >
-              <div className="flex flex-col sm:flex-row">
-                <div className="relative aspect-video sm:aspect-[4/3] sm:w-44 md:w-52 flex-shrink-0">
-                  <img
-                    src={video.thumbnail}
-                    alt={video.title}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-
-                <div className="p-3.5 md:p-4 flex-1 flex flex-col">
-                  <h4 className="font-medium text-base md:text-lg line-clamp-2 mb-2 group-hover:text-red-400">
-                    {video.title}
-                  </h4>
-                  <p className="text-sm text-zinc-400 mb-2">
-                    {video.channel?.name || "Unknown channel"}
-                  </p>
-                  <div className="flex items-center gap-3 text-sm text-zinc-400 mt-auto">
-                    {video.duration && (
-                      <>
-                        <Clock size={14} />
-                        <span>{formatTime(video.duration)}</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Remove button - visible on hover */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleRemove(video._id || video.id);
-                }}
-                className="absolute top-2 right-2 md:top-3 md:right-3 p-1.5 md:p-2 rounded-full bg-black/70 text-zinc-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                <X size={18} />
-              </button>
+        ) : error ? (
+          <SettingsErrorState onRetry={() => fetchWatchLater(page)} />
+        ) : videos.length === 0 ? (
+          <SettingsEmptyState
+            icon={Bookmark}
+            title="Watch Later is empty"
+            description="Save videos here to watch them later."
+          />
+        ) : (
+          <>
+            <div className="space-y-2.5">
+              {videos.map((video) => (
+                <VideoRowCard
+                  key={video._id || video.id}
+                  video={{
+                    ...video,
+                    channelName: video.channel?.name || "Unknown channel",
+                    durationText: video.duration
+                      ? formatTime(video.duration)
+                      : undefined,
+                  }}
+                  onClick={handleOpen}
+                  action={
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemove(video._id || video.id);
+                      }}
+                      className="rounded-full p-2 text-zinc-500 opacity-0 transition-all hover:bg-zinc-800 hover:text-red-400 group-hover:opacity-100 focus-visible:opacity-100"
+                      title="Remove from Watch Later"
+                    >
+                      <X size={16} />
+                    </button>
+                  }
+                />
+              ))}
             </div>
-          ))}
-        </div>
-      )}
-    </div>
+
+            <SettingsPagination
+              page={page}
+              totalPages={totalPages}
+              onPageChange={setPage}
+            />
+          </>
+        )}
+      </div>
+    </SettingsPageShell>
   );
 }

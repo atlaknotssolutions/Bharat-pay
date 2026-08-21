@@ -69,6 +69,7 @@ router.get("/subscribed-channels", isAuthenticated, getSubscribedChannels);
 router.get("/history", isAuthenticated, getUserWatchHistory);
 router.delete("/history", isAuthenticated, clearWatchHistory);
 router.delete("/history/:videoId", isAuthenticated, removeFromWatchHistory);
+// DEPRECATED: /liked-videos is dead code (no frontend consumer). Use /liked instead.
 router.get("/liked-videos", isAuthenticated, getUserLikedVideos);
 router.get("/watch-later", isAuthenticated, getUserWatchLaterVideos);
 router.get("/my-videos", isAuthenticated, getUserUploadedVideos);

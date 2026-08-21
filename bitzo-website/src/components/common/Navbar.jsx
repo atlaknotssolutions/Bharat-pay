@@ -641,14 +641,22 @@ export default function Navbar({ toggleSidebar }) {
                 </Link>
 
                 <div className="py-1 border-t border-gray-800">
-                  <button className="w-full px-5 py-3 text-left hover:bg-[#272727] flex items-center gap-4 transition">
+                  <Link
+                    to="/faq"
+                    onClick={() => setIsDropdownOpen(false)}
+                    className="w-full px-5 py-3 text-left hover:bg-[#272727] flex items-center gap-4 transition"
+                  >
                     <HelpCircle size={20} className="text-gray-300" />
                     <span>FAQ</span>
-                  </button>
-                  <button className="w-full px-5 py-3 text-left hover:bg-[#272727] flex items-center gap-4 transition">
+                  </Link>
+                  <Link
+                    to="/feedback"
+                    onClick={() => setIsDropdownOpen(false)}
+                    className="w-full px-5 py-3 text-left hover:bg-[#272727] flex items-center gap-4 transition"
+                  >
                     <MessageCircle size={20} className="text-gray-300" />
                     <span>Feedback</span>
-                  </button>
+                  </Link>
                   <div className="relative">
                     <button
                       onClick={() => setCopyrightOpen(!copyrightOpen)}
@@ -681,14 +689,22 @@ export default function Navbar({ toggleSidebar }) {
                       </div>
                     )}
                   </div>
-                  <button className="w-full px-5 py-3 text-left hover:bg-[#272727] flex items-center gap-4 transition">
+                  <Link
+                    to="/customer-support"
+                    onClick={() => setIsDropdownOpen(false)}
+                    className="w-full px-5 py-3 text-left hover:bg-[#272727] flex items-center gap-4 transition"
+                  >
                     <PhoneCall size={20} className="text-gray-300" />
                     <span>Customer Support</span>
-                  </button>
-                  <button className="w-full px-5 py-3 text-left hover:bg-[#272727] flex items-center gap-4 transition">
+                  </Link>
+                  <Link
+                    to="/terms-and-conditions"
+                    onClick={() => setIsDropdownOpen(false)}
+                    className="w-full px-5 py-3 text-left hover:bg-[#272727] flex items-center gap-4 transition"
+                  >
                     <FileText size={20} className="text-gray-300" />
                     <span>Terms and Conditions</span>
-                  </button>
+                  </Link>
                   <button
                     onClick={handleSignOut}
                     className="w-full px-5 py-3 text-left hover:bg-[#272727] flex items-center gap-4 transition border-t border-gray-800 text-red-400 hover:text-red-300"

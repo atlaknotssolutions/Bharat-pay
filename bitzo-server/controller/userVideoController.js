@@ -422,6 +422,7 @@ const mapVideoToListItem = (video) => ({
   videoUrl: video?.videoUrl,
   views: video?.views || 0,
   likesCount: video?.likesCount || 0,
+  status: video?.status || "active",
 });
 
 const getUserWatchHistory = async (req, res) => {
@@ -431,26 +432,31 @@ const getUserWatchHistory = async (req, res) => {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
 
-    const user = await User.findById(userId).populate({
-      path: "viewedVideos",
-      populate: {
-        path: "channel",
-        select: "name channelImage",
-      },
-      options: { sort: { updatedAt: -1 } },
-    });
+    const { page, limit, skip } = getPagination(req);
 
-    const seenIds = new Set();
-    const videos = (user?.viewedVideos || [])
-      .filter((video) => {
-        const key = video?._id?.toString();
-        if (!key || seenIds.has(key)) return false;
-        seenIds.add(key);
-        return true;
-      })
+    const user = await User.findById(userId).select("viewedVideos");
+    const viewedVideoIds = user?.viewedVideos || [];
+
+    const total = viewedVideoIds.length;
+    const reversedIds = viewedVideoIds.slice().reverse();
+    const pagedIds = reversedIds.slice(skip, skip + limit);
+
+    if (pagedIds.length === 0) {
+      return res.status(200).json({ success: true, videos: [], total, page, limit });
+    }
+
+    const videos = await Video.find({ _id: { $in: pagedIds } })
+      .populate("channel", "name channelImage")
+      .populate("uploadedBy", "name email");
+
+    const videoMap = new Map(videos.map((v) => [v._id.toString(), v]));
+
+    const orderedVideos = pagedIds
+      .map((id) => videoMap.get(id.toString()))
+      .filter(Boolean)
       .map(mapVideoToListItem);
 
-    return res.status(200).json({ success: true, videos });
+    return res.status(200).json({ success: true, videos: orderedVideos, total, page, limit });
   } catch (error) {
     console.error("Error in getUserWatchHistory:", error.message);
     return res.status(500).json({ success: false, message: "Server error" });
@@ -565,18 +571,31 @@ const getUserWatchLaterVideos = async (req, res) => {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
 
-    const user = await User.findById(userId).populate({
-      path: "watchLaterVideos",
-      populate: {
-        path: "channel",
-        select: "name channelImage",
-      },
-      options: { sort: { createdAt: -1 } },
-    });
+    const { page, limit, skip } = getPagination(req);
 
-    const videos = (user?.watchLaterVideos || []).map(mapVideoToListItem);
+    const user = await User.findById(userId).select("watchLaterVideos");
+    const watchLaterIds = user?.watchLaterVideos || [];
 
-    return res.status(200).json({ success: true, videos });
+    const total = watchLaterIds.length;
+    const reversedIds = watchLaterIds.slice().reverse();
+    const pagedIds = reversedIds.slice(skip, skip + limit);
+
+    if (pagedIds.length === 0) {
+      return res.status(200).json({ success: true, videos: [], total, page, limit });
+    }
+
+    const videos = await Video.find({ _id: { $in: pagedIds } })
+      .populate("channel", "name channelImage")
+      .populate("uploadedBy", "name email");
+
+    const videoMap = new Map(videos.map((v) => [v._id.toString(), v]));
+
+    const orderedVideos = pagedIds
+      .map((id) => videoMap.get(id.toString()))
+      .filter(Boolean)
+      .map(mapVideoToListItem);
+
+    return res.status(200).json({ success: true, videos: orderedVideos, total, page, limit });
   } catch (error) {
     console.error("Error in getUserWatchLaterVideos:", error.message);
     return res.status(500).json({ success: false, message: "Server error" });
@@ -590,14 +609,26 @@ const getUserUploadedVideos = async (req, res) => {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
 
-    const videos = await Video.find({ uploadedBy: userId })
-      .populate("channel", "name channelImage")
-      .sort({ createdAt: -1 })
-      .lean();
+    const { page, limit, skip } = getPagination(req);
+
+    const filter = { uploadedBy: userId };
+
+    const [videos, total] = await Promise.all([
+      Video.find(filter)
+        .populate("channel", "name channelImage")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Video.countDocuments(filter),
+    ]);
 
     return res.status(200).json({
       success: true,
       videos: videos.map(mapVideoToListItem),
+      total,
+      page,
+      limit,
     });
   } catch (error) {
     console.error("Error in getUserUploadedVideos:", error.message);
@@ -1860,6 +1891,8 @@ const LikedVideos = async (req, res) => {
       });
     }
 
+    const { page, limit, skip } = getPagination(req);
+
     const user = await User.findById(userId).select("likedVideos");
     const likedVideoIds = user?.likedVideos || [];
 
@@ -1867,29 +1900,35 @@ const LikedVideos = async (req, res) => {
       return res.status(200).json({
         success: true,
         videos: [],
+        total: 0,
+        page,
+        limit,
       });
     }
 
-    // Fetch all liked videos
+    const reversedIds = likedVideoIds.slice().reverse();
+    const pagedIds = reversedIds.slice(skip, skip + limit);
+    const total = reversedIds.length;
+
     const videos = await Video.find({
-      _id: { $in: likedVideoIds },
+      _id: { $in: pagedIds },
+      status: "active",
     })
       .populate("channel", "name channelImage")
       .populate("uploadedBy", "name email");
 
-    // Preserve the order of likedVideos (most recently liked first)
-    // Assuming newer likes are pushed to the end of the array
     const videoMap = new Map(videos.map((v) => [v._id.toString(), v]));
 
-    const orderedVideos = likedVideoIds
-      .slice()
-      .reverse()
+    const orderedVideos = pagedIds
       .map((id) => videoMap.get(id.toString()))
       .filter(Boolean);
 
     res.status(200).json({
       success: true,
       videos: orderedVideos,
+      total,
+      page,
+      limit,
     });
   } catch (error) {
     console.error("Error in LikedVideos:", error);
@@ -1969,29 +2008,20 @@ const RemoveFromWatchLater = async (req, res) => {
       });
     }
 
-    const user = await User.findById(userId);
-    if (!user) {
+    const result = await User.findByIdAndUpdate(
+      userId,
+      {
+        $pull: { watchLaterVideos: videoId, watchLater: videoId },
+      },
+      { new: true },
+    );
+
+    if (!result) {
       return res.status(404).json({
         success: false,
         message: "User not found",
       });
     }
-
-    const existingWatchLater = Array.isArray(user.watchLater)
-      ? user.watchLater
-      : [];
-    const existingWatchLaterVideos = Array.isArray(user.watchLaterVideos)
-      ? user.watchLaterVideos
-      : [];
-
-    user.watchLater = existingWatchLater.filter(
-      (id) => id.toString() !== videoId.toString(),
-    );
-    user.watchLaterVideos = existingWatchLaterVideos.filter(
-      (id) => id.toString() !== videoId.toString(),
-    );
-
-    await user.save();
 
     await logAuditEvent({
       userId,
@@ -2005,7 +2035,7 @@ const RemoveFromWatchLater = async (req, res) => {
       success: true,
       message: "Video removed from Watch Later",
       removed: true,
-      watchLaterCount: user.watchLater.length,
+      watchLaterCount: (result.watchLaterVideos || []).length,
     });
   } catch (error) {
     console.error("Error in RemoveFromWatchLater:", error);
@@ -2031,31 +2061,27 @@ const addToWatchLater = async (req, res) => {
         .json({ success: false, message: "Video ID required" });
     }
 
-    const user = await User.findById(userId);
-    if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
-    }
+    const result = await User.findOneAndUpdate(
+      { _id: userId, watchLaterVideos: { $ne: videoId } },
+      {
+        $addToSet: { watchLaterVideos: videoId, watchLater: videoId },
+      },
+      { new: true },
+    );
 
-    user.watchLaterVideos = user.watchLaterVideos || [];
-    user.watchLater = user.watchLater || [];
-
-    const alreadyAdded =
-      user.watchLaterVideos.some((id) => id.toString() === videoId) ||
-      user.watchLater.some((id) => id.toString() === videoId);
-
-    if (alreadyAdded) {
+    if (!result) {
+      const user = await User.findById(userId).select("_id");
+      if (!user) {
+        return res
+          .status(404)
+          .json({ success: false, message: "User not found" });
+      }
       return res.status(200).json({
         success: true,
         message: "Already in Watch Later",
         added: false,
       });
     }
-
-    user.watchLaterVideos.push(videoId);
-    user.watchLater.push(videoId);
-    await user.save();
 
     await logAuditEvent({
       userId,

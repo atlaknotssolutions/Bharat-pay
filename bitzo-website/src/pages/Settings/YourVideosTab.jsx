@@ -1,169 +1,231 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { Eye, Clock, Heart, ArrowUpDown } from "lucide-react";
 import { formatTime } from "../../components/player/utils";
-import { API_ORIGIN as BACKEND_URL, API_USERVIDEO } from "../../config/api";
+import { API_USERVIDEO } from "../../config/api";
+import { authFetch } from "../../utils/session";
+import { resolveMediaUrl } from "../../utils/mediaUrl";
+import {
+  SettingsPageShell,
+  SettingsPageHeader,
+  VideoRowCard,
+  VideoRowCardSkeletonStack,
+  SettingsPagination,
+  SettingsEmptyState,
+  SettingsErrorState,
+  SettingsAuthState,
+} from "../../components/common/SettingsShared";
 
-const toMediaUrl = (value) => {
-  if (!value) return "";
-  if (/^https?:\/\//i.test(value)) return value.replace(/\\/g, "/");
+const PAGE_SIZE = 20;
 
-  const normalized = value.replace(/\\/g, "/");
-  if (normalized.startsWith("/uploads/")) return `${BACKEND_URL}${normalized}`;
-  if (normalized.startsWith("uploads/")) return `${BACKEND_URL}/${normalized}`;
-  return `${BACKEND_URL}/${normalized.replace(/^\/+/, "")}`;
-};
+const SORT_OPTIONS = [
+  { value: "latest", label: "Latest" },
+  { value: "views", label: "Most Viewed" },
+  { value: "earnings", label: "Most Earnings" },
+];
 
-const normalizeVideo = (video) => ({
-  id: video?._id || video?.id,
-  title: video?.title || "Untitled video",
-  channel: video?.channelName || video?.channel?.name || "Unknown channel",
-  thumbnail:
-    toMediaUrl(video?.thumbnail || video?.thumb || "") ||
-    "https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=800",
-  views: Number(video?.views || 0),
-  duration: video?.duration || "—",
-  likesCount: Number(video?.likesCount || video?.likes || 0),
-  status: video?.status || "Public",
-  uploadDate: video?.createdAt
-    ? new Date(video.createdAt).toLocaleDateString()
-    : "Recently uploaded",
-  createdAt: video?.createdAt,
-  raw: video,
-});
-
-export default function YourVideosTab({ openDetail, sortBy, onSortChange }) {
+export default function YourVideosTab({
+  openDetail,
+  sortBy: sortByProp,
+  onSortChange: onSortChangeProp,
+}) {
+  const navigate = useNavigate();
+  const [internalSortBy, setInternalSortBy] = useState("latest");
+  const sortBy = sortByProp ?? internalSortBy;
+  const onSortChange = onSortChangeProp ?? setInternalSortBy;
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+
+  const totalPages = Math.max(Math.ceil(total / PAGE_SIZE), 1);
+
+  const fetchMyVideos = useCallback(
+    async (pageNum) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await authFetch(
+          `${API_USERVIDEO}/my-videos?page=${pageNum}&limit=${PAGE_SIZE}`,
+        );
+        if (res.status === 401 || res.status === 403) {
+          setError("auth");
+          return;
+        }
+        if (!res.ok) {
+          setError("server");
+          return;
+        }
+        const data = await res.json();
+        const list = Array.isArray(data?.videos) ? data.videos : [];
+        setVideos(list);
+        setTotal(data.total ?? 0);
+      } catch {
+        setError("network");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      setVideos([]);
-      setLoading(false);
+    fetchMyVideos(page);
+  }, [page, fetchMyVideos]);
+
+  const handleOpen = (video) => {
+    if (typeof openDetail === "function") {
+      openDetail(video);
       return;
     }
-
-fetch(`${API_USERVIDEO}/my-videos`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        const list = Array.isArray(data?.videos) ? data.videos : [];
-        setVideos(list.map(normalizeVideo));
-      })
-      .catch(() => setVideos([]))
-      .finally(() => setLoading(false));
-  }, []);
+    navigate(`/video/${video._id || video.id}`, { state: { video } });
+  };
 
   const sortedVideos = [...videos].sort((a, b) => {
     if (sortBy === "latest") {
       return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
     }
-    if (sortBy === "views") return b.views - a.views;
-    if (sortBy === "earnings") return b.likesCount - a.likesCount;
+    if (sortBy === "views") return (b.views || 0) - (a.views || 0);
+    if (sortBy === "earnings")
+      return (b.likesCount || b.likes || 0) - (a.likesCount || a.likes || 0);
     return 0;
   });
 
+  const formatViews = (num) => {
+    if (!num) return "0";
+    if (num >= 1_000_000) return (num / 1_000_000).toFixed(1) + "M";
+    if (num >= 1_000) return (num / 1_000).toFixed(1) + "K";
+    return num.toLocaleString();
+  };
+
   const getStatusBadge = (status) => {
-    const isPublic = status?.toLowerCase() === "public";
+    const isActive = status?.toLowerCase() === "active";
     return (
       <span
-        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-          isPublic
-            ? "bg-green-900/40 text-green-400 border border-green-800/50"
-            : "bg-amber-900/40 text-amber-400 border border-amber-800/50"
+        className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${
+          isActive
+            ? "bg-green-900/40 text-green-400 ring-1 ring-green-800/50"
+            : "bg-amber-900/40 text-amber-400 ring-1 ring-amber-800/50"
         }`}
       >
-        {isPublic ? "Public" : "Limited"}
+        {isActive ? "Active" : "Limited"}
       </span>
     );
   };
 
   return (
-    <div className="space-y-5 md:space-y-6 px-3 sm:px-4 md:px-0 ml-5 mt-5">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h3 className="text-lg md:text-xl font-semibold">Your Videos</h3>
-
-        <div className="flex items-center gap-2.5 self-end sm:self-auto">
-          <ArrowUpDown size={16} className="text-zinc-400" />
-          <select
-            value={sortBy}
-            onChange={(e) => onSortChange(e.target.value)}
-            className="bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-red-600 appearance-none"
-          >
-            <option value="latest">Latest</option>
-            <option value="views">Most Viewed</option>
-            <option value="earnings">Most Earnings</option>
-          </select>
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="text-center py-16 md:py-24 text-zinc-500">
-          Loading your videos...
-        </div>
-      ) : sortedVideos.length === 0 ? (
-        <div className="text-center py-16 md:py-24 text-zinc-500">
-          <p className="text-xl md:text-2xl font-medium">
-            No videos uploaded yet
-          </p>
-          <p className="mt-3 text-sm md:text-base">
-            Upload your first video to get started
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-4 md:space-y-5 max-h-[calc(100vh-180px)] overflow-y-auto pb-6 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-zinc-900">
-          {sortedVideos.map((video) => (
-            <div
-              key={video.id}
-              onClick={() => openDetail(video.raw || video)}
-              className="bg-zinc-900/80 border border-zinc-800 rounded-xl overflow-hidden hover:border-zinc-600 transition-all cursor-pointer active:scale-[0.995] group"
-            >
-              <div className="flex flex-col sm:flex-row">
-                <div className="relative aspect-video sm:aspect-[4/3] sm:w-44 md:w-52 flex-shrink-0">
-                  <img
-                    src={
-                      video.thumbnail || "uploads/1785320561817-355290654.jpg"
-                    }
-                    alt={video.title}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-
-                <div className="p-3.5 md:p-4 flex-1 flex flex-col">
-                  <p className="text-sm text-zinc-400 mb-1.5">
-                    {video.channel || "Unknown channel"}
-                  </p>
-                  <h4 className="font-medium text-base md:text-lg line-clamp-2 mb-2.5 group-hover:text-red-400 transition-colors">
-                    {video.title}
-                  </h4>
-
-                  <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs md:text-sm text-zinc-400 mb-3">
-                    <div className="flex items-center gap-1.5">
-                      <Eye size={14} />
-                      <span>{video.views.toLocaleString()}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Clock size={14} />
-                      <span>{formatTime(video.duration)}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-red-400">
-                      <Heart size={14} className="fill-red-500" />
-                      <span>{video.likesCount.toLocaleString()}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between text-xs text-zinc-500 mt-auto">
-                    {getStatusBadge(video.status)}
-                    <span>Uploaded {video.uploadDate}</span>
-                  </div>
-                </div>
-              </div>
+    <SettingsPageShell>
+      <SettingsPageHeader
+        title="Your Videos"
+        count={!loading && !error ? sortedVideos.length : undefined}
+        controls={
+          !error &&
+          !loading && (
+            <div className="flex items-center gap-2">
+              <ArrowUpDown size={14} className="text-zinc-500" />
+              <select
+                value={sortBy}
+                onChange={(e) => onSortChange(e.target.value)}
+                aria-label="Sort videos"
+                className="appearance-none rounded-lg border border-zinc-700 bg-zinc-800/80 px-3 py-1.5 pr-8 text-sm text-zinc-200 transition-colors hover:border-zinc-600 focus:border-red-600 focus:outline-none"
+                style={{
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
+                  backgroundRepeat: "no-repeat",
+                  backgroundPosition: "right 0.5rem center",
+                }}
+              >
+                {SORT_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
             </div>
-          ))}
-        </div>
-      )}
-    </div>
+          )
+        }
+      />
+
+      <div className="mt-5">
+        {loading ? (
+          <VideoRowCardSkeletonStack count={4} />
+        ) : error === "auth" ? (
+          <SettingsAuthState
+            icon={Eye}
+            title="Sign in to see your uploaded videos"
+          />
+        ) : error ? (
+          <SettingsErrorState onRetry={() => fetchMyVideos(page)} />
+        ) : sortedVideos.length === 0 ? (
+          <SettingsEmptyState
+            icon={Eye}
+            title="No videos uploaded yet"
+            description="Upload your first video to get started."
+          />
+        ) : (
+          <>
+            <div className="space-y-2.5">
+              {sortedVideos.map((video) => {
+                const videoId = video._id || video.id;
+                return (
+                  <VideoRowCard
+                    key={videoId}
+                    video={{
+                      ...video,
+                      channelName:
+                        video.channelName ||
+                        video.channel?.name ||
+                        "Unknown channel",
+                      durationText:
+                        video.duration && video.duration !== "—"
+                          ? formatTime(video.duration)
+                          : undefined,
+                      thumbnail:
+                        resolveMediaUrl(video.thumbnail || video.thumb) ||
+                        undefined,
+                    }}
+                    onClick={handleOpen}
+                    badge={getStatusBadge(video.status)}
+                    meta={
+                      <>
+                        <span className="inline-flex items-center gap-1">
+                          <Eye size={12} />
+                          {formatViews(video.views)}
+                        </span>
+                        {video.duration && video.duration !== "—" && (
+                          <span className="inline-flex items-center gap-1">
+                            <Clock size={12} />
+                            {formatTime(video.duration)}
+                          </span>
+                        )}
+                        <span className="inline-flex items-center gap-1 text-red-400/80">
+                          <Heart size={12} />
+                          {formatViews(
+                            video.likesCount || video.likes || 0,
+                          )}
+                        </span>
+                        {video.createdAt && (
+                          <span>
+                            {new Date(
+                              video.createdAt,
+                            ).toLocaleDateString()}
+                          </span>
+                        )}
+                      </>
+                    }
+                  />
+                );
+              })}
+            </div>
+
+            <SettingsPagination
+              page={page}
+              totalPages={totalPages}
+              onPageChange={setPage}
+            />
+          </>
+        )}
+      </div>
+    </SettingsPageShell>
   );
 }

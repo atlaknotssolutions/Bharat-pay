@@ -33,6 +33,11 @@ import SearchPage from "../pages/SearchPage";
 import CopyrightPage from "../pages/CopyrightPage";
 import CopyrightClaimPage from "../pages/CopyrightClaimPage";
 import MyClaimsPage from "../pages/MyClaimsPage";
+import FAQPage from "../pages/FAQPage";
+import FeedbackPage from "../pages/FeedbackPage";
+import SupportPage from "../pages/SupportPage";
+import TermsPage from "../pages/TermsPage";
+import BharatPlayStudio from "../pages/Studio/BharatPlayStudio";
 
 function ViewAllRoute() {
   const { type } = useParams();
@@ -79,6 +84,11 @@ export default function AppRoutes() {
           <Route path="/copyright" element={<CopyrightPage />} />
           <Route path="/copyright/claim" element={<CopyrightClaimPage />} />
           <Route path="/copyright/my-claims" element={<MyClaimsPage />} />
+          <Route path="/faq" element={<FAQPage />} />
+          <Route path="/feedback" element={<FeedbackPage />} />
+          <Route path="/customer-support" element={<SupportPage />} />
+          <Route path="/terms-and-conditions" element={<TermsPage />} />
+          <Route path="/studio" element={<BharatPlayStudio />} />
         </Route>
       </Route>
 
