@@ -1,5 +1,5 @@
 const API_ORIGIN = String(
-  import.meta.env.VITE_API_BASE_URL || "https://bharat-pay-3.onrender.com"
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000",
 ).replace(/\/+$/, "");
 
 const API_BASE = `${API_ORIGIN}/api`;

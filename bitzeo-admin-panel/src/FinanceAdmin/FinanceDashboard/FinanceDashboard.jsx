@@ -35,7 +35,8 @@ import {
   ChevronRight,
 } from "lucide-react";
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://bharat-pay-3.onrender.com/api";
+const BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
 
 // ========== MOCK DATA (replace with API) ==========
 const MOCK_OVERVIEW = {
@@ -59,8 +60,20 @@ const MOCK_OVERVIEW = {
 
 const MOCK_CPM = [
   { network: "AdMob", type: "Banner", india: 1.2, intl: 3.8, status: "synced" },
-  { network: "AdMob", type: "Interstitial", india: 2.8, intl: 6.2, status: "synced" },
-  { network: "Unity", type: "Rewarded", india: 3.1, intl: 7.5, status: "synced" },
+  {
+    network: "AdMob",
+    type: "Interstitial",
+    india: 2.8,
+    intl: 6.2,
+    status: "synced",
+  },
+  {
+    network: "Unity",
+    type: "Rewarded",
+    india: 3.1,
+    intl: 7.5,
+    status: "synced",
+  },
   { network: "Meta", type: "Native", india: 1.9, intl: 4.4, status: "pending" },
 ];
 
@@ -70,23 +83,93 @@ const MOCK_WALLETS = {
   creatorPending: 38600,
   creatorConfirmed: 210400,
   withdrawalQueue: [
-    { id: "w1", user: "Rahul S.", type: "viewer", amount: 850, status: "pending", date: "2026-08-16" },
-    { id: "w2", user: "Priya M.", type: "creator", amount: 4200, status: "pending", date: "2026-08-16" },
-    { id: "w3", user: "Amit K.", type: "creator", amount: 1800, status: "pending", date: "2026-08-15" },
-    { id: "w4", user: "Sneha R.", type: "viewer", amount: 320, status: "pending", date: "2026-08-15" },
+    {
+      id: "w1",
+      user: "Rahul S.",
+      type: "viewer",
+      amount: 850,
+      status: "pending",
+      date: "2026-08-16",
+    },
+    {
+      id: "w2",
+      user: "Priya M.",
+      type: "creator",
+      amount: 4200,
+      status: "pending",
+      date: "2026-08-16",
+    },
+    {
+      id: "w3",
+      user: "Amit K.",
+      type: "creator",
+      amount: 1800,
+      status: "pending",
+      date: "2026-08-15",
+    },
+    {
+      id: "w4",
+      user: "Sneha R.",
+      type: "viewer",
+      amount: 320,
+      status: "pending",
+      date: "2026-08-15",
+    },
   ],
 };
 
 const MOCK_FLAGGED = [
-  { id: "f1", user: "bot_user_92", reason: "VPN", score: 12, evidence: "IP mismatch x14", date: "2026-08-16" },
-  { id: "f2", user: "loop_watch_01", reason: "Loop", score: 8, evidence: "Same video 200x", date: "2026-08-16" },
-  { id: "f3", user: "farm_acc_77", reason: "Bot", score: 5, evidence: "Device fingerprint match", date: "2026-08-15" },
+  {
+    id: "f1",
+    user: "bot_user_92",
+    reason: "VPN",
+    score: 12,
+    evidence: "IP mismatch x14",
+    date: "2026-08-16",
+  },
+  {
+    id: "f2",
+    user: "loop_watch_01",
+    reason: "Loop",
+    score: 8,
+    evidence: "Same video 200x",
+    date: "2026-08-16",
+  },
+  {
+    id: "f3",
+    user: "farm_acc_77",
+    reason: "Bot",
+    score: 5,
+    evidence: "Device fingerprint match",
+    date: "2026-08-15",
+  },
 ];
 
 const MOCK_CREATORS = [
-  { id: "c1", name: "TechWithRaj", earnings: 28400, videos: 42, flags: 0, status: "active" },
-  { id: "c2", name: "ComedyKing", earnings: 51200, videos: 128, flags: 2, status: "active" },
-  { id: "c3", name: "MusicVibe", earnings: 9800, videos: 19, flags: 1, status: "flagged" },
+  {
+    id: "c1",
+    name: "TechWithRaj",
+    earnings: 28400,
+    videos: 42,
+    flags: 0,
+    status: "active",
+  },
+  {
+    id: "c2",
+    name: "ComedyKing",
+    earnings: 51200,
+    videos: 128,
+    flags: 2,
+    status: "active",
+  },
+  {
+    id: "c3",
+    name: "MusicVibe",
+    earnings: 9800,
+    videos: 19,
+    flags: 1,
+    status: "flagged",
+  },
 ];
 
 const TABS = [
@@ -261,7 +344,9 @@ export default function FinanceDashboard() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold text-white">Ad Revenue Monitoring</h2>
+          <h2 className="text-lg font-semibold text-white">
+            Ad Revenue Monitoring
+          </h2>
           <p className="text-sm text-gray-500">Last sync: 12 min ago</p>
         </div>
         <div className="flex gap-2">
@@ -282,9 +367,27 @@ export default function FinanceDashboard() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard title="India CPM Avg" value="$2.15" icon={Globe} color="amber" trend={-1.2} />
-        <StatCard title="Intl CPM Avg" value="$5.48" icon={Globe} color="blue" trend={4.8} />
-        <StatCard title="7-day Rolling" value="$3.21" icon={TrendingUp} color="emerald" trend={2.1} />
+        <StatCard
+          title="India CPM Avg"
+          value="$2.15"
+          icon={Globe}
+          color="amber"
+          trend={-1.2}
+        />
+        <StatCard
+          title="Intl CPM Avg"
+          value="$5.48"
+          icon={Globe}
+          color="blue"
+          trend={4.8}
+        />
+        <StatCard
+          title="7-day Rolling"
+          value="$3.21"
+          icon={TrendingUp}
+          color="emerald"
+          trend={2.1}
+        />
       </div>
 
       <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
@@ -301,10 +404,16 @@ export default function FinanceDashboard() {
           <tbody className="divide-y divide-gray-800">
             {MOCK_CPM.map((row, i) => (
               <tr key={i} className="hover:bg-gray-800/40 transition">
-                <td className="px-5 py-3.5 font-medium text-gray-200">{row.network}</td>
+                <td className="px-5 py-3.5 font-medium text-gray-200">
+                  {row.network}
+                </td>
                 <td className="px-5 py-3.5 text-gray-400">{row.type}</td>
-                <td className="px-5 py-3.5 text-right text-gray-300">${row.india}</td>
-                <td className="px-5 py-3.5 text-right text-gray-300">${row.intl}</td>
+                <td className="px-5 py-3.5 text-right text-gray-300">
+                  ${row.india}
+                </td>
+                <td className="px-5 py-3.5 text-right text-gray-300">
+                  ${row.intl}
+                </td>
                 <td className="px-5 py-3.5 text-center">
                   <span
                     className={`px-2 py-0.5 text-xs rounded-full ${
@@ -323,7 +432,10 @@ export default function FinanceDashboard() {
       </div>
 
       <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 flex items-start gap-3">
-        <AlertTriangle size={18} className="text-amber-400 mt-0.5 flex-shrink-0" />
+        <AlertTriangle
+          size={18}
+          className="text-amber-400 mt-0.5 flex-shrink-0"
+        />
         <div>
           <p className="text-sm font-medium text-amber-300">CPM Alert</p>
           <p className="text-xs text-amber-400/80 mt-0.5">
@@ -338,10 +450,30 @@ export default function FinanceDashboard() {
   const renderWallets = () => (
     <div className="space-y-6">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Viewer Pending" value={formatINR(MOCK_WALLETS.viewerPending)} icon={Clock} color="amber" />
-        <StatCard title="Viewer Confirmed" value={formatINR(MOCK_WALLETS.viewerConfirmed)} icon={CheckCircle} color="emerald" />
-        <StatCard title="Creator Pending" value={formatINR(MOCK_WALLETS.creatorPending)} icon={Clock} color="amber" />
-        <StatCard title="Creator Confirmed" value={formatINR(MOCK_WALLETS.creatorConfirmed)} icon={CheckCircle} color="indigo" />
+        <StatCard
+          title="Viewer Pending"
+          value={formatINR(MOCK_WALLETS.viewerPending)}
+          icon={Clock}
+          color="amber"
+        />
+        <StatCard
+          title="Viewer Confirmed"
+          value={formatINR(MOCK_WALLETS.viewerConfirmed)}
+          icon={CheckCircle}
+          color="emerald"
+        />
+        <StatCard
+          title="Creator Pending"
+          value={formatINR(MOCK_WALLETS.creatorPending)}
+          icon={Clock}
+          color="amber"
+        />
+        <StatCard
+          title="Creator Confirmed"
+          value={formatINR(MOCK_WALLETS.creatorConfirmed)}
+          icon={CheckCircle}
+          color="indigo"
+        />
       </div>
 
       <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
@@ -364,7 +496,9 @@ export default function FinanceDashboard() {
           <tbody className="divide-y divide-gray-800">
             {MOCK_WALLETS.withdrawalQueue.map((w) => (
               <tr key={w.id} className="hover:bg-gray-800/40 transition">
-                <td className="px-5 py-3.5 font-medium text-gray-200">{w.user}</td>
+                <td className="px-5 py-3.5 font-medium text-gray-200">
+                  {w.user}
+                </td>
                 <td className="px-5 py-3.5">
                   <span
                     className={`px-2 py-0.5 text-xs rounded-full capitalize ${
@@ -430,7 +564,9 @@ export default function FinanceDashboard() {
             Update Score
           </button>
         </div>
-        <p className="text-xs text-gray-500 mt-2">All adjustments are logged with admin ID + timestamp.</p>
+        <p className="text-xs text-gray-500 mt-2">
+          All adjustments are logged with admin ID + timestamp.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -475,7 +611,9 @@ export default function FinanceDashboard() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-white">Flagged Users</h2>
-        <span className="text-sm text-rose-400">{MOCK_FLAGGED.length} active flags</span>
+        <span className="text-sm text-rose-400">
+          {MOCK_FLAGGED.length} active flags
+        </span>
       </div>
 
       <div className="space-y-3">
@@ -492,7 +630,9 @@ export default function FinanceDashboard() {
                 </span>
               </div>
               <p className="text-sm text-gray-500 mt-1">{f.evidence}</p>
-              <p className="text-xs text-gray-600 mt-1">Trust: {f.score} • {f.date}</p>
+              <p className="text-xs text-gray-600 mt-1">
+                Trust: {f.score} • {f.date}
+              </p>
             </div>
             <div className="flex gap-2 flex-shrink-0">
               <button
@@ -518,7 +658,10 @@ export default function FinanceDashboard() {
   const renderCreators = () => (
     <div className="space-y-6">
       <div className="relative max-w-md">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+        <Search
+          size={16}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
+        />
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -544,11 +687,15 @@ export default function FinanceDashboard() {
               c.name.toLowerCase().includes(search.toLowerCase()),
             ).map((c) => (
               <tr key={c.id} className="hover:bg-gray-800/40 transition">
-                <td className="px-5 py-3.5 font-medium text-gray-200">{c.name}</td>
+                <td className="px-5 py-3.5 font-medium text-gray-200">
+                  {c.name}
+                </td>
                 <td className="px-5 py-3.5 text-right text-emerald-400">
                   {formatINR(c.earnings)}
                 </td>
-                <td className="px-5 py-3.5 text-center text-gray-300">{c.videos}</td>
+                <td className="px-5 py-3.5 text-center text-gray-300">
+                  {c.videos}
+                </td>
                 <td className="px-5 py-3.5 text-center">
                   {c.flags > 0 ? (
                     <span className="text-rose-400 font-medium">{c.flags}</span>
@@ -588,7 +735,9 @@ export default function FinanceDashboard() {
         <div className="flex items-center justify-between py-3 border-b border-gray-800">
           <div>
             <p className="text-gray-200">Platform / Creator / Viewer</p>
-            <p className="text-xs text-gray-500">Locked — contact Super Admin</p>
+            <p className="text-xs text-gray-500">
+              Locked — contact Super Admin
+            </p>
           </div>
           <span className="flex items-center gap-1.5 text-sm text-gray-400">
             <Lock size={14} />
@@ -632,12 +781,16 @@ export default function FinanceDashboard() {
         <div className="flex items-center justify-between py-2">
           <div>
             <p className="text-gray-300">Platform maintenance</p>
-            <p className="text-xs text-gray-500">Users see maintenance screen</p>
+            <p className="text-xs text-gray-500">
+              Users see maintenance screen
+            </p>
           </div>
           <button
             onClick={() => {
               setMaintenanceMode(!maintenanceMode);
-              toast.info(maintenanceMode ? "Maintenance OFF" : "Maintenance ON");
+              toast.info(
+                maintenanceMode ? "Maintenance OFF" : "Maintenance ON",
+              );
             }}
             className={`w-11 h-6 rounded-full transition relative ${
               maintenanceMode ? "bg-rose-600" : "bg-gray-700"
@@ -669,13 +822,41 @@ export default function FinanceDashboard() {
 
       <div className="bg-gray-900 border border-gray-800 rounded-xl divide-y divide-gray-800">
         {[
-          { action: "Payout approved", user: "admin@vidoo", target: "Rahul S. ₹850", time: "10 min ago" },
-          { action: "Trust score adjusted", user: "finance@vidoo", target: "user_882 → 45", time: "1h ago" },
-          { action: "User frozen", user: "support@vidoo", target: "bot_user_92", time: "2h ago" },
-          { action: "CPM sync completed", user: "system", target: "AdMob + Unity", time: "3h ago" },
-          { action: "Withdrawal rejected", user: "finance@vidoo", target: "Unknown ₹1200", time: "5h ago" },
+          {
+            action: "Payout approved",
+            user: "admin@vidoo",
+            target: "Rahul S. ₹850",
+            time: "10 min ago",
+          },
+          {
+            action: "Trust score adjusted",
+            user: "finance@vidoo",
+            target: "user_882 → 45",
+            time: "1h ago",
+          },
+          {
+            action: "User frozen",
+            user: "support@vidoo",
+            target: "bot_user_92",
+            time: "2h ago",
+          },
+          {
+            action: "CPM sync completed",
+            user: "system",
+            target: "AdMob + Unity",
+            time: "3h ago",
+          },
+          {
+            action: "Withdrawal rejected",
+            user: "finance@vidoo",
+            target: "Unknown ₹1200",
+            time: "5h ago",
+          },
         ].map((log, i) => (
-          <div key={i} className="px-5 py-3.5 flex items-center gap-4 hover:bg-gray-800/30 transition">
+          <div
+            key={i}
+            className="px-5 py-3.5 flex items-center gap-4 hover:bg-gray-800/30 transition"
+          >
             <div className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center flex-shrink-0">
               <History size={14} className="text-gray-500" />
             </div>
@@ -685,7 +866,9 @@ export default function FinanceDashboard() {
                 {log.user} → {log.target}
               </p>
             </div>
-            <span className="text-xs text-gray-600 flex-shrink-0">{log.time}</span>
+            <span className="text-xs text-gray-600 flex-shrink-0">
+              {log.time}
+            </span>
           </div>
         ))}
       </div>

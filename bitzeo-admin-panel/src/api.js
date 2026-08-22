@@ -3,7 +3,7 @@ import { setupAdminAxiosAuth } from "./utils/session";
 
 // Base URL from env (VITE_API_BASE_URL), production fallback for deployed builds.
 export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "https://bharat-pay-3.onrender.com/api";
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
 
 const API = axios.create({
   baseURL: API_BASE_URL,
@@ -82,8 +82,7 @@ export const scanProduct = (barcodeData) =>
 // Admin User Management
 export const fetchAdminUsers = (params) =>
   API.get("/admin/alluser", { params });
-export const fetchAdminUserById = (id) =>
-  API.get(`/admin/users/${id}`);
+export const fetchAdminUserById = (id) => API.get(`/admin/users/${id}`);
 export const fetchAdminUserOverview = (id) =>
   API.get(`/admin/users/${id}/overview`);
 export const fetchAdminUserChannels = (id, params) =>
@@ -120,13 +119,13 @@ export const fetchAdminUserEngagement = (id) =>
   API.get(`/admin/users/${id}/engagement`);
 
 // Admin Uploads
-export const getAdminUploads = (params) => API.get("/admin/uploads", { params });
+export const getAdminUploads = (params) =>
+  API.get("/admin/uploads", { params });
 
 // Admin User Moderation
 export const suspendAdminUser = (id, reason) =>
   API.post(`/admin/users/${id}/suspend`, { reason });
-export const restoreAdminUser = (id) =>
-  API.post(`/admin/users/${id}/restore`);
+export const restoreAdminUser = (id) => API.post(`/admin/users/${id}/restore`);
 export const banAdminUser = (id, reason) =>
   API.post(`/admin/users/${id}/ban`, { reason });
 
@@ -140,7 +139,9 @@ export const banAdminChannel = (userId, channelId, reason) =>
 export const restoreAdminChannel = (userId, channelId) =>
   API.post(`/admin/users/${userId}/channels/${channelId}/restore`);
 export const deleteAdminChannel = (userId, channelId, reason) =>
-  API.delete(`/admin/users/${userId}/channels/${channelId}`, { data: { reason } });
+  API.delete(`/admin/users/${userId}/channels/${channelId}`, {
+    data: { reason },
+  });
 
 // Admin Video Moderation
 export const disableAdminVideo = (userId, videoId, reason) =>
@@ -187,8 +188,7 @@ export const fetchUserCopyrightStrikes = (userId) =>
   API.get(`/admin/copyright/strikes/user/${userId}`);
 
 // Copyright Stats
-export const fetchCopyrightStats = () =>
-  API.get("/admin/copyright/stats");
+export const fetchCopyrightStats = () => API.get("/admin/copyright/stats");
 
 // Search (for copyright create form etc.)
 export const searchVideos = (q) =>
