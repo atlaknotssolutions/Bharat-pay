@@ -205,7 +205,7 @@ const uploadVideo = async (req, res) => {
       description,
       videoUrl: videoPath,
       thumbnail: thumbnailPath,
-      videoType: videoType,
+      videoType: videoType ? [videoType] : undefined,
       duration:
         authoritativeDuration ||
         (Number(duration) > 0 ? Number(duration) : undefined),
