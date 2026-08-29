@@ -12,7 +12,6 @@ const {
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
-const fileUpload = require("express-fileupload");
 const path = require("node:path");
 const mongoose = require("mongoose");
 const morgan = require("morgan");
@@ -99,16 +98,6 @@ app.use(
   express.urlencoded({
     extended: true,
     limit: "50mb",
-  })
-);
-
-app.use(
-  fileUpload({
-    limits: {
-      fileSize: 5 * 1024 * 1024,
-    },
-    abortOnLimit: true,
-    useTempFiles: false,
   })
 );
 

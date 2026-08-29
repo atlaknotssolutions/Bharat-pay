@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const fileUpload = require("express-fileupload");
 const {
   registrationStatus,
   registerUser,
@@ -77,7 +78,11 @@ router.post("/refresh", refreshLimiter, adminRefresh);
 router.post("/logout", adminLogout);
 
 // ====================== PROTECTED: EMPLOYEE MANAGEMENT ======================
-router.post("/employee/register", requireAdmin, requirePermission("employee:create"), adminRegisterLimiter, registerEmployee);
+router.post("/employee/register", fileUpload({
+  limits: { fileSize: 5 * 1024 * 1024 },
+  abortOnLimit: true,
+  useTempFiles: false,
+}), requireAdmin, requirePermission("employee:create"), adminRegisterLimiter, registerEmployee);
 router.get("/roles", requireAdmin, requirePermission("employee:read"), getEmployees);
 
 // ====================== PROTECTED: DASHBOARD ======================
