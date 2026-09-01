@@ -104,9 +104,6 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use(cookieParser());
 
-// =====================================================
-// CORS
-// =====================================================
 
 app.use(
   cors({
