@@ -32,8 +32,9 @@ const userSchema = new mongoose.Schema(
 
     deviceId: {
       type: String,
-      unique: true,
-      sparse: true,
+      // unique: true,
+      index: true,
+      
     },
 
     googleId: String,

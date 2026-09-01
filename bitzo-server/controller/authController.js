@@ -444,6 +444,7 @@ exports.loginUser = async (req, res) => {
       });
     }
 
+    // ========== PASSWORD STEP (no OTP yet) ==========
     if (!otp) {
       if (!password) {
         return res.status(400).json({
@@ -476,54 +477,48 @@ exports.loginUser = async (req, res) => {
         });
       }
 
-      // ≡ƒöä Auto-replace old device binding with new device
-      if (user.deviceId && user.deviceId !== deviceId) {
+      // ---------- Safe device binding ----------
+      // 1. Clear this deviceId from ANY other user
+      await User.updateMany(
+        { deviceId, _id: { $ne: user._id } },
+        { $unset: { deviceId: 1 } }
+      );
+
+      // 2. Now safely assign it to the current user
+      if (user.deviceId !== deviceId) {
         const oldDeviceId = user.deviceId;
 
-        // Update user to new device
         user.deviceId = deviceId;
         await user.save();
 
-        // Update DeviceFingerprint: old record should no longer link to this user
-        await DeviceFingerprint.updateOne(
-          { deviceId: oldDeviceId },
-          { $unset: { userId: 1 } },
-        );
-
-        // Create/update fingerprint record for new device
-        await DeviceFingerprint.findOneAndUpdate(
-          { deviceId },
-          {
-            $set: {
-              userId: user._id,
-              lastIp: ip,
-              userAgent: ua,
-              lastSeen: new Date(),
-            },
-            $addToSet: { associatedUsers: user._id },
-          },
-          { upsert: true },
-        );
+        // Clean old device fingerprint
+        if (oldDeviceId) {
+          await DeviceFingerprint.updateOne(
+            { deviceId: oldDeviceId },
+            { $unset: { userId: 1 } }
+          );
+        }
       } else if (!user.deviceId) {
         user.deviceId = deviceId;
         await user.save();
-
-        // Link new device to user in DeviceFingerprint
-        await DeviceFingerprint.findOneAndUpdate(
-          { deviceId },
-          {
-            $set: {
-              userId: user._id,
-              lastIp: ip,
-              userAgent: ua,
-              lastSeen: new Date(),
-            },
-            $addToSet: { associatedUsers: user._id },
-          },
-          { upsert: true },
-        );
       }
 
+      // Create / update fingerprint for current device
+      await DeviceFingerprint.findOneAndUpdate(
+        { deviceId },
+        {
+          $set: {
+            userId: user._id,
+            lastIp: ip,
+            userAgent: ua,
+            lastSeen: new Date(),
+          },
+          $addToSet: { associatedUsers: user._id },
+        },
+        { upsert: true }
+      );
+
+      // ---------- VPN / Proxy check ----------
       const vpnInfo = await detectVPN(ip);
       if (vpnInfo.isVPN || vpnInfo.isProxy) {
         await logFraudEvent({
@@ -554,6 +549,7 @@ exports.loginUser = async (req, res) => {
         });
       }
 
+      // Issue OTP
       const otpCode = await issueOtpToDevice({
         deviceId,
         user,
@@ -563,12 +559,12 @@ exports.loginUser = async (req, res) => {
       return res.status(200).json({
         success: true,
         requiresOtp: true,
-        message:
-          "OTP has been sent to your email. Verify it to complete login.",
+        message: "OTP has been sent to your email. Verify it to complete login.",
         otpCode: process.env.NODE_ENV !== "production" ? otpCode : undefined,
       });
     }
 
+    // ========== OTP VERIFICATION STEP ==========
     const fingerprintRecord = await DeviceFingerprint.findOne({ deviceId });
     if (!fingerprintRecord || !fingerprintRecord.pendingOtp) {
       return res.status(401).json({
@@ -589,30 +585,37 @@ exports.loginUser = async (req, res) => {
       });
     }
 
+    // Clear OTP
     await DeviceFingerprint.updateOne(
       { deviceId },
-      { $unset: { pendingOtp: 1, otpExpiresAt: 1, otpPurpose: 1 } },
+      { $unset: { pendingOtp: 1, otpExpiresAt: 1, otpPurpose: 1 } }
     );
 
-    // Γ£à Ensure final device binding is set after OTP verification
-    if (
-      !fingerprintRecord.userId ||
-      String(fingerprintRecord.userId) !== String(user._id)
-    ) {
-      await DeviceFingerprint.updateOne(
-        { deviceId },
-        {
-          $set: {
-            userId: user._id,
-            lastIp: ip,
-            userAgent: ua,
-            lastSeen: new Date(),
-          },
-          $addToSet: { associatedUsers: user._id },
-        },
-      );
+    // Final device binding after successful OTP
+    await User.updateMany(
+      { deviceId, _id: { $ne: user._id } },
+      { $unset: { deviceId: 1 } }
+    );
+
+    if (user.deviceId !== deviceId) {
+      user.deviceId = deviceId;
+      await user.save();
     }
 
+    await DeviceFingerprint.updateOne(
+      { deviceId },
+      {
+        $set: {
+          userId: user._id,
+          lastIp: ip,
+          userAgent: ua,
+          lastSeen: new Date(),
+        },
+        $addToSet: { associatedUsers: user._id },
+      }
+    );
+
+    // Risk analysis
     const { riskPoints, reasons } = await analyzeBehavior(user._id);
     if (riskPoints > 0) {
       await applyRiskToUser(user._id, riskPoints, reasons);
@@ -648,17 +651,17 @@ exports.loginUser = async (req, res) => {
       sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
+
     const refreshToken = await createAuthSession(user._id, "user");
     setRefreshCookie(res, refreshToken, "user");
 
-    // Update lastLoginAt and lastActivityAt on successful login
     const now = new Date();
     await User.updateOne(
       { _id: user._id },
-      { $set: { lastLoginAt: now, lastActivityAt: now } },
+      { $set: { lastLoginAt: now, lastActivityAt: now } }
     );
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "Login successful",
       token,
@@ -673,8 +676,8 @@ exports.loginUser = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Γ¥î Login error:", error.message);
-    res.status(500).json({
+    console.error("Login error:", error.message);
+    return res.status(500).json({
       success: false,
       message: "Internal server error",
     });

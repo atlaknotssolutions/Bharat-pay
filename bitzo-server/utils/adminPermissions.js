@@ -13,11 +13,13 @@ const ROLE_PERMISSIONS = {
     "moderation:delete",
     "employee:read",
     "employee:create",
+    "employee:delete",
     "dashboard:read",
     "content:read",
     "copyright:read",
     "copyright:write",
     "copyright:delete",
+    
   ],
   finance: [
     "finance:read",

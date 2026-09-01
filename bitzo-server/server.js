@@ -5,9 +5,7 @@ require("./config/validateEnv")();
 const {
   startTrustScoreJob,
 } = require("./services/vpn.service/trustScore.job.js");
-const {
-  startStrikeExpiryJob,
-} = require("./jobs/strikeExpiryJob.js");
+const { startStrikeExpiryJob } = require("./jobs/strikeExpiryJob.js");
 
 const express = require("express");
 const cookieParser = require("cookie-parser");
@@ -29,7 +27,6 @@ const notificationRoutes = require("./routes/notificationRoute.js");
 const copyrightRoutes = require("./routes/CopyrightRoutes/CopyrightRoutes.js");
 const userCopyrightRoutes = require("./routes/CopyrightRoutes/UserCopyrightRoutes.js");
 const { detectVPN } = require("./services/vpn.service/vpn.service.js");
-
 
 const app = express();
 
@@ -65,9 +62,7 @@ morgan.token("body", (req) => {
 });
 
 app.use(
-  morgan(
-    ":method :url :status :res[content-length] - :response-time ms :body"
-  )
+  morgan(":method :url :status :res[content-length] - :response-time ms :body"),
 );
 
 // =====================================================
@@ -101,6 +96,12 @@ app.use(
   })
 );
 
+
+// Bad if applied globally before the route
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+
 app.use(cookieParser());
 
 // =====================================================
@@ -112,15 +113,7 @@ app.use(
     origin: true,
     credentials: true,
 
-    methods: [
-      "GET",
-      "POST",
-      "PUT",
-      "PATCH",
-      "DELETE",
-      "OPTIONS",
-      "HEAD",
-    ],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
 
     allowedHeaders: [
       "Content-Type",
@@ -130,21 +123,15 @@ app.use(
       "Origin",
     ],
 
-    exposedHeaders: [
-      "Content-Type",
-      "Authorization",
-    ],
-  })
+    exposedHeaders: ["Content-Type", "Authorization"],
+  }),
 );
 
 // =====================================================
 // STATIC FILES
 // =====================================================
 
-app.use(
-  "/uploads",
-  express.static(path.join(__dirname, "uploads"))
-);
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // =====================================================
 // ROUTES

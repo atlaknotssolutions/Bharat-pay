@@ -9,7 +9,7 @@ const {
   loginEmployee,
   getAllUsers,
   updateUser,
-  deleteUser,
+  deleteEmployee,
   getUserById,
   getUserOverview,
   getAdminUserChannels,
@@ -115,7 +115,7 @@ router.put("/users/:id", requireAdmin, requirePermission("users:write"), adminUs
 
 // ====================== PROTECTED: USER DELETE ======================
 router.delete("/users/:id/permanent", requireAdmin, requirePermission("users:delete"), adminDestructiveLimiter, hardDeleteUser);
-router.delete("/users/:id", requireAdmin, requirePermission("users:delete"), adminDestructiveLimiter, deleteUser);
+router.delete("/employee/:id", requireAdmin, requirePermission("users:delete"), adminDestructiveLimiter, deleteEmployee);
 
 // ====================== DELETED USERS ======================
 router.get("/deleted-users", requireAdmin, requirePermission("users:read"), adminUserListLimiter, getDeletedUsers);
@@ -150,5 +150,5 @@ router.patch("/users/:id/status", requireAdmin, toggleUserStatus);
 router.get("/users/:id", requireAdmin, getUserById);
 router.get("/alluser", requireAdmin, getAllUsers);
 router.put("/users/:id", requireAdmin, updateUser);
-router.delete("/users/:id", requireAdmin, deleteUser);
+router.delete("/employee/:id", requireAdmin, deleteEmployee);
 module.exports = router;

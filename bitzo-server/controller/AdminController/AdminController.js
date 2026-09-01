@@ -749,6 +749,80 @@ exports.hardDeleteUser = async (req, res) => {
   }
 };
 
+
+exports.deleteEmployee = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const adminId = req.admin && req.admin._id;
+ 
+    // Validate user ID format
+    if (!id || !isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "Invalid user ID format" });
+    }
+ 
+    // Prevent admin from deleting themselves
+    if (adminId && adminId.toString() === id) {
+      return res.status(400).json({ success: false, message: "You cannot delete your own account" });
+    }
+ 
+    const employee = await User.findById(id);
+    if (!employee) {
+      return res.status(404).json({ success: false, message: "Employee not found" });
+    }
+ 
+    // Prevent deleting the primary owner account (role admin with lowest createdAt)
+    const primaryOwner = await User.findOne({ role: "admin" }).sort({ createdAt: 1 });
+    if (primaryOwner && primaryOwner._id.toString() === id) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Cannot delete the primary owner account" });
+    }
+ 
+    // Prevent deleting the last remaining admin
+    if (employee.role === "admin") {
+      const adminCount = await User.countDocuments({ role: "admin" });
+      if (adminCount <= 1) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Cannot delete the last admin account" });
+      }
+    }
+ 
+    // Hard-delete the employee record
+    await User.findByIdAndDelete(id);
+ 
+    logAuditEvent({
+      userId: id,
+      eventType: "ADMIN_EMPLOYEE_DELETE",
+      ip: req.ip,
+      userAgent: req.get("user-agent"),
+      metadata: { adminId, role: employee.role, email: employee.email },
+    }).catch(() => {});
+ 
+    // Notify the removed employee by email (best-effort)
+    try {
+      await sendMailSafely(
+        getRemoveEmployeeMailOptions(
+          employee.email,
+          employee.name,
+          employee.role || "Employee",
+          "Bharat Play",
+        ),
+      );
+    } catch (mailError) {
+      console.error("Delete employee mail error:", mailError.message);
+    }
+ 
+    return res.status(200).json({
+      success: true,
+      message: "Employee deleted successfully",
+    });
+  } catch (err) {
+    console.error("deleteEmployee error:", err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+ 
 // ================== USER OVERVIEW (360┬░) ==================
 exports.getUserOverview = async (req, res) => {
   try {

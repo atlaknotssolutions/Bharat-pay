@@ -349,85 +349,90 @@ export default function ChannelPage() {
     }
   };
 
-  const handleCreateChannel = async (e) => {
-    e.preventDefault();
-    const token = getToken();
+ const handleCreateChannel = async (e) => {
+  e.preventDefault();
+  const token = getToken();
 
-    if (!token) {
-      setCreateError("Please login first.");
-      return;
+  if (!token) {
+    setCreateError("Please login first.");
+    return;
+  }
+
+  if (!newChannel.name.trim()) {
+    setCreateError("Channel name is required");
+    return;
+  }
+
+  if (!newChannel.category) {
+    setCreateError("Please select a category");
+    return;
+  }
+
+  try {
+    setCreateError("");
+
+    const formData = new FormData();
+    formData.append("name", newChannel.name.trim());
+    formData.append(
+      "channeldescription",
+      newChannel.channelDescription || ""
+    );
+    formData.append("category", newChannel.category);
+    formData.append("contactemail", newChannel.contactemail || "");
+
+    if (newChannel.channelImageFile) {
+      formData.append("channelImage", newChannel.channelImageFile);
+    }
+    if (newChannel.channelBannerFile) {
+      formData.append("channelBanner", newChannel.channelBannerFile);
     }
 
-    if (!newChannel.name.trim()) {
-      setCreateError("Channel name is required");
-      return;
+    const response = await fetch(`${API_BASE}/uservideo/createchannel`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        // Do NOT set Content-Type — browser will set it with boundary
+      },
+      body: formData,
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || result.error || "Failed to create channel");
     }
 
-    if (!newChannel.category) {
-      setCreateError("Please select a category");
-      return;
-    }
+    // Refetch channels
+    const channelsRes = await fetch(`${API_BASE}/uservideo/channel`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
 
-    try {
-      const formData = new FormData();
-      formData.append("name", newChannel.name.trim());
-      formData.append(
-        "channeldescription",
-        newChannel.channelDescription || "",
-      );
-      formData.append("category", newChannel.category);
-      formData.append("contactemail", newChannel.contactemail || "");
-
-      if (newChannel.channelImageFile) {
-        formData.append("channelImage", newChannel.channelImageFile);
-      }
-      if (newChannel.channelBannerFile) {
-        formData.append("channelBanner", newChannel.channelBannerFile);
-      }
-
-      const response = await fetch(`${API_BASE}/uservideo/createchannel`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message || "Failed to create channel");
-      }
-
-      // Refetch channels
-      const channelsRes = await fetch(`${API_BASE}/uservideo/channel`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (channelsRes.ok) {
-        const data = await channelsRes.json();
-        setChannels(data.channels || []);
+    if (channelsRes.ok) {
+      const data = await channelsRes.json();
+      setChannels(data.channels || []);
+      if (result.channel?._id) {
         setSelectedChannelId(result.channel._id);
       }
-
-      setShowCreateModal(false);
-      setNewChannel({
-        name: "",
-        channelDescription: "",
-        category: "",
-        channelImageFile: null,
-        channelImagePreview: "",
-        channelBannerFile: null,
-        channelBannerPreview: "",
-        contactemail: "",
-      });
-
-      alert("Channel created successfully!");
-    } catch (error) {
-      console.error("Channel creation error:", error);
-      setCreateError(error.message || "Failed to create channel.");
     }
-  };
+
+    setShowCreateModal(false);
+    setNewChannel({
+      name: "",
+      channelDescription: "",
+      category: "",
+      channelImageFile: null,
+      channelImagePreview: "",
+      channelBannerFile: null,
+      channelBannerPreview: "",
+      contactemail: "",
+    });
+
+    alert("Channel created successfully!");
+  } catch (error) {
+    console.error("Channel creation error:", error);
+    setCreateError(error.message || "Failed to create channel.");
+  }
+};
 
   // Generate thumbnail from video if user didn't upload one
   const generateVideoThumbnail = (file) => {

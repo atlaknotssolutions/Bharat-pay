@@ -119,7 +119,7 @@ export default function Profile() {
     setEditError(null);
   };
 
-  // Submit Edit Profile (Name + Email + Avatar)
+  // Submit Edit Profile (Name + Email + Avatar) - FIXED
   const handleEditSubmit = async () => {
     setEditLoading(true);
     setEditError(null);
@@ -128,34 +128,39 @@ export default function Profile() {
       const token = localStorage.getItem("token");
       if (!token || !user?._id) throw new Error("Please login again");
 
+      const trimmedName = (editForm.name || "").trim();
+      const trimmedEmail = (editForm.email || "").trim().toLowerCase();
+      const currentEmail = (user.email || "").toLowerCase();
+
+      // No changes check
+      if (
+        !avatarFile &&
+        trimmedName === (user.name || "") &&
+        trimmedEmail === currentEmail
+      ) {
+        throw new Error("No changes detected");
+      }
+
+      if (!trimmedName) {
+        throw new Error("Name cannot be empty");
+      }
+
       const formData = new FormData();
 
-      // Name
-      const trimmedName = editForm.name?.trim();
-      if (trimmedName && trimmedName !== user.name) {
-        formData.append("name", trimmedName);
-      }
+      // Always send name & email (prevents empty / incomplete form issues)
+      formData.append("name", trimmedName);
+      formData.append("email", trimmedEmail);
 
-      // Email
-      const trimmedEmail = editForm.email?.trim().toLowerCase();
-      if (trimmedEmail && trimmedEmail !== user.email.toLowerCase()) {
-        formData.append("email", trimmedEmail);
-      }
-
-      // Avatar
+      // Avatar only if selected
       if (avatarFile) {
         formData.append("avatar", avatarFile);
-      }
-
-      // Check if any change exists
-      if (!formData.has("name") && !formData.has("email") && !avatarFile) {
-        throw new Error("No changes detected");
       }
 
       const res = await fetch(`${API_BASE}/user/${user._id}`, {
         method: "PUT",
         headers: {
           Authorization: `Bearer ${token}`,
+          // Important: DO NOT set Content-Type when using FormData
         },
         body: formData,
       });
@@ -170,20 +175,22 @@ export default function Profile() {
       await dispatch(fetchProfileData());
 
       setEditForm({
-        name: data.user.name || editForm.name,
-        email: data.user.email || editForm.email,
+        name: data.user?.name || trimmedName,
+        email: data.user?.email || trimmedEmail,
       });
 
       // Cleanup preview URL
-      if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+      if (avatarPreview) {
+        URL.revokeObjectURL(avatarPreview);
+      }
       setAvatarFile(null);
       setAvatarPreview(null);
       setIsEditOpen(false);
 
-      alert("Profile updated successfully!"); // Replace with toast later
+      toast.success("Profile updated successfully!");
     } catch (err) {
       console.error("Edit submit error:", err);
-      setEditError(err.message);
+      setEditError(err.message || "Something went wrong");
     } finally {
       setEditLoading(false);
     }
@@ -197,7 +204,7 @@ export default function Profile() {
     setAvatarPreview(null);
   };
 
-  // Password Submit (you can improve this later with real backend)
+  // Password Submit
   const handlePasswordSubmit = async () => {
     try {
       setPasswordLoading(true);
@@ -219,16 +226,13 @@ export default function Profile() {
       const token = localStorage.getItem("token");
       if (!token || !user?._id) throw new Error("Authentication required");
 
-      const res = await authFetch(
-        `${API_BASE}/user/password/${user._id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ oldPassword, newPassword }),
+      const res = await authFetch(`${API_BASE}/user/password/${user._id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({ oldPassword, newPassword }),
+      });
 
       const data = await res.json();
       if (!res.ok || !data.success) {
@@ -255,7 +259,11 @@ export default function Profile() {
 
   const closePasswordModal = () => {
     setIsPasswordOpen(false);
-    setPasswordForm({ oldPassword: "", newPassword: "", confirmPassword: "" });
+    setPasswordForm({
+      oldPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    });
     setPasswordError(null);
     setPasswordSuccess(false);
     setShowPasswords({ old: false, new: false, confirm: false });
@@ -372,9 +380,7 @@ export default function Profile() {
                     <h4 className="font-medium text-base line-clamp-2">
                       {video.title}
                     </h4>
-                    <p className="mt-1 text-sm text-zinc-400">
-                      {video.channel}
-                    </p>
+                    <p className="mt-1 text-sm text-zinc-400">{video.channel}</p>
                     <p className="mt-2 text-sm text-zinc-500">
                       {Number(video.views || 0).toLocaleString()} views
                       {video.watchedAt && (
@@ -468,7 +474,7 @@ export default function Profile() {
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6">
             <div className="flex items-start gap-5">
               <img
-                src={user.avatar}
+                src={resolveMediaUrl(user.avatar) || user.avatar}
                 alt={user.name}
                 className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-2 border-zinc-700 shadow-lg"
               />
@@ -485,10 +491,7 @@ export default function Profile() {
                     <span>Joined {user.createdAt}</span>
                   </div>
                 </div>
-                <div className="mt-3 flex items-center gap-3 text-sm">
-                  <Mail size={15} className="text-zinc-500" />
-                  <span>{user.email}</span>
-                </div>
+                
               </div>
             </div>
 
@@ -530,20 +533,6 @@ export default function Profile() {
               label: "Total Views",
             },
             {
-              icon: Clock,
-              color: "emerald",
-              value: formatWatchTime(user.watchTimeTodaySeconds),
-              sub: formatWatchMinutes(user.watchTimeTodaySeconds),
-              label: "Today's Watch Time",
-            },
-            {
-              icon: Clock,
-              color: "teal",
-              value: formatWatchTime(user.watchTimeTotalSeconds),
-              sub: formatWatchMinutes(user.watchTimeTotalSeconds),
-              label: "Total Watch Time",
-            },
-            {
               icon: DollarSign,
               color: "red",
               value: `₹${(user.totalEarnings || 0).toLocaleString()}`,
@@ -551,9 +540,15 @@ export default function Profile() {
             },
             {
               icon: TrendingUp,
-              color: "purple",
-              value: `₹${user.avgRPM}`,
-              label: "Avg. RPM",
+              color: "red",
+              value: `₹${(user.totalEarnings || 0).toLocaleString()}`,
+              label: "Trust Score",
+            },
+            {
+              icon: IndianRupee,
+              color: "red",
+              value: `₹${(user.totalEarnings || 0).toLocaleString()}`,
+              label: "Earning as Viewer",
             },
           ].map(({ icon: Icon, color, value, label, sub }) => (
             <div
@@ -626,7 +621,11 @@ export default function Profile() {
                 <span className="text-xs text-zinc-400 block mb-2">Avatar</span>
                 <div className="flex items-center gap-4">
                   <img
-                    src={avatarPreview || user.avatar}
+                    src={
+                      avatarPreview ||
+                      resolveMediaUrl(user.avatar) ||
+                      user.avatar
+                    }
                     alt="Avatar Preview"
                     className="w-20 h-20 rounded-full object-cover border-2 border-zinc-700"
                   />
@@ -868,7 +867,6 @@ export default function Profile() {
               <h3 className="mt-5 text-2xl font-semibold">
                 {selectedVideo.title}
               </h3>
-              {/* Add more details as needed */}
             </div>
           </div>
         </div>

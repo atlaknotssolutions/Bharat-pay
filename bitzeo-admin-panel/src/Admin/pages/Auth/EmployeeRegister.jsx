@@ -1458,19 +1458,18 @@ export default function UsersManagement() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this user?")) return;
+ const handleDelete = async (id) => {                          // line 1461
+    if (!window.confirm("Are you sure you want to delete this employee?")) return;
     try {
-      const res = await API.delete(`/admin/users/${id}`);
+      const res = await API.delete(`/admin/employee/${id}`);    // line 1464  ← new endpoint
       if (res.data.success) {
-        toast.success("User deleted");
+        toast.success("Employee deleted");
         fetchUsers();
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Delete failed");
     }
   };
-
   // ========== Toggle Enable / Disable ==========
   const handleToggleStatus = async (user) => {
     const newStatus = user.isActive === false ? true : false;
