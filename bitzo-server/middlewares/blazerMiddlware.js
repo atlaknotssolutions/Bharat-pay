@@ -257,12 +257,12 @@ const uploadBufferToB2 = async (file, folderName) => {
      * This requires the bucket to be public.
      */
     const publicUrl =
-      `${authData.downloadUrl}/file/` +
-      `${encodeURIComponent(cfg.bucketName)}/` +
-      `${fileName
-        .split("/")
-        .map(encodeURIComponent)
-        .join("/")}`;
+  `${authData.downloadUrl}/file/` +
+  `${encodeURIComponent(cfg.bucketName)}/` +
+  `${fileName
+    .split("/")
+    .map(encodeURIComponent)
+    .join("/")}`;
 
     return {
       fileName,
