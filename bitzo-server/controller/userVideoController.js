@@ -163,8 +163,9 @@ const uploadVideo = async (req, res) => {
       });
     }
 
-    const videoFile = req.files.video[0];
-    const thumbnailFile = req.files.thumbnail ? req.files.thumbnail[0] : null;
+    const b2UploadedVideo = req.uploadedVideo;
+    const videoFile = req.files?.video?.[0] || null;
+    const thumbnailFile = req.files?.thumbnail?.[0] || null;
 
     const normalizeMediaPath = (filePath) => {
       if (!filePath) return null;
@@ -183,16 +184,29 @@ const uploadVideo = async (req, res) => {
       return `uploads/${basename}`;
     };
 
-    const videoPath = normalizeMediaPath(videoFile.path);
-    const thumbnailPath = normalizeMediaPath(thumbnailFile?.path || null);
+    let videoPath = null;
+    let thumbnailPath = null;
+
+    if (b2UploadedVideo?.url) {
+      videoPath = b2UploadedVideo.url;
+      thumbnailPath = b2UploadedVideo.thumbnailUrl || null;
+    } else {
+      videoPath = normalizeMediaPath(videoFile?.path);
+      thumbnailPath = normalizeMediaPath(thumbnailFile?.path || null);
+    }
 
     // Authoritative duration from the media file; falls back to the client
     // value. Never throws/fails the upload when extraction is not possible.
     let authoritativeDuration = null;
     try {
-      authoritativeDuration = await getVideoDuration(videoPath);
+      if (videoPath && !/^https?:\/\//i.test(videoPath)) {
+        authoritativeDuration = await getVideoDuration(videoPath);
+      }
       if (!authoritativeDuration) {
-        console.error("[mediaDuration] Could not determine duration for:", videoPath);
+        console.error(
+          "[mediaDuration] Could not determine duration for:",
+          videoPath || "<no path>",
+        );
       }
     } catch (err) {
       console.error("[mediaDuration] Duration extraction failed:", err.message);
@@ -442,7 +456,9 @@ const getUserWatchHistory = async (req, res) => {
     const pagedIds = reversedIds.slice(skip, skip + limit);
 
     if (pagedIds.length === 0) {
-      return res.status(200).json({ success: true, videos: [], total, page, limit });
+      return res
+        .status(200)
+        .json({ success: true, videos: [], total, page, limit });
     }
 
     const videos = await Video.find({ _id: { $in: pagedIds } })
@@ -456,7 +472,9 @@ const getUserWatchHistory = async (req, res) => {
       .filter(Boolean)
       .map(mapVideoToListItem);
 
-    return res.status(200).json({ success: true, videos: orderedVideos, total, page, limit });
+    return res
+      .status(200)
+      .json({ success: true, videos: orderedVideos, total, page, limit });
   } catch (error) {
     console.error("Error in getUserWatchHistory:", error.message);
     return res.status(500).json({ success: false, message: "Server error" });
@@ -581,7 +599,9 @@ const getUserWatchLaterVideos = async (req, res) => {
     const pagedIds = reversedIds.slice(skip, skip + limit);
 
     if (pagedIds.length === 0) {
-      return res.status(200).json({ success: true, videos: [], total, page, limit });
+      return res
+        .status(200)
+        .json({ success: true, videos: [], total, page, limit });
     }
 
     const videos = await Video.find({ _id: { $in: pagedIds } })
@@ -595,7 +615,9 @@ const getUserWatchLaterVideos = async (req, res) => {
       .filter(Boolean)
       .map(mapVideoToListItem);
 
-    return res.status(200).json({ success: true, videos: orderedVideos, total, page, limit });
+    return res
+      .status(200)
+      .json({ success: true, videos: orderedVideos, total, page, limit });
   } catch (error) {
     console.error("Error in getUserWatchLaterVideos:", error.message);
     return res.status(500).json({ success: false, message: "Server error" });
@@ -1105,8 +1127,10 @@ const recordWatchSession = async (video, userId, body) => {
 
     const reportedDuration =
       Number.isFinite(durationNum) && durationNum > 0 ? durationNum : 0;
-    const storedDuration = Number(video.duration) > 0 ? Number(video.duration) : 0;
-    const authoritativeDuration = storedDuration > 0 ? storedDuration : reportedDuration;
+    const storedDuration =
+      Number(video.duration) > 0 ? Number(video.duration) : 0;
+    const authoritativeDuration =
+      storedDuration > 0 ? storedDuration : reportedDuration;
     const cap =
       authoritativeDuration > 0
         ? Math.min(authoritativeDuration, ABS_WATCH_SECONDS_CAP)
@@ -1143,7 +1167,10 @@ const recordWatchSession = async (video, userId, body) => {
         $max: { watchedSeconds: clampedSeconds },
         $set: {
           duration: authoritativeDuration,
-          watchedPercent: Math.min(100, Math.max(0, Number(watchedPercent) || 0)),
+          watchedPercent: Math.min(
+            100,
+            Math.max(0, Number(watchedPercent) || 0),
+          ),
           videoType,
           lastActiveAt: new Date(),
         },
@@ -2216,7 +2243,9 @@ const searchVideos = async (req, res) => {
         .map((c) => c._id);
       if (catIds.length) {
         orConditions.push({ category: { $in: catIds } });
-        scoreExpressions.push({ $cond: [{ $in: ["$category", catIds] }, 3, 0] });
+        scoreExpressions.push({
+          $cond: [{ $in: ["$category", catIds] }, 3, 0],
+        });
       }
 
       const chIds = channelDocs

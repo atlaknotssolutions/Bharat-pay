@@ -58,10 +58,7 @@ router.post(
 router.post(
   "/upload/:channelId",
   isAuthenticated,
-  upload.videoAndThumbnailUpload.fields([
-    { name: "video", maxCount: 1 },
-    { name: "thumbnail", maxCount: 1 },
-  ]),
+  uploadToBackblaze,
   uploadVideo,
 );
 router.get("/channel", isAuthenticated, getChannels);
