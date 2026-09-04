@@ -70,9 +70,12 @@ export const fetchProfileData = createAsyncThunk(
 
       let historyItems = [];
       try {
-        const historyRes = await authFetch(`${BACKEND_URL}/api/uservideo/history`, {
-          method: "GET",
-        });
+        const historyRes = await authFetch(
+          `${BACKEND_URL}/api/uservideo/history`,
+          {
+            method: "GET",
+          },
+        );
 
         if (historyRes.ok) {
           const historyData = await historyRes.json();
@@ -88,6 +91,21 @@ export const fetchProfileData = createAsyncThunk(
           name: profile.name || "User",
           handle: `@${(profile.name || "user").toLowerCase().replace(/\s+/g, "")}`,
           email: profile.email || "",
+          phone: profile.phone || "",
+          phoneVerified: Boolean(profile.phoneVerified),
+          deviceVerified: Boolean(profile.deviceVerified),
+          advertisingId: profile.advertisingId || "",
+          deviceFingerprint: profile.deviceFingerprint || "",
+          country: profile.country || "",
+          timezone: profile.timezone || "",
+          simMcc: profile.simMcc || "",
+          trustScore: profile.trustScore ?? 50,
+          trustTier: profile.trustTier || "standard",
+          walletBalance: profile.walletBalance || 0,
+          pendingBalance: profile.pendingBalance || 0,
+          totalWithdrawn: profile.totalWithdrawn || 0,
+          minimumWithdrawal: profile.minimumWithdrawal || 0,
+          withdrawalStatus: profile.withdrawalStatus || "none",
           avatar:
             profile.avatar ||
             "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400",

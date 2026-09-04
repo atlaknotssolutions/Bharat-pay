@@ -196,6 +196,8 @@ exports.registerUser = async (req, res) => {
         email: normalizedEmail,
         password: hashedPassword,
         deviceId,
+        deviceVerified: true,
+        ipAddress: ip,
       });
 
       await DeviceFingerprint.updateOne(
@@ -325,6 +327,9 @@ exports.saveDeviceFingerprint = async (req, res) => {
           await existingOtherRecord.save();
 
           user.deviceId = deviceId;
+          user.deviceVerified = true;
+          user.deviceFingerprint = fingerprint || user.deviceFingerprint;
+          user.ipAddress = ip;
           await user.save();
 
           return res.status(200).json({
@@ -337,6 +342,11 @@ exports.saveDeviceFingerprint = async (req, res) => {
 
       if (!user.deviceId || user.deviceId === deviceId) {
         user.deviceId = deviceId;
+        if (req.user?.id || req.user?._id) {
+          user.deviceVerified = true;
+          user.deviceFingerprint = fingerprint || user.deviceFingerprint;
+          user.ipAddress = ip;
+        }
         await user.save();
       }
     }
@@ -372,6 +382,15 @@ exports.saveDeviceFingerprint = async (req, res) => {
       }
 
       await existing.save();
+      if (userId && (req.user?.id || req.user?._id)) {
+        await User.findByIdAndUpdate(userId, {
+          $set: {
+            deviceVerified: true,
+            ...(fingerprint ? { deviceFingerprint: fingerprint } : {}),
+            ipAddress: ip,
+          },
+        });
+      }
       return res.status(200).json({
         success: true,
         deviceId,
@@ -392,6 +411,18 @@ exports.saveDeviceFingerprint = async (req, res) => {
     if (userId) {
       const user = await User.findById(userId).select("name email");
       if (user) {
+        if (req.user?.id || req.user?._id) {
+          await User.updateOne(
+            { _id: userId },
+            {
+              $set: {
+                deviceVerified: true,
+                ...(fingerprint ? { deviceFingerprint: fingerprint } : {}),
+                ipAddress: ip,
+              },
+            },
+          );
+        }
         await sendMailSafely(getLoginMailOptions(user.email, user.name));
       }
     }
@@ -481,7 +512,7 @@ exports.loginUser = async (req, res) => {
       // 1. Clear this deviceId from ANY other user
       await User.updateMany(
         { deviceId, _id: { $ne: user._id } },
-        { $unset: { deviceId: 1 } }
+        { $unset: { deviceId: 1 } },
       );
 
       // 2. Now safely assign it to the current user
@@ -495,7 +526,7 @@ exports.loginUser = async (req, res) => {
         if (oldDeviceId) {
           await DeviceFingerprint.updateOne(
             { deviceId: oldDeviceId },
-            { $unset: { userId: 1 } }
+            { $unset: { userId: 1 } },
           );
         }
       } else if (!user.deviceId) {
@@ -515,7 +546,7 @@ exports.loginUser = async (req, res) => {
           },
           $addToSet: { associatedUsers: user._id },
         },
-        { upsert: true }
+        { upsert: true },
       );
 
       // ---------- VPN / Proxy check ----------
@@ -559,7 +590,8 @@ exports.loginUser = async (req, res) => {
       return res.status(200).json({
         success: true,
         requiresOtp: true,
-        message: "OTP has been sent to your email. Verify it to complete login.",
+        message:
+          "OTP has been sent to your email. Verify it to complete login.",
         otpCode: process.env.NODE_ENV !== "production" ? otpCode : undefined,
       });
     }
@@ -588,13 +620,13 @@ exports.loginUser = async (req, res) => {
     // Clear OTP
     await DeviceFingerprint.updateOne(
       { deviceId },
-      { $unset: { pendingOtp: 1, otpExpiresAt: 1, otpPurpose: 1 } }
+      { $unset: { pendingOtp: 1, otpExpiresAt: 1, otpPurpose: 1 } },
     );
 
     // Final device binding after successful OTP
     await User.updateMany(
       { deviceId, _id: { $ne: user._id } },
-      { $unset: { deviceId: 1 } }
+      { $unset: { deviceId: 1 } },
     );
 
     if (user.deviceId !== deviceId) {
@@ -612,7 +644,7 @@ exports.loginUser = async (req, res) => {
           lastSeen: new Date(),
         },
         $addToSet: { associatedUsers: user._id },
-      }
+      },
     );
 
     // Risk analysis
@@ -658,7 +690,7 @@ exports.loginUser = async (req, res) => {
     const now = new Date();
     await User.updateOne(
       { _id: user._id },
-      { $set: { lastLoginAt: now, lastActivityAt: now } }
+      { $set: { lastLoginAt: now, lastActivityAt: now } },
     );
 
     return res.status(200).json({
@@ -810,8 +842,8 @@ exports.getMyProfile = async (req, res) => {
       (sum, video) => sum + Number(video.views || 0),
       0,
     );
-    populatedUser.totalEarnings = 0;
-    populatedUser.avgRPM = 0;
+    populatedUser.totalEarnings = Number(populatedUser.totalEarnings || 0);
+    populatedUser.avgRPM = Number(populatedUser.avgRPM || 0);
     populatedUser.subscribers =
       populatedUser.channels?.reduce(
         (count, channel) => count + Number(channel.subscribedBy?.length || 0),
@@ -846,6 +878,127 @@ exports.getMyProfile = async (req, res) => {
   } catch (error) {
     console.error("getMyProfile Error:", error);
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+const normalizePhone = (phone) =>
+  typeof phone === "string" ? phone.trim().replace(/[\s()-]/g, "") : "";
+
+const isValidPhone = (phone) => /^\+?[1-9]\d{7,14}$/.test(phone);
+
+exports.requestPhoneVerification = async (req, res) => {
+  try {
+    const phone = normalizePhone(req.body?.phone);
+    if (!isValidPhone(phone)) {
+      return res.status(400).json({
+        success: false,
+        message: "Enter a valid phone number with country code",
+      });
+    }
+
+    const user = await User.findById(req.user.id).select("name email phone");
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+
+    const deviceId = resolveDeviceId(req, res);
+    const otp = generateOtp();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+    await DeviceFingerprint.findOneAndUpdate(
+      { deviceId },
+      {
+        $set: {
+          userId: user._id,
+          pendingOtp: otp,
+          otpExpiresAt: expiresAt,
+          otpPurpose: "phone",
+          lastOtpSentAt: new Date(),
+        },
+      },
+      { upsert: true, new: true },
+    );
+
+    const mailResult = await sendMailSafely(
+      getLoginMailOptions(user.email, user.name, otp),
+    );
+    if (!mailResult.sent && process.env.NODE_ENV === "production") {
+      return res.status(503).json({
+        success: false,
+        message: "Verification service is not configured",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Verification code sent. Check your account email.",
+      otpCode: process.env.NODE_ENV !== "production" ? otp : undefined,
+    });
+  } catch (error) {
+    console.error("Phone verification request error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Could not send verification code",
+    });
+  }
+};
+
+exports.verifyPhone = async (req, res) => {
+  try {
+    const phone = normalizePhone(req.body?.phone);
+    const otp = String(req.body?.otp || "").trim();
+    if (!isValidPhone(phone) || !/^\d{6}$/.test(otp)) {
+      return res.status(400).json({
+        success: false,
+        message: "Phone number and six-digit verification code are required",
+      });
+    }
+
+    const deviceId = resolveDeviceId(req, res);
+    const fingerprintRecord = await DeviceFingerprint.findOne({
+      deviceId,
+      userId: req.user.id,
+      otpPurpose: "phone",
+    });
+    const otpExpired =
+      !fingerprintRecord?.otpExpiresAt ||
+      new Date(fingerprintRecord.otpExpiresAt).getTime() < Date.now();
+
+    if (
+      !fingerprintRecord ||
+      otpExpired ||
+      String(fingerprintRecord.pendingOtp) !== otp
+    ) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid or expired verification code",
+      });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { $set: { phone, phoneVerified: true } },
+      { new: true, runValidators: true },
+    ).select("-password");
+
+    await DeviceFingerprint.updateOne(
+      { _id: fingerprintRecord._id },
+      { $unset: { pendingOtp: 1, otpExpiresAt: 1, otpPurpose: 1 } },
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Phone verified successfully",
+      user,
+    });
+  } catch (error) {
+    console.error("Phone verification error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Could not verify phone number",
+    });
   }
 };
 
@@ -926,7 +1079,7 @@ exports.UserEdit = async (req, res) => {
     }
 
     const user = await User.findById(userId).select(
-      "+avatar +avatarFileId +name +email",
+      "+avatar +avatarFileId +name +email +phone +phoneVerified",
     );
     if (!user) {
       return res
@@ -936,6 +1089,42 @@ exports.UserEdit = async (req, res) => {
 
     const updateData = {};
     const oldAvatarFileId = user.avatarFileId;
+
+    const profileFields = [
+      "advertisingId",
+      "deviceFingerprint",
+      "country",
+      "timezone",
+      "simMcc",
+    ];
+    for (const field of profileFields) {
+      if (req.body?.[field] !== undefined) {
+        const value = String(req.body[field]).trim();
+        if (value.length > 120) {
+          return res.status(400).json({
+            success: false,
+            message: `${field} is too long`,
+          });
+        }
+        updateData[field] = value || null;
+      }
+    }
+
+    if (req.body?.phone !== undefined && String(req.body.phone).trim()) {
+      const phone = normalizePhone(req.body.phone);
+      if (!isValidPhone(phone)) {
+        return res.status(400).json({
+          success: false,
+          message: "Enter a valid phone number with country code",
+        });
+      }
+      if (phone !== user.phone) {
+        updateData.phone = phone;
+        updateData.phoneVerified = false;
+      }
+    }
+
+    updateData.ipAddress = getClientIp(req);
 
     // ====================== AVATAR ======================
     if (req.file) {
@@ -1259,10 +1448,14 @@ exports.forgotPassword = async (req, res) => {
     const normalizedEmail =
       typeof email === "string" ? email.trim().toLowerCase() : "";
 
-    if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please enter a valid email address." });
+    if (
+      !normalizedEmail ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid email address.",
+      });
     }
 
     const user = await User.findOne({ email: normalizedEmail });
@@ -1299,7 +1492,8 @@ exports.forgotPassword = async (req, res) => {
     // Generic response: never reveal whether the email exists.
     return res.status(200).json({
       success: true,
-      message: "If an account exists with this email, a verification code has been sent.",
+      message:
+        "If an account exists with this email, a verification code has been sent.",
     });
   } catch (error) {
     console.error("Forgot password error:", error.message);
@@ -1314,16 +1508,21 @@ exports.verifyResetOtp = async (req, res) => {
     const normalizedEmail =
       typeof email === "string" ? email.trim().toLowerCase() : "";
 
-    if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please enter a valid email address." });
+    if (
+      !normalizedEmail ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid email address.",
+      });
     }
 
     if (typeof otp !== "string" || !/^\d{6}$/.test(otp)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please enter a valid 6-digit verification code." });
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid 6-digit verification code.",
+      });
     }
 
     const user = await User.findOne({ email: normalizedEmail }).select(
@@ -1333,7 +1532,8 @@ exports.verifyResetOtp = async (req, res) => {
     if (!user || !user.resetOtpHash) {
       return res.status(400).json({
         success: false,
-        message: "Invalid or expired verification code. Please request a new one.",
+        message:
+          "Invalid or expired verification code. Please request a new one.",
       });
     }
 
@@ -1343,18 +1543,23 @@ exports.verifyResetOtp = async (req, res) => {
     ) {
       await User.updateOne(
         { _id: user._id },
-        { $unset: { resetOtpHash: 1, resetOtpExpires: 1, resetOtpAttempts: 1 } },
+        {
+          $unset: { resetOtpHash: 1, resetOtpExpires: 1, resetOtpAttempts: 1 },
+        },
       );
       return res.status(400).json({
         success: false,
-        message: "This verification code has expired. Please request a new one.",
+        message:
+          "This verification code has expired. Please request a new one.",
       });
     }
 
     if (user.resetOtpAttempts >= 5) {
       await User.updateOne(
         { _id: user._id },
-        { $unset: { resetOtpHash: 1, resetOtpExpires: 1, resetOtpAttempts: 1 } },
+        {
+          $unset: { resetOtpHash: 1, resetOtpExpires: 1, resetOtpAttempts: 1 },
+        },
       );
       return res.status(400).json({
         success: false,
@@ -1369,7 +1574,13 @@ exports.verifyResetOtp = async (req, res) => {
       if (newAttempts >= 5) {
         await User.updateOne(
           { _id: user._id },
-          { $unset: { resetOtpHash: 1, resetOtpExpires: 1, resetOtpAttempts: 1 } },
+          {
+            $unset: {
+              resetOtpHash: 1,
+              resetOtpExpires: 1,
+              resetOtpAttempts: 1,
+            },
+          },
         );
         return res.status(400).json({
           success: false,
@@ -1437,9 +1648,10 @@ exports.resetPassword = async (req, res) => {
     );
 
     if (!user) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Your password reset session has expired. Please start again." });
+      return res.status(400).json({
+        success: false,
+        message: "Your password reset session has expired. Please start again.",
+      });
     }
 
     if (
@@ -1449,11 +1661,20 @@ exports.resetPassword = async (req, res) => {
       // Expired token: clear it so it cannot be reused.
       await User.updateOne(
         { _id: user._id },
-        { $unset: { resetTokenHash: 1, resetTokenExpires: 1, resetOtpHash: 1, resetOtpExpires: 1, resetOtpAttempts: 1 } },
+        {
+          $unset: {
+            resetTokenHash: 1,
+            resetTokenExpires: 1,
+            resetOtpHash: 1,
+            resetOtpExpires: 1,
+            resetOtpAttempts: 1,
+          },
+        },
       );
-      return res
-        .status(400)
-        .json({ success: false, message: "Your password reset session has expired. Please start again." });
+      return res.status(400).json({
+        success: false,
+        message: "Your password reset session has expired. Please start again.",
+      });
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);

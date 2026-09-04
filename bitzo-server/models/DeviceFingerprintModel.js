@@ -20,7 +20,7 @@ const deviceFingerprintSchema = new mongoose.Schema(
     otpExpiresAt: { type: Date, default: null },
     otpPurpose: {
       type: String,
-      enum: ["login", "register", "device"],
+      enum: ["login", "register", "device", "phone"],
       default: null,
     },
     lastOtpSentAt: { type: Date, default: null },

@@ -34,7 +34,70 @@ const userSchema = new mongoose.Schema(
       type: String,
       // unique: true,
       index: true,
-      
+    },
+
+    phone: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+
+    phoneVerified: {
+      type: Boolean,
+      default: false,
+    },
+
+    advertisingId: {
+      type: String,
+      default: null,
+      index: true,
+    },
+
+    deviceFingerprint: {
+      type: String,
+      default: null,
+      index: true,
+    },
+
+    ipAddress: {
+      type: String,
+      default: null,
+    },
+
+    country: {
+      type: String,
+      default: null,
+    },
+
+    timezone: {
+      type: String,
+      default: null,
+    },
+
+    simMcc: {
+      type: String,
+      default: null,
+    },
+
+    deviceVerified: {
+      type: Boolean,
+      default: false,
+    },
+
+    vpnDetected: {
+      type: Boolean,
+      default: false,
+    },
+
+    proxyDetected: {
+      type: Boolean,
+      default: false,
+    },
+
+    trustTier: {
+      type: String,
+      default: "standard",
+      trim: true,
     },
 
     googleId: String,
@@ -82,6 +145,42 @@ const userSchema = new mongoose.Schema(
       default: 50,
       min: 0,
       max: 100,
+    },
+
+    walletBalance: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    pendingBalance: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    totalEarnings: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    totalWithdrawn: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    minimumWithdrawal: {
+      type: Number,
+      default: 100,
+      min: 0,
+    },
+
+    withdrawalStatus: {
+      type: String,
+      enum: ["none", "pending", "processing", "completed", "rejected"],
+      default: "none",
     },
 
     // All channels created by this user
@@ -207,7 +306,7 @@ const userSchema = new mongoose.Schema(
       default: null,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 userSchema.index({ createdAt: -1 });

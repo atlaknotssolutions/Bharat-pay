@@ -5,7 +5,6 @@ import {
   fetchProfileData,
   removeHistoryItem,
 } from "../features/profile/profileSlice";
-import { formatWatchTime, formatWatchMinutes } from "../utils/watchTime";
 import { toast } from "react-toastify";
 import {
   Eye,
@@ -23,6 +22,8 @@ import {
   Upload,
   Lock,
   Trash2,
+  Phone,
+  ShieldCheck,
   Eye as EyeIcon,
   EyeOff,
 } from "lucide-react";
@@ -42,6 +43,39 @@ const resolveMediaUrl = (value) => {
   return `${BACKEND_URL}/${normalized}`;
 };
 
+const COUNTRY_MCC = {
+  IN: "404",
+  US: "310",
+  CA: "302",
+  GB: "234",
+  AU: "505",
+  AE: "424",
+  SA: "420",
+  SG: "525",
+  MY: "502",
+  BD: "470",
+  PK: "410",
+  NP: "429",
+  LK: "413",
+};
+
+const getMccForCountry = (country) => COUNTRY_MCC[country?.toUpperCase()] || "";
+
+const createDeviceFingerprint = async (value) => {
+  const source = String(value || "");
+  if (/^[a-f0-9]{64}$/i.test(source)) return source;
+
+  if (window.crypto?.subtle) {
+    const encoded = new TextEncoder().encode(source);
+    const digest = await window.crypto.subtle.digest("SHA-256", encoded);
+    return Array.from(new Uint8Array(digest))
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join("");
+  }
+
+  return source.slice(0, 64);
+};
+
 export default function Profile() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -55,11 +89,23 @@ export default function Profile() {
 
   // Edit Profile Modal States
   const [isEditOpen, setIsEditOpen] = useState(false);
-  const [editForm, setEditForm] = useState({ name: "", email: "" });
+  const [editForm, setEditForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    advertisingId: "",
+    deviceFingerprint: "",
+    country: "",
+    timezone: "",
+    simMcc: "",
+  });
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState(null);
+  const [phoneOtp, setPhoneOtp] = useState("");
+  const [phoneOtpSent, setPhoneOtpSent] = useState(false);
+  const [phoneVerifyLoading, setPhoneVerifyLoading] = useState(false);
 
   // Change Password Modal States
   const [isPasswordOpen, setIsPasswordOpen] = useState(false);
@@ -82,10 +128,95 @@ export default function Profile() {
   }, [dispatch]);
 
   useEffect(() => {
-    if (user) {
-      setEditForm({ name: user.name || "", email: user.email || "" });
-    }
+    let cancelled = false;
+
+    const loadProfileDeviceData = async () => {
+      if (!user) return;
+
+      const storedAdvertisingId =
+        localStorage.getItem("advertisingId") || window.crypto.randomUUID();
+      localStorage.setItem("advertisingId", storedAdvertisingId);
+      const rawFingerprint =
+        user.deviceFingerprint ||
+        `${navigator.userAgent}|${navigator.language}|${screen.width}x${screen.height}`;
+      const fingerprint = await createDeviceFingerprint(rawFingerprint);
+      if (cancelled) return;
+
+      setEditForm({
+        name: user.name || "",
+        email: user.email || "",
+        phone: user.phone || "",
+        advertisingId: user.advertisingId || storedAdvertisingId,
+        deviceFingerprint: fingerprint,
+        country: user.country || "",
+        timezone:
+          user.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+        simMcc: user.simMcc || getMccForCountry(user.country),
+      });
+    };
+
+    loadProfileDeviceData();
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
+
+  useEffect(() => {
+    if (!isEditOpen || !user) return;
+
+    let cancelled = false;
+    const applyDetectedCountry = (country) => {
+      if (!country || cancelled || user.country) return;
+      const normalizedCountry = country.toUpperCase();
+      setEditForm((current) => ({
+        ...current,
+        country: normalizedCountry,
+        simMcc: user.simMcc || getMccForCountry(normalizedCountry),
+      }));
+    };
+
+    const detectCountryByIp = async () => {
+      try {
+        const response = await fetch("https://ipwho.is/");
+        if (response.ok) {
+          const location = await response.json();
+          applyDetectedCountry(location.country_code);
+        }
+      } catch (error) {
+        console.warn("Could not detect country from IP:", error);
+      }
+    };
+
+    if (!user.country && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async ({ coords }) => {
+          try {
+            const response = await fetch(
+              `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${coords.latitude}&longitude=${coords.longitude}&localityLanguage=en`,
+            );
+            if (!response.ok) return detectCountryByIp();
+            const location = await response.json();
+            if (location.countryCode) {
+              applyDetectedCountry(location.countryCode);
+            } else {
+              detectCountryByIp();
+            }
+          } catch (error) {
+            console.warn("Could not detect country from location:", error);
+            detectCountryByIp();
+          }
+        },
+        () => detectCountryByIp(),
+        { enableHighAccuracy: false, timeout: 8000, maximumAge: 3600000 },
+      );
+    } else if (!user.country) {
+      detectCountryByIp();
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isEditOpen, user]);
 
   useEffect(() => {
     if (error) {
@@ -130,16 +261,6 @@ export default function Profile() {
 
       const trimmedName = (editForm.name || "").trim();
       const trimmedEmail = (editForm.email || "").trim().toLowerCase();
-      const currentEmail = (user.email || "").toLowerCase();
-
-      // No changes check
-      if (
-        !avatarFile &&
-        trimmedName === (user.name || "") &&
-        trimmedEmail === currentEmail
-      ) {
-        throw new Error("No changes detected");
-      }
 
       if (!trimmedName) {
         throw new Error("Name cannot be empty");
@@ -150,6 +271,13 @@ export default function Profile() {
       // Always send name & email (prevents empty / incomplete form issues)
       formData.append("name", trimmedName);
       formData.append("email", trimmedEmail);
+      if (editForm.phone.trim())
+        formData.append("phone", editForm.phone.trim());
+      formData.append("advertisingId", editForm.advertisingId.trim());
+      formData.append("deviceFingerprint", editForm.deviceFingerprint.trim());
+      formData.append("country", editForm.country.trim());
+      formData.append("timezone", editForm.timezone.trim());
+      formData.append("simMcc", editForm.simMcc.trim());
 
       // Avatar only if selected
       if (avatarFile) {
@@ -177,6 +305,13 @@ export default function Profile() {
       setEditForm({
         name: data.user?.name || trimmedName,
         email: data.user?.email || trimmedEmail,
+        phone: data.user?.phone || editForm.phone,
+        advertisingId: data.user?.advertisingId || editForm.advertisingId,
+        deviceFingerprint:
+          data.user?.deviceFingerprint || editForm.deviceFingerprint,
+        country: data.user?.country || editForm.country,
+        timezone: data.user?.timezone || editForm.timezone,
+        simMcc: data.user?.simMcc || editForm.simMcc,
       });
 
       // Cleanup preview URL
@@ -202,6 +337,58 @@ export default function Profile() {
     setAvatarFile(null);
     if (avatarPreview) URL.revokeObjectURL(avatarPreview);
     setAvatarPreview(null);
+    setPhoneOtp("");
+    setPhoneOtpSent(false);
+  };
+
+  const requestPhoneOtp = async () => {
+    try {
+      setPhoneVerifyLoading(true);
+      setEditError(null);
+      const response = await authFetch(`${API_BASE}/phone/request-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: editForm.phone }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Could not send verification code");
+      }
+      setPhoneOtpSent(true);
+      toast.info(
+        data.otpCode
+          ? `Development OTP: ${data.otpCode}`
+          : "Verification code sent to your account email",
+      );
+    } catch (err) {
+      setEditError(err.message);
+    } finally {
+      setPhoneVerifyLoading(false);
+    }
+  };
+
+  const verifyPhoneOtp = async () => {
+    try {
+      setPhoneVerifyLoading(true);
+      setEditError(null);
+      const response = await authFetch(`${API_BASE}/phone/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: editForm.phone, otp: phoneOtp }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Invalid verification code");
+      }
+      setPhoneOtpSent(false);
+      setPhoneOtp("");
+      await dispatch(fetchProfileData());
+      toast.success("Phone verified successfully");
+    } catch (err) {
+      setEditError(err.message);
+    } finally {
+      setPhoneVerifyLoading(false);
+    }
   };
 
   // Password Submit
@@ -365,7 +552,7 @@ export default function Profile() {
                   onClick={() => navigate(`/video/${video.id}`)}
                   className="group flex flex-col sm:flex-row items-start gap-3 rounded-xl border border-zinc-800 bg-zinc-900/80 p-3 hover:border-zinc-600 hover:bg-zinc-900 transition cursor-pointer"
                 >
-                  <div className="relative aspect-video w-full sm:w-40 md:w-48 flex-shrink-0 overflow-hidden rounded-lg bg-zinc-800">
+                  <div className="relative aspect-video w-full sm:w-40 md:w-48 shrink-0 overflow-hidden rounded-lg bg-zinc-800">
                     <img
                       src={resolveMediaUrl(video.avatar)}
                       alt={video.title}
@@ -380,7 +567,9 @@ export default function Profile() {
                     <h4 className="font-medium text-base line-clamp-2">
                       {video.title}
                     </h4>
-                    <p className="mt-1 text-sm text-zinc-400">{video.channel}</p>
+                    <p className="mt-1 text-sm text-zinc-400">
+                      {video.channel}
+                    </p>
                     <p className="mt-2 text-sm text-zinc-500">
                       {Number(video.views || 0).toLocaleString()} views
                       {video.watchedAt && (
@@ -491,7 +680,6 @@ export default function Profile() {
                     <span>Joined {user.createdAt}</span>
                   </div>
                 </div>
-                
               </div>
             </div>
 
@@ -550,19 +738,25 @@ export default function Profile() {
               value: `₹${(user.totalEarnings || 0).toLocaleString()}`,
               label: "Earning as Viewer",
             },
-          ].map(({ icon: Icon, color, value, label, sub }) => (
-            <div
-              key={label}
-              className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 text-center"
-            >
-              <Icon size={24} className={`mx-auto mb-3 text-${color}-500`} />
-              <p className="text-2xl font-bold">{value}</p>
-              {sub ? (
-                <p className="text-xs text-zinc-500 mt-0.5">{sub}</p>
-              ) : null}
-              <p className="text-xs text-zinc-600 mt-1">{label}</p>
-            </div>
-          ))}
+          ].map((item) => {
+            const StatIcon = item.icon;
+            return (
+              <div
+                key={item.label}
+                className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 text-center"
+              >
+                <StatIcon
+                  size={24}
+                  className={`mx-auto mb-3 text-${item.color}-500`}
+                />
+                <p className="text-2xl font-bold">{item.value}</p>
+                {item.sub ? (
+                  <p className="text-xs text-zinc-500 mt-0.5">{item.sub}</p>
+                ) : null}
+                <p className="text-xs text-zinc-600 mt-1">{item.label}</p>
+              </div>
+            );
+          })}
         </div>
 
         {/* Tabs */}
@@ -590,7 +784,7 @@ export default function Profile() {
         </div>
 
         {/* Tab Content */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 min-h-[500px]">
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 min-h-125">
           {getTabContent()}
         </div>
       </div>
@@ -672,6 +866,114 @@ export default function Profile() {
                   }
                   className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-4 py-3 focus:outline-none focus:border-red-600"
                   placeholder="your@email.com"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-zinc-400">Phone number</span>
+                  {user.phoneVerified && editForm.phone === user.phone ? (
+                    <span className="inline-flex items-center gap-1 text-xs text-green-400">
+                      <ShieldCheck size={14} /> Verified
+                    </span>
+                  ) : null}
+                </div>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Phone
+                      size={16}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500"
+                    />
+                    <input
+                      type="tel"
+                      value={editForm.phone}
+                      onChange={(e) => {
+                        setEditForm({ ...editForm, phone: e.target.value });
+                        setPhoneOtpSent(false);
+                      }}
+                      className="w-full bg-zinc-950 border border-zinc-700 rounded-lg pl-9 pr-3 py-3 focus:outline-none focus:border-red-600"
+                      placeholder="+919876543210"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={requestPhoneOtp}
+                    disabled={phoneVerifyLoading || !editForm.phone.trim()}
+                    className="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs disabled:opacity-50"
+                  >
+                    {phoneVerifyLoading ? "Sending..." : "Verify"}
+                  </button>
+                </div>
+                {phoneOtpSent && (
+                  <div className="flex gap-2 mt-2">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={6}
+                      value={phoneOtp}
+                      onChange={(e) =>
+                        setPhoneOtp(e.target.value.replace(/\D/g, ""))
+                      }
+                      className="flex-1 bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-red-600"
+                      placeholder="6-digit code"
+                    />
+                    <button
+                      type="button"
+                      onClick={verifyPhoneOtp}
+                      disabled={phoneVerifyLoading || phoneOtp.length !== 6}
+                      className="px-3 py-2 bg-green-700 hover:bg-green-600 rounded-lg text-xs disabled:opacity-50"
+                    >
+                      Confirm
+                    </button>
+                  </div>
+                )}
+                <p className="text-xs text-zinc-500 mt-1">
+                  Verification code is sent to your account email.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[
+                  ["country", "Country", "IN"],
+                  ["timezone", "Timezone", "Asia/Kolkata"],
+                  ["simMcc", "SIM MCC (auto)", "Detected from location"],
+                  ["advertisingId", "Advertising ID", "Optional"],
+                ].map(([field, label, placeholder]) => (
+                  <div key={field}>
+                    <span className="text-xs text-zinc-400 block mb-1">
+                      {label}
+                    </span>
+                    <input
+                      type="text"
+                      value={editForm[field]}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, [field]: e.target.value })
+                      }
+                      readOnly={field === "simMcc"}
+                      className={`w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-red-600 ${field === "simMcc" ? "cursor-not-allowed text-zinc-500" : ""}`}
+                      placeholder={placeholder}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-zinc-400">
+                    Device fingerprint
+                  </span>
+                  <span
+                    className={`text-xs ${user.deviceVerified ? "text-green-400" : "text-amber-400"}`}
+                  >
+                    {user.deviceVerified ? "Verified" : "Not verified"}
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  value={editForm.deviceFingerprint}
+                  readOnly
+                  className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-500 focus:outline-none"
+                  placeholder="Generating secure fingerprint..."
                 />
               </div>
 
@@ -883,7 +1185,7 @@ function VideoCard({ video, onOpen, getStatusBadge }) {
       className="bg-zinc-900 rounded-2xl border border-zinc-800 overflow-hidden hover:border-zinc-700 transition-all cursor-pointer"
     >
       <div className="flex flex-col sm:flex-row">
-        <div className="relative w-full sm:w-40 h-48 sm:h-28 flex-shrink-0">
+        <div className="relative w-full sm:w-40 h-48 sm:h-28 shrink-0">
           <img
             src={video.thumbnail}
             alt={video.title}

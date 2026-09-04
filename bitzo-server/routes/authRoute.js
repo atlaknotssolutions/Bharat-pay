@@ -38,6 +38,8 @@ const {
   forgotPassword,
   resetPassword,
   verifyResetOtp,
+  requestPhoneVerification,
+  verifyPhone,
 } = require("../controller/authController");
 const {
   getAllUsers,
@@ -58,6 +60,13 @@ router.post("/logout-all", authMiddleware, logoutAll);
 router.post("/forgot-password", forgotPasswordLimiter, forgotPassword);
 router.post("/verify-reset-otp", verifyResetOtpLimiter, verifyResetOtp);
 router.post("/reset-password", resetPasswordLimiter, resetPassword);
+router.post(
+  "/phone/request-otp",
+  loginLimiter,
+  authMiddleware,
+  requestPhoneVerification,
+);
+router.post("/phone/verify", loginLimiter, authMiddleware, verifyPhone);
 
 router.post("/auth/google", googleLimiter, async (req, res) => {
   const { credential } = req.body;

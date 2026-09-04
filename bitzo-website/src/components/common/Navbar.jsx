@@ -337,7 +337,7 @@ export default function Navbar({ toggleSidebar }) {
               BharatPlay
             </span>
             <div className="w-18 h-18 rounded-full  flex items-center justify-center text-white font-bold text-sm">
-              <img src="../../../dist/assets/logo.png" alt="BharatPlay Logo" w-8 h-8 />
+              <img src="../../../dist/assets/Bharatplay.png" alt="BharatPlay Logo" w-8 h-8 />
             </div>
             
           </Link>
