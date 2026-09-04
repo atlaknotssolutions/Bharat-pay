@@ -29,6 +29,7 @@ const {
   applyTrustRule,
 } = require("../services/vpn.service/fraud.service.js");
 const { logAuditEvent } = require("../services/auditEventService");
+const { registerOrVerifyDevice } = require("../services/deviceSecurityService");
 const transporter = require("../Email/nodemailer.js");
 const getRegisterMailOptions = require("../Email/register.js");
 const getLoginMailOptions = require("../Email/login.js");
@@ -122,6 +123,15 @@ exports.registerUser = async (req, res) => {
     const ip = getClientIp(req);
     const ua = req.headers["user-agent"] || "unknown";
 
+    const deviceCheck = await registerOrVerifyDevice({ req });
+    if (!deviceCheck.ok) {
+      return res.status(deviceCheck.status).json({
+        success: false,
+        code: deviceCheck.code,
+        message: deviceCheck.message,
+      });
+    }
+
     const deviceExists = await User.findOne({ deviceId });
     if (deviceExists) {
       return res.status(400).json({
@@ -200,6 +210,8 @@ exports.registerUser = async (req, res) => {
         deviceVerified: true,
         ipAddress: ip,
       });
+
+      await registerOrVerifyDevice({ req, userId: user._id });
 
       await DeviceFingerprint.updateOne(
         { deviceId },
@@ -506,6 +518,18 @@ exports.loginUser = async (req, res) => {
         return res.status(401).json({
           success: false,
           message: "Invalid email or password",
+        });
+      }
+
+      const deviceCheck = await registerOrVerifyDevice({
+        req,
+        userId: user._id,
+      });
+      if (!deviceCheck.ok) {
+        return res.status(deviceCheck.status).json({
+          success: false,
+          code: deviceCheck.code,
+          message: deviceCheck.message,
         });
       }
 

@@ -240,6 +240,22 @@ const userSchema = new mongoose.Schema(
       min: 0,
     },
 
+    rewardFrozen: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+
+    rewardFrozenAt: {
+      type: Date,
+      default: null,
+    },
+
+    rewardFreezeReason: {
+      type: String,
+      default: null,
+    },
+
     // Account status (Phase 1 — User 360°)
     status: {
       type: String,

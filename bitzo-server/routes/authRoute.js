@@ -9,6 +9,7 @@ const {
 const { OAuth2Client } = require("google-auth-library");
 const { resolveDeviceId } = require("../utils/deviceCookie");
 const { setRefreshCookie } = require("../utils/refreshCookie");
+const { registerOrVerifyDevice } = require("../services/deviceSecurityService");
 
 const User = require("../models/usermodel");
 const RefreshToken = require("../models/RefreshToken");
@@ -103,6 +104,18 @@ router.post("/auth/google", googleLimiter, async (req, res) => {
 
     let user = await User.findOne({ email });
 
+    const deviceCheck = await registerOrVerifyDevice({
+      req,
+      userId: user?._id || null,
+    });
+    if (!deviceCheck.ok) {
+      return res.status(deviceCheck.status).json({
+        success: false,
+        code: deviceCheck.code,
+        message: deviceCheck.message,
+      });
+    }
+
     if (!user) {
       const deviceExists = await User.findOne({ deviceId });
       if (deviceExists) {
@@ -118,6 +131,7 @@ router.post("/auth/google", googleLimiter, async (req, res) => {
         avatar: picture,
         deviceId,
       });
+      await registerOrVerifyDevice({ req, userId: user._id });
     } else if (!user.deviceId) {
       // First binding of a legacy Google account (no prior device binding).
       user.deviceId = deviceId;

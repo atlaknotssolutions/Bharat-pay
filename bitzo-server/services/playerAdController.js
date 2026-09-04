@@ -138,7 +138,15 @@ const completeRewardedAd = async (req, res) => {
       });
     }
 
-    const user = await User.findById(userId).select("trustScore");
+    const user = await User.findById(userId).select("trustScore rewardFrozen");
+    if (user?.rewardFrozen) {
+      return res.status(403).json({
+        success: false,
+        code: "REWARDS_FROZEN",
+        message:
+          "Rewards are temporarily frozen due to suspicious device activity",
+      });
+    }
     const adAccess = getAdAccess(user?.trustScore ?? 50);
     if (!adAccess.rewardedAds) {
       return res

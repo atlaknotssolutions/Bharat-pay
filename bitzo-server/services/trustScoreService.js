@@ -1,5 +1,6 @@
 const User = require("../models/usermodel");
 const TrustScoreLog = require("../models/TrustScoreLog");
+const Device = require("../models/Device");
 const { emitTrustScoreUpdated } = require("./socketService");
 
 const TRUST_RULES = Object.freeze({
@@ -84,6 +85,10 @@ async function changeTrustScore({
   user.trustScore = newScore;
   user.trustTier = getTrustTier(newScore);
   await user.save();
+  await Device.updateMany(
+    { linked_user_id: userId },
+    { $set: { trust_score: newScore } },
+  );
 
   try {
     const scoreLog = await TrustScoreLog.create({
