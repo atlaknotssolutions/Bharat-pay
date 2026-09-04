@@ -1,5 +1,14 @@
 const FraudEvent = require("../../models/FraudEventModel");
-const User = require("../../models/usermodel");
+const { TRUST_RULES, changeTrustScore } = require("../trustScoreService");
+
+const TRUST_EVENT_BY_FRAUD_EVENT = {
+  RAPID_ACTIONS: "RAPID_CLICKS",
+  SUSPICIOUS_BEHAVIOR: "ABNORMAL_BEHAVIOR",
+  HIGH_RISK_ACTION: "POLICY_ABUSE",
+  BOT: "BOT",
+  POLICY_ABUSE: "POLICY_ABUSE",
+  REPEATED_LOOPS: "REPEATED_LOOPS",
+};
 
 async function logFraudEvent({
   userId = null,
@@ -14,7 +23,7 @@ async function logFraudEvent({
   metadata = {},
 }) {
   try {
-    await FraudEvent.create({
+    const fraudEvent = await FraudEvent.create({
       userId,
       eventType,
       severity,
@@ -26,6 +35,15 @@ async function logFraudEvent({
       riskScoreImpact,
       metadata,
     });
+    const trustEventType = TRUST_EVENT_BY_FRAUD_EVENT[eventType];
+    if (userId && trustEventType) {
+      await applyTrustRule(userId, trustEventType, eventType, {
+        deviceId,
+        ipAddress: ip,
+        eventKey: `fraud:${fraudEvent._id}`,
+        metadata,
+      });
+    }
   } catch (err) {
     console.error("Failed to log fraud event:", err.message);
   }
@@ -45,7 +63,9 @@ async function analyzeBehavior(userId) {
   let riskPoints = 0;
   const reasons = [];
 
-  const failedLogins = recent.filter((e) => e.eventType === "LOGIN_FAILED").length;
+  const failedLogins = recent.filter(
+    (e) => e.eventType === "LOGIN_FAILED",
+  ).length;
   if (failedLogins >= 5) {
     riskPoints += 35;
     reasons.push("Multiple failed logins");
@@ -73,19 +93,14 @@ async function analyzeBehavior(userId) {
 
 async function applyRiskToUser(userId, riskPoints, reasons = []) {
   if (!userId || riskPoints <= 0) return;
-
-  const user = await User.findById(userId);
-  if (!user) return;
-
-  const newScore = Math.max(0, Math.min(100, user.trustScore - riskPoints));
-  user.trustScore = newScore;
-
-  if (newScore < 30) {
-    // optional: auto flag
-    // user.isHighRisk = true;
-  }
-
-  await user.save();
+  const result = await changeTrustScore({
+    userId,
+    changeAmount: -riskPoints,
+    eventType: "ABNORMAL_BEHAVIOR",
+    reason: reasons.join(", ") || "Abnormal behavior detected",
+    source: "automatic",
+    metadata: { riskPoints, reasons },
+  });
 
   if (riskPoints >= 20) {
     await logFraudEvent({
@@ -93,13 +108,26 @@ async function applyRiskToUser(userId, riskPoints, reasons = []) {
       eventType: "TRUST_SCORE_DROP",
       severity: riskPoints >= 40 ? "high" : "medium",
       riskScoreImpact: riskPoints,
-      metadata: { reasons, newScore },
+      metadata: { reasons, newScore: result?.newScore ?? null },
     });
   }
+}
+
+async function applyTrustRule(userId, eventType, reason, context = {}) {
+  const amount = TRUST_RULES[eventType];
+  if (!Number.isFinite(amount)) return null;
+  return changeTrustScore({
+    userId,
+    changeAmount: amount,
+    eventType,
+    reason,
+    ...context,
+  });
 }
 
 module.exports = {
   logFraudEvent,
   analyzeBehavior,
   applyRiskToUser,
+  applyTrustRule,
 };

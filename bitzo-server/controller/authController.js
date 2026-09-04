@@ -26,6 +26,7 @@ const {
   logFraudEvent,
   analyzeBehavior,
   applyRiskToUser,
+  applyTrustRule,
 } = require("../services/vpn.service/fraud.service.js");
 const { logAuditEvent } = require("../services/auditEventService");
 const transporter = require("../Email/nodemailer.js");
@@ -515,24 +516,7 @@ exports.loginUser = async (req, res) => {
         { $unset: { deviceId: 1 } },
       );
 
-      // 2. Now safely assign it to the current user
-      if (user.deviceId !== deviceId) {
-        const oldDeviceId = user.deviceId;
-
-        user.deviceId = deviceId;
-        await user.save();
-
-        // Clean old device fingerprint
-        if (oldDeviceId) {
-          await DeviceFingerprint.updateOne(
-            { deviceId: oldDeviceId },
-            { $unset: { userId: 1 } },
-          );
-        }
-      } else if (!user.deviceId) {
-        user.deviceId = deviceId;
-        await user.save();
-      }
+      // Keep the account binding unchanged until the OTP is verified.
 
       // Create / update fingerprint for current device
       await DeviceFingerprint.findOneAndUpdate(
@@ -624,6 +608,7 @@ exports.loginUser = async (req, res) => {
     );
 
     // Final device binding after successful OTP
+    const deviceChanged = Boolean(user.deviceId && user.deviceId !== deviceId);
     await User.updateMany(
       { deviceId, _id: { $ne: user._id } },
       { $unset: { deviceId: 1 } },
@@ -632,6 +617,19 @@ exports.loginUser = async (req, res) => {
     if (user.deviceId !== deviceId) {
       user.deviceId = deviceId;
       await user.save();
+    }
+
+    if (deviceChanged) {
+      await applyTrustRule(
+        user._id,
+        "DEVICE_CHANGE",
+        "Verified login from a changed device",
+        {
+          deviceId,
+          ipAddress: ip,
+          eventKey: `device-change:${user._id}:${deviceId}`,
+        },
+      );
     }
 
     await DeviceFingerprint.updateOne(
@@ -791,6 +789,16 @@ exports.claimDevice = async (req, res) => {
     });
 
     // Release the old binding and make this device the account's active device.
+    await applyTrustRule(
+      user._id,
+      "DEVICE_CHANGE",
+      "Account device was changed through device claim",
+      {
+        deviceId,
+        ipAddress: getClientIp(req),
+        eventKey: `device-claim:${user._id}:${deviceId}`,
+      },
+    );
     user.deviceId = deviceId;
     await user.save();
 

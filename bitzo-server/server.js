@@ -24,6 +24,7 @@ const userRoutes = require("./routes/userVideoRoute.js");
 const categoryRouter = require("./routes/categoryRoute/category.route.js");
 const leaderboardRoute = require("./routes/leaderboardRoute.js");
 const notificationRoutes = require("./routes/notificationRoute.js");
+const playerAdRoutes = require("./routes/playerAdRoutes/playerAdRoutes.js");
 const copyrightRoutes = require("./routes/CopyrightRoutes/CopyrightRoutes.js");
 const userCopyrightRoutes = require("./routes/CopyrightRoutes/UserCopyrightRoutes.js");
 const { detectVPN } = require("./services/vpn.service/vpn.service.js");
@@ -86,24 +87,21 @@ mongoose
 app.use(
   express.json({
     limit: "50mb",
-  })
+  }),
 );
 
 app.use(
   express.urlencoded({
     extended: true,
     limit: "50mb",
-  })
+  }),
 );
-
 
 // Bad if applied globally before the route
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-
 app.use(cookieParser());
-
 
 app.use(
   cors({
@@ -143,6 +141,7 @@ app.use("/api/adminvideo", videoRoutes);
 app.use("/api/uservideo", userRoutes);
 app.use("/api/leaderboard", leaderboardRoute);
 app.use("/api/notifications", notificationRoutes);
+app.use("/v1/player", playerAdRoutes);
 
 // =====================================================
 // TEMPORARY VPN TEST ROUTE

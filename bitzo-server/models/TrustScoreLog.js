@@ -20,9 +20,27 @@ const trustScoreLogSchema = new mongoose.Schema(
       min: 0,
       max: 100,
     },
-    change: {
+    changeAmount: {
       type: Number,
       required: true,
+    },
+    eventType: {
+      type: String,
+      required: true,
+      trim: true,
+      index: true,
+    },
+    deviceId: {
+      type: String,
+      default: null,
+    },
+    ipAddress: {
+      type: String,
+      default: null,
+    },
+    change: {
+      type: Number,
+      default: null,
     },
     reason: {
       type: String,
@@ -38,10 +56,19 @@ const trustScoreLogSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
       default: null,
     },
+    eventKey: {
+      type: String,
+      default: null,
+      select: false,
+    },
   },
-  { timestamps: true },
+  { timestamps: true, collection: "trust_score_logs" },
 );
 
 trustScoreLogSchema.index({ userId: 1, createdAt: -1 });
+trustScoreLogSchema.index(
+  { userId: 1, eventKey: 1 },
+  { unique: true, partialFilterExpression: { eventKey: { $type: "string" } } },
+);
 
 module.exports = mongoose.model("TrustScoreLog", trustScoreLogSchema);

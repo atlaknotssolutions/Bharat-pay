@@ -13,6 +13,10 @@ const {
   createBulkNotifications,
 } = require("../utils/notificationService");
 const { logAuditEvent } = require("../services/auditEventService");
+const {
+  TRUST_RULES,
+  changeTrustScore,
+} = require("../services/trustScoreService");
 
 const ABS_WATCH_SECONDS_CAP = 12 * 60 * 60; // 43200s hard cap per session
 
@@ -1178,6 +1182,36 @@ const recordWatchSession = async (video, userId, body) => {
       },
       { upsert: true, new: true, setDefaultsOnInsert: true },
     );
+
+    const effectivePercent =
+      authoritativeDuration > 0
+        ? (clampedSeconds / authoritativeDuration) * 100
+        : Math.min(100, Math.max(0, Number(watchedPercent) || 0));
+    const eventContext = {
+      deviceId: null,
+      ipAddress: null,
+      metadata: { videoId: videoIdString, sessionId: finalSessionId },
+    };
+    if (clampedSeconds > 180) {
+      await changeTrustScore({
+        userId: normalizedUserId,
+        changeAmount: TRUST_RULES.SESSION_OVER_3_MIN,
+        eventType: "SESSION_OVER_3_MIN",
+        reason: "Watched a video session for more than 3 minutes",
+        eventKey: `watch-3m:${normalizedUserId}:${videoIdString}:${finalSessionId}`,
+        ...eventContext,
+      });
+    }
+    if (effectivePercent > 60) {
+      await changeTrustScore({
+        userId: normalizedUserId,
+        changeAmount: TRUST_RULES.VIDEO_COMPLETION_OVER_60,
+        eventType: "VIDEO_COMPLETION_OVER_60",
+        reason: "Completed more than 60% of a video",
+        eventKey: `watch-60:${normalizedUserId}:${videoIdString}:${finalSessionId}`,
+        ...eventContext,
+      });
+    }
 
     return true;
   } catch (error) {

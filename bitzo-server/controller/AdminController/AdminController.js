@@ -29,6 +29,7 @@ const {
 } = require("../../utils/refreshCookie");
 const bcrypt = require("bcryptjs");
 const { logAuditEvent } = require("../../services/auditEventService");
+const { changeTrustScore } = require("../../services/trustScoreService");
 
 const VALID_ROLES = ["viewer", "creator", "admin"];
 const MAX_SEARCH_LENGTH = 100;
@@ -111,7 +112,8 @@ exports.registerUser = async (req, res) => {
       if (!envKey && !isDev) {
         return res.status(403).json({
           success: false,
-          message: "Admin registration is not configured. Contact your system administrator.",
+          message:
+            "Admin registration is not configured. Contact your system administrator.",
         });
       }
     }
@@ -422,10 +424,13 @@ exports.updateUser = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, email, role, trustScore, rewardPoints } = req.body;
+    let requestedTrustScore;
 
     // Validate user ID format
     if (!id || !/^[0-9a-fA-F]{24}$/.test(id)) {
-      return res.status(400).json({ success: false, message: "Invalid user ID format" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid user ID format" });
     }
 
     const user = await AllUser.findById(id);
@@ -438,10 +443,15 @@ exports.updateUser = async (req, res) => {
     // Validate name
     if (name !== undefined) {
       if (typeof name !== "string" || !name.trim()) {
-        return res.status(400).json({ success: false, message: "Name must be a non-empty string" });
+        return res
+          .status(400)
+          .json({ success: false, message: "Name must be a non-empty string" });
       }
       if (name.trim().length > 100) {
-        return res.status(400).json({ success: false, message: "Name must be 100 characters or less" });
+        return res.status(400).json({
+          success: false,
+          message: "Name must be 100 characters or less",
+        });
       }
       user.name = name.trim();
     }
@@ -449,16 +459,27 @@ exports.updateUser = async (req, res) => {
     // Validate email
     if (email !== undefined) {
       if (typeof email !== "string" || !email.trim()) {
-        return res.status(400).json({ success: false, message: "Email must be a non-empty string" });
+        return res.status(400).json({
+          success: false,
+          message: "Email must be a non-empty string",
+        });
       }
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email.trim())) {
-        return res.status(400).json({ success: false, message: "Invalid email format" });
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid email format" });
       }
       // Check email uniqueness
-      const emailExists = await AllUser.findOne({ email: email.toLowerCase().trim(), _id: { $ne: id } });
+      const emailExists = await AllUser.findOne({
+        email: email.toLowerCase().trim(),
+        _id: { $ne: id },
+      });
       if (emailExists) {
-        return res.status(409).json({ success: false, message: "Email is already in use by another user" });
+        return res.status(409).json({
+          success: false,
+          message: "Email is already in use by another user",
+        });
       }
       user.email = email.toLowerCase().trim();
     }
@@ -467,7 +488,10 @@ exports.updateUser = async (req, res) => {
     if (role !== undefined) {
       const validRoles = ["viewer", "creator", "admin"];
       if (!validRoles.includes(role)) {
-        return res.status(400).json({ success: false, message: `Invalid role. Must be one of: ${validRoles.join(", ")}` });
+        return res.status(400).json({
+          success: false,
+          message: `Invalid role. Must be one of: ${validRoles.join(", ")}`,
+        });
       }
       user.role = role;
     }
@@ -475,26 +499,52 @@ exports.updateUser = async (req, res) => {
     // Validate trustScore (0ΓÇô100)
     if (trustScore !== undefined) {
       if (typeof trustScore !== "number" || !Number.isFinite(trustScore)) {
-        return res.status(400).json({ success: false, message: "Trust score must be a number" });
+        return res
+          .status(400)
+          .json({ success: false, message: "Trust score must be a number" });
       }
       if (trustScore < 0 || trustScore > 100) {
-        return res.status(400).json({ success: false, message: "Trust score must be between 0 and 100" });
+        return res.status(400).json({
+          success: false,
+          message: "Trust score must be between 0 and 100",
+        });
       }
-      user.trustScore = trustScore;
+      requestedTrustScore = trustScore;
     }
 
     // Validate rewardPoints (ΓëÑ 0)
     if (rewardPoints !== undefined) {
       if (typeof rewardPoints !== "number" || !Number.isFinite(rewardPoints)) {
-        return res.status(400).json({ success: false, message: "Reward points must be a number" });
+        return res
+          .status(400)
+          .json({ success: false, message: "Reward points must be a number" });
       }
       if (rewardPoints < 0) {
-        return res.status(400).json({ success: false, message: "Reward points must be 0 or greater" });
+        return res.status(400).json({
+          success: false,
+          message: "Reward points must be 0 or greater",
+        });
       }
       user.rewardPoints = rewardPoints;
     }
 
     await user.save();
+
+    if (
+      requestedTrustScore !== undefined &&
+      requestedTrustScore !== Number(user.trustScore ?? 50)
+    ) {
+      const scoreLog = await changeTrustScore({
+        userId: user._id,
+        changeAmount: requestedTrustScore - Number(user.trustScore ?? 50),
+        eventType: "ADMIN_ADJUSTMENT",
+        reason: "Trust score adjusted by an administrator",
+        source: "admin",
+        eventKey: `admin-adjustment:${user._id}:${Date.now()}`,
+        metadata: { adminId: req.admin?._id || null },
+      });
+      if (scoreLog) user.trustScore = scoreLog.newScore;
+    }
 
     res.status(200).json({
       success: true,
@@ -515,12 +565,17 @@ exports.deleteUser = async (req, res) => {
 
     // Validate user ID format
     if (!id || !/^[0-9a-fA-F]{24}$/.test(id)) {
-      return res.status(400).json({ success: false, message: "Invalid user ID format" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid user ID format" });
     }
 
     // Prevent admin from deleting themselves
     if (adminId && adminId.toString() === id) {
-      return res.status(400).json({ success: false, message: "You cannot delete your own account" });
+      return res.status(400).json({
+        success: false,
+        message: "You cannot delete your own account",
+      });
     }
 
     const user = await AllUser.findById(id);
@@ -530,9 +585,12 @@ exports.deleteUser = async (req, res) => {
         .json({ success: false, message: "User not found" });
     }
 
-// Prevent deletion of other admins
+    // Prevent deletion of other admins
     if (user.role === "admin") {
-      return res.status(400).json({ success: false, message: "Cannot delete admin accounts via this endpoint" });
+      return res.status(400).json({
+        success: false,
+        message: "Cannot delete admin accounts via this endpoint",
+      });
     }
 
     // Soft-delete: mark status instead of destroying the document
@@ -655,11 +713,16 @@ exports.hardDeleteUser = async (req, res) => {
     const adminId = req.admin && req.admin._id;
 
     if (!id || !/^[0-9a-fA-F]{24}$/.test(id)) {
-      return res.status(400).json({ success: false, message: "Invalid user ID format" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid user ID format" });
     }
 
     if (adminId && adminId.toString() === id) {
-      return res.status(400).json({ success: false, message: "You cannot delete your own account" });
+      return res.status(400).json({
+        success: false,
+        message: "You cannot delete your own account",
+      });
     }
 
     const user = await AllUser.findOne({ _id: id, status: "deleted" });
@@ -745,52 +808,65 @@ exports.hardDeleteUser = async (req, res) => {
     });
   } catch (err) {
     console.error("hardDeleteUser error:", err);
-    res.status(500).json({ success: false, message: err.message || "Failed to permanently delete user" });
+    res.status(500).json({
+      success: false,
+      message: err.message || "Failed to permanently delete user",
+    });
   }
 };
-
 
 exports.deleteEmployee = async (req, res) => {
   try {
     const { id } = req.params;
     const adminId = req.admin && req.admin._id;
- 
+
     // Validate user ID format
     if (!id || !isValidObjectId(id)) {
-      return res.status(400).json({ success: false, message: "Invalid user ID format" });
-    }
- 
-    // Prevent admin from deleting themselves
-    if (adminId && adminId.toString() === id) {
-      return res.status(400).json({ success: false, message: "You cannot delete your own account" });
-    }
- 
-    const employee = await User.findById(id);
-    if (!employee) {
-      return res.status(404).json({ success: false, message: "Employee not found" });
-    }
- 
-    // Prevent deleting the primary owner account (role admin with lowest createdAt)
-    const primaryOwner = await User.findOne({ role: "admin" }).sort({ createdAt: 1 });
-    if (primaryOwner && primaryOwner._id.toString() === id) {
       return res
         .status(400)
-        .json({ success: false, message: "Cannot delete the primary owner account" });
+        .json({ success: false, message: "Invalid user ID format" });
     }
- 
+
+    // Prevent admin from deleting themselves
+    if (adminId && adminId.toString() === id) {
+      return res.status(400).json({
+        success: false,
+        message: "You cannot delete your own account",
+      });
+    }
+
+    const employee = await User.findById(id);
+    if (!employee) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Employee not found" });
+    }
+
+    // Prevent deleting the primary owner account (role admin with lowest createdAt)
+    const primaryOwner = await User.findOne({ role: "admin" }).sort({
+      createdAt: 1,
+    });
+    if (primaryOwner && primaryOwner._id.toString() === id) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot delete the primary owner account",
+      });
+    }
+
     // Prevent deleting the last remaining admin
     if (employee.role === "admin") {
       const adminCount = await User.countDocuments({ role: "admin" });
       if (adminCount <= 1) {
-        return res
-          .status(400)
-          .json({ success: false, message: "Cannot delete the last admin account" });
+        return res.status(400).json({
+          success: false,
+          message: "Cannot delete the last admin account",
+        });
       }
     }
- 
+
     // Hard-delete the employee record
     await User.findByIdAndDelete(id);
- 
+
     logAuditEvent({
       userId: id,
       eventType: "ADMIN_EMPLOYEE_DELETE",
@@ -798,7 +874,7 @@ exports.deleteEmployee = async (req, res) => {
       userAgent: req.get("user-agent"),
       metadata: { adminId, role: employee.role, email: employee.email },
     }).catch(() => {});
- 
+
     // Notify the removed employee by email (best-effort)
     try {
       await sendMailSafely(
@@ -812,7 +888,7 @@ exports.deleteEmployee = async (req, res) => {
     } catch (mailError) {
       console.error("Delete employee mail error:", mailError.message);
     }
- 
+
     return res.status(200).json({
       success: true,
       message: "Employee deleted successfully",
@@ -822,27 +898,36 @@ exports.deleteEmployee = async (req, res) => {
     return res.status(500).json({ success: false, message: err.message });
   }
 };
- 
+
 // ================== USER OVERVIEW (360┬░) ==================
 exports.getUserOverview = async (req, res) => {
   try {
     const { id } = req.params;
 
     if (!id || !/^[0-9a-fA-F]{24}$/.test(id)) {
-      return res.status(400).json({ success: false, message: "Invalid user ID format" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid user ID format" });
     }
 
     const user = await AllUser.findById(id)
-      .select("name email avatar role status trustScore rewardPoints createdAt updatedAt lastLoginAt lastActivityAt suspendedAt suspendedBy suspendReason googleId deviceId channels videos likedVideos dislikedVideos subscribedChannels watchLaterVideos viewedVideos")
+      .select(
+        "name email avatar role status trustScore rewardPoints createdAt updatedAt lastLoginAt lastActivityAt suspendedAt suspendedBy suspendReason googleId deviceId channels videos likedVideos dislikedVideos subscribedChannels watchLaterVideos viewedVideos",
+      )
       .lean();
 
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     // Compute account info
     const account = {
-      accountAge: Math.floor((Date.now() - new Date(user.createdAt).getTime()) / (1000 * 60 * 60 * 24)),
+      accountAge: Math.floor(
+        (Date.now() - new Date(user.createdAt).getTime()) /
+          (1000 * 60 * 60 * 24),
+      ),
       registrationMethod: user.googleId ? "google" : "email",
       hasGoogleAccount: !!user.googleId,
     };
@@ -867,30 +952,61 @@ exports.getUserOverview = async (req, res) => {
       videoIds.length
         ? Video.aggregate([
             { $match: { _id: { $in: videoIds } } },
-            { $group: {
+            {
+              $group: {
                 _id: null,
                 videoCount: { $sum: 1 },
                 shortCount: {
                   $sum: {
-                    $cond: [{ $setIsSubset: [["short"], { $ifNull: ["$videoType", []] }] }, 1, 0],
+                    $cond: [
+                      {
+                        $setIsSubset: [
+                          ["short"],
+                          { $ifNull: ["$videoType", []] },
+                        ],
+                      },
+                      1,
+                      0,
+                    ],
                   },
                 },
                 totalViews: { $sum: { $ifNull: ["$views", 0] } },
                 totalLikes: { $sum: { $ifNull: ["$likesCount", 0] } },
-                totalComments: { $sum: { $size: { $ifNull: ["$comments", []] } } },
-            }},
-          ]).then((r) => r[0] || { videoCount: 0, shortCount: 0, totalViews: 0, totalLikes: 0, totalComments: 0 })
-        : Promise.resolve({ videoCount: 0, shortCount: 0, totalViews: 0, totalLikes: 0, totalComments: 0 }),
+                totalComments: {
+                  $sum: { $size: { $ifNull: ["$comments", []] } },
+                },
+              },
+            },
+          ]).then(
+            (r) =>
+              r[0] || {
+                videoCount: 0,
+                shortCount: 0,
+                totalViews: 0,
+                totalLikes: 0,
+                totalComments: 0,
+              },
+          )
+        : Promise.resolve({
+            videoCount: 0,
+            shortCount: 0,
+            totalViews: 0,
+            totalLikes: 0,
+            totalComments: 0,
+          }),
       videoIds.length
         ? Video.find({ _id: { $in: videoIds } })
-            .select("title thumbnail views likesCount comments channel createdAt videoType")
+            .select(
+              "title thumbnail views likesCount comments channel createdAt videoType",
+            )
             .sort({ createdAt: -1 })
             .limit(8)
             .lean()
         : Promise.resolve([]),
     ]);
 
-    const { videoCount, shortCount, totalViews, totalLikes, totalComments } = aggResult;
+    const { videoCount, shortCount, totalViews, totalLikes, totalComments } =
+      aggResult;
     const recentVideosMapped = recentVideos.map((v) => ({
       _id: v._id,
       title: v.title,
@@ -951,7 +1067,10 @@ exports.getUserOverview = async (req, res) => {
     });
   } catch (err) {
     console.error("getUserOverview error:", err);
-    res.status(500).json({ success: false, message: err.message || "Failed to fetch user overview" });
+    res.status(500).json({
+      success: false,
+      message: err.message || "Failed to fetch user overview",
+    });
   }
 };
 
@@ -961,16 +1080,23 @@ exports.getAdminUserChannels = async (req, res) => {
     const { id } = req.params;
 
     if (!id || !/^[0-9a-fA-F]{24}$/.test(id)) {
-      return res.status(400).json({ success: false, message: "Invalid user ID format" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid user ID format" });
     }
 
     const user = await AllUser.findById(id).select("channels").lean();
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
-    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 50);
+    const limit = Math.min(
+      Math.max(parseInt(req.query.limit, 10) || 10, 1),
+      50,
+    );
     const skip = (page - 1) * limit;
 
     const channelIds = (user.channels || []).filter(Boolean);
@@ -985,7 +1111,9 @@ exports.getAdminUserChannels = async (req, res) => {
 
     const [channels, total] = await Promise.all([
       Channel.find(filter)
-        .select("name channeldescription channelImage channelBanner category subscriberCount videos subscribedBy createdAt updatedAt")
+        .select(
+          "name channeldescription channelImage channelBanner category subscriberCount videos subscribedBy createdAt updatedAt",
+        )
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -1002,7 +1130,24 @@ exports.getAdminUserChannels = async (req, res) => {
           _id: "$channel",
           totalVideos: { $sum: 1 },
           totalShorts: {
-            $sum: { $cond: [{ $setIsSubset: [["short"], { $cond: [{ $eq: [{ $type: "$videoType" }, "string"] }, ["$videoType"], { $ifNull: ["$videoType", []] }] }] }, 1, 0] },
+            $sum: {
+              $cond: [
+                {
+                  $setIsSubset: [
+                    ["short"],
+                    {
+                      $cond: [
+                        { $eq: [{ $type: "$videoType" }, "string"] },
+                        ["$videoType"],
+                        { $ifNull: ["$videoType", []] },
+                      ],
+                    },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
           },
           totalViews: { $sum: { $ifNull: ["$views", 0] } },
           totalLikes: { $sum: { $ifNull: ["$likesCount", 0] } },
@@ -1024,10 +1169,14 @@ exports.getAdminUserChannels = async (req, res) => {
 
     const baseUrl = `${req.protocol}://${req.get("host")}`;
     const enriched = channels.map((ch) => {
-      const chImage = ch.channelImage && !ch.channelImage.startsWith("http")
-        ? `${baseUrl}/${ch.channelImage}` : ch.channelImage || null;
-      const banner = ch.channelBanner && !ch.channelBanner.startsWith("http")
-        ? `${baseUrl}/${ch.channelBanner}` : ch.channelBanner || null;
+      const chImage =
+        ch.channelImage && !ch.channelImage.startsWith("http")
+          ? `${baseUrl}/${ch.channelImage}`
+          : ch.channelImage || null;
+      const banner =
+        ch.channelBanner && !ch.channelBanner.startsWith("http")
+          ? `${baseUrl}/${ch.channelBanner}`
+          : ch.channelBanner || null;
 
       return {
         _id: ch._id,
@@ -1061,7 +1210,10 @@ exports.getAdminUserChannels = async (req, res) => {
     });
   } catch (err) {
     console.error("getAdminUserChannels error:", err);
-    res.status(500).json({ success: false, message: err.message || "Failed to fetch channels" });
+    res.status(500).json({
+      success: false,
+      message: err.message || "Failed to fetch channels",
+    });
   }
 };
 
@@ -1075,30 +1227,45 @@ exports.getAdminUserVideos = async (req, res) => {
     const { id } = req.params;
 
     if (!id || !/^[0-9a-fA-F]{24}$/.test(id)) {
-      return res.status(400).json({ success: false, message: "Invalid user ID format" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid user ID format" });
     }
 
     const user = await AllUser.findById(id).select("channels videos").lean();
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
-    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || VIDEO_PAGE_SIZE, 1), VIDEO_MAX_PAGE_SIZE);
+    const limit = Math.min(
+      Math.max(parseInt(req.query.limit, 10) || VIDEO_PAGE_SIZE, 1),
+      VIDEO_MAX_PAGE_SIZE,
+    );
     const skip = (page - 1) * limit;
 
     const userVideoIds = (user.videos || []).filter(Boolean);
-    const filter = { _id: { $in: userVideoIds }, videoType: { $nin: ["short", ["short"]] } };
+    const filter = {
+      _id: { $in: userVideoIds },
+      videoType: { $nin: ["short", ["short"]] },
+    };
 
     // Channel ownership validation
     if (req.query.channelId) {
       const channelId = req.query.channelId;
       if (!/^[0-9a-fA-F]{24}$/.test(channelId)) {
-        return res.status(400).json({ success: false, message: "Invalid channel ID format" });
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid channel ID format" });
       }
       const ownedChannelIds = (user.channels || []).map(String);
       if (!ownedChannelIds.includes(channelId)) {
-        return res.status(403).json({ success: false, message: "Channel does not belong to this user" });
+        return res.status(403).json({
+          success: false,
+          message: "Channel does not belong to this user",
+        });
       }
       filter.channel = channelId;
     }
@@ -1112,13 +1279,17 @@ exports.getAdminUserVideos = async (req, res) => {
     }
 
     // Sorting
-    const sortField = VIDEO_SORT_FIELDS[req.query.sortBy] ? req.query.sortBy : "createdAt";
+    const sortField = VIDEO_SORT_FIELDS[req.query.sortBy]
+      ? req.query.sortBy
+      : "createdAt";
     const sortOrder = req.query.sortOrder === "asc" ? 1 : -1;
     const sort = { [sortField]: sortOrder };
 
     const [videos, total] = await Promise.all([
       Video.find(filter)
-        .select("title description thumbnail views likesCount dislikesCount channel duration videoType createdAt updatedAt")
+        .select(
+          "title description thumbnail views likesCount dislikesCount channel duration videoType createdAt updatedAt",
+        )
         .sort(sort)
         .skip(skip)
         .limit(limit)
@@ -1138,8 +1309,10 @@ exports.getAdminUserVideos = async (req, res) => {
 
     const baseUrl = `${req.protocol}://${req.get("host")}`;
     const items = videos.map((v) => {
-      const thumb = v.thumbnail && !v.thumbnail.startsWith("http")
-        ? `${baseUrl}/${v.thumbnail}` : v.thumbnail || null;
+      const thumb =
+        v.thumbnail && !v.thumbnail.startsWith("http")
+          ? `${baseUrl}/${v.thumbnail}`
+          : v.thumbnail || null;
       return {
         _id: v._id,
         title: v.title,
@@ -1171,7 +1344,10 @@ exports.getAdminUserVideos = async (req, res) => {
     });
   } catch (err) {
     console.error("getAdminUserVideos error:", err);
-    res.status(500).json({ success: false, message: err.message || "Failed to fetch videos" });
+    res.status(500).json({
+      success: false,
+      message: err.message || "Failed to fetch videos",
+    });
   }
 };
 
@@ -1183,30 +1359,45 @@ exports.getAdminUserShorts = async (req, res) => {
     const { id } = req.params;
 
     if (!id || !/^[0-9a-fA-F]{24}$/.test(id)) {
-      return res.status(400).json({ success: false, message: "Invalid user ID format" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid user ID format" });
     }
 
     const user = await AllUser.findById(id).select("channels videos").lean();
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
-    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || VIDEO_PAGE_SIZE, 1), VIDEO_MAX_PAGE_SIZE);
+    const limit = Math.min(
+      Math.max(parseInt(req.query.limit, 10) || VIDEO_PAGE_SIZE, 1),
+      VIDEO_MAX_PAGE_SIZE,
+    );
     const skip = (page - 1) * limit;
 
     const userVideoIds = (user.videos || []).filter(Boolean);
-    const filter = { _id: { $in: userVideoIds }, videoType: { $in: ["short", ["short"]] } };
+    const filter = {
+      _id: { $in: userVideoIds },
+      videoType: { $in: ["short", ["short"]] },
+    };
 
     // Channel ownership validation
     if (req.query.channelId) {
       const channelId = req.query.channelId;
       if (!/^[0-9a-fA-F]{24}$/.test(channelId)) {
-        return res.status(400).json({ success: false, message: "Invalid channel ID format" });
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid channel ID format" });
       }
       const ownedChannelIds = (user.channels || []).map(String);
       if (!ownedChannelIds.includes(channelId)) {
-        return res.status(403).json({ success: false, message: "Channel does not belong to this user" });
+        return res.status(403).json({
+          success: false,
+          message: "Channel does not belong to this user",
+        });
       }
       filter.channel = channelId;
     }
@@ -1220,13 +1411,17 @@ exports.getAdminUserShorts = async (req, res) => {
     }
 
     // Sorting
-    const sortField = SHORT_SORT_FIELDS[req.query.sortBy] ? req.query.sortBy : "createdAt";
+    const sortField = SHORT_SORT_FIELDS[req.query.sortBy]
+      ? req.query.sortBy
+      : "createdAt";
     const sortOrder = req.query.sortOrder === "asc" ? 1 : -1;
     const sort = { [sortField]: sortOrder };
 
     const [videos, total] = await Promise.all([
       Video.find(filter)
-        .select("title description thumbnail views likesCount dislikesCount channel duration videoType createdAt updatedAt")
+        .select(
+          "title description thumbnail views likesCount dislikesCount channel duration videoType createdAt updatedAt",
+        )
         .sort(sort)
         .skip(skip)
         .limit(limit)
@@ -1246,8 +1441,10 @@ exports.getAdminUserShorts = async (req, res) => {
 
     const baseUrl = `${req.protocol}://${req.get("host")}`;
     const items = videos.map((v) => {
-      const thumb = v.thumbnail && !v.thumbnail.startsWith("http")
-        ? `${baseUrl}/${v.thumbnail}` : v.thumbnail || null;
+      const thumb =
+        v.thumbnail && !v.thumbnail.startsWith("http")
+          ? `${baseUrl}/${v.thumbnail}`
+          : v.thumbnail || null;
       return {
         _id: v._id,
         title: v.title,
@@ -1279,7 +1476,10 @@ exports.getAdminUserShorts = async (req, res) => {
     });
   } catch (err) {
     console.error("getAdminUserShorts error:", err);
-    res.status(500).json({ success: false, message: err.message || "Failed to fetch shorts" });
+    res.status(500).json({
+      success: false,
+      message: err.message || "Failed to fetch shorts",
+    });
   }
 };
 
@@ -1519,7 +1719,9 @@ exports.getUserActivity = async (req, res) => {
 
     const user = await AllUser.findById(id).lean();
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     const filter = { userId: id };
@@ -1527,14 +1729,23 @@ exports.getUserActivity = async (req, res) => {
 
     const skip = (Number(page) - 1) * Number(limit);
     const [events, total] = await Promise.all([
-      AuditEvent.find(filter).sort({ createdAt: -1 }).skip(skip).limit(Number(limit)).lean(),
+      AuditEvent.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit))
+        .lean(),
       AuditEvent.countDocuments(filter),
     ]);
 
     return res.status(200).json({
       success: true,
       events,
-      pagination: { page: Number(page), limit: Number(limit), total, pages: Math.ceil(total / Number(limit)) },
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        pages: Math.ceil(total / Number(limit)),
+      },
     });
   } catch (error) {
     console.error("getUserActivity error:", error.message);
@@ -1550,11 +1761,16 @@ exports.getUserWatchHistory = async (req, res) => {
 
     const user = await AllUser.findById(id).lean();
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     const sessions = await WatchSession.find({ userId: id })
-      .populate("videoId", "title thumbnail videoType views likesCount dislikesCount channel")
+      .populate(
+        "videoId",
+        "title thumbnail videoType views likesCount dislikesCount channel",
+      )
       .sort({ startedAt: -1 })
       .skip((Number(page) - 1) * Number(limit))
       .limit(Number(limit))
@@ -1565,7 +1781,12 @@ exports.getUserWatchHistory = async (req, res) => {
     return res.status(200).json({
       success: true,
       sessions,
-      pagination: { page: Number(page), limit: Number(limit), total, pages: Math.ceil(total / Number(limit)) },
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        pages: Math.ceil(total / Number(limit)),
+      },
     });
   } catch (error) {
     console.error("getUserWatchHistory error:", error.message);
@@ -1587,7 +1808,9 @@ exports.getUserSubscriptions = async (req, res) => {
       .lean();
 
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     const subscriptions = (user.subscribedChannels || []).map((ch) => ({
@@ -1598,7 +1821,9 @@ exports.getUserSubscriptions = async (req, res) => {
       creator: ch.creator,
     }));
 
-    return res.status(200).json({ success: true, subscriptions, total: subscriptions.length });
+    return res
+      .status(200)
+      .json({ success: true, subscriptions, total: subscriptions.length });
   } catch (error) {
     console.error("getUserSubscriptions error:", error.message);
     return res.status(500).json({ success: false, message: "Server error" });
@@ -1613,12 +1838,17 @@ exports.getUserLikedVideos = async (req, res) => {
 
     const user = await AllUser.findById(id).lean();
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     const likedIds = user.likedVideos || [];
     const total = likedIds.length;
-    const paginatedIds = likedIds.slice((Number(page) - 1) * Number(limit), Number(page) * Number(limit));
+    const paginatedIds = likedIds.slice(
+      (Number(page) - 1) * Number(limit),
+      Number(page) * Number(limit),
+    );
 
     const videos = await Video.find({ _id: { $in: paginatedIds } })
       .populate("channel", "name channelImage")
@@ -1628,7 +1858,12 @@ exports.getUserLikedVideos = async (req, res) => {
     return res.status(200).json({
       success: true,
       videos,
-      pagination: { page: Number(page), limit: Number(limit), total, pages: Math.ceil(total / Number(limit)) },
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        pages: Math.ceil(total / Number(limit)),
+      },
     });
   } catch (error) {
     console.error("getUserLikedVideos error:", error.message);
@@ -1644,12 +1879,17 @@ exports.getUserDislikedVideos = async (req, res) => {
 
     const user = await AllUser.findById(id).lean();
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     const dislikedIds = user.dislikedVideos || [];
     const total = dislikedIds.length;
-    const paginatedIds = dislikedIds.slice((Number(page) - 1) * Number(limit), Number(page) * Number(limit));
+    const paginatedIds = dislikedIds.slice(
+      (Number(page) - 1) * Number(limit),
+      Number(page) * Number(limit),
+    );
 
     const videos = await Video.find({ _id: { $in: paginatedIds } })
       .populate("channel", "name channelImage")
@@ -1659,7 +1899,12 @@ exports.getUserDislikedVideos = async (req, res) => {
     return res.status(200).json({
       success: true,
       videos,
-      pagination: { page: Number(page), limit: Number(limit), total, pages: Math.ceil(total / Number(limit)) },
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        pages: Math.ceil(total / Number(limit)),
+      },
     });
   } catch (error) {
     console.error("getUserDislikedVideos error:", error.message);
@@ -1675,12 +1920,17 @@ exports.getUserWatchLater = async (req, res) => {
 
     const user = await AllUser.findById(id).lean();
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     const watchLaterIds = user.watchLaterVideos || user.watchLater || [];
     const total = watchLaterIds.length;
-    const paginatedIds = watchLaterIds.slice((Number(page) - 1) * Number(limit), Number(page) * Number(limit));
+    const paginatedIds = watchLaterIds.slice(
+      (Number(page) - 1) * Number(limit),
+      Number(page) * Number(limit),
+    );
 
     const videos = await Video.find({ _id: { $in: paginatedIds } })
       .populate("channel", "name channelImage")
@@ -1688,12 +1938,19 @@ exports.getUserWatchLater = async (req, res) => {
       .lean();
 
     const videoMap = new Map(videos.map((v) => [v._id.toString(), v]));
-    const ordered = paginatedIds.map((vid) => videoMap.get(vid.toString())).filter(Boolean);
+    const ordered = paginatedIds
+      .map((vid) => videoMap.get(vid.toString()))
+      .filter(Boolean);
 
     return res.status(200).json({
       success: true,
       videos: ordered,
-      pagination: { page: Number(page), limit: Number(limit), total, pages: Math.ceil(total / Number(limit)) },
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        pages: Math.ceil(total / Number(limit)),
+      },
     });
   } catch (error) {
     console.error("getUserWatchLater error:", error.message);
@@ -1709,7 +1966,9 @@ exports.getUserNotifications = async (req, res) => {
 
     const user = await AllUser.findById(id).lean();
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     const filter = { recipient: id };
@@ -1732,7 +1991,12 @@ exports.getUserNotifications = async (req, res) => {
       success: true,
       notifications,
       unreadCount,
-      pagination: { page: Number(page), limit: Number(limit), total, pages: Math.ceil(total / Number(limit)) },
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        pages: Math.ceil(total / Number(limit)),
+      },
     });
   } catch (error) {
     console.error("getUserNotifications error:", error.message);
@@ -1747,7 +2011,9 @@ exports.getUserDevices = async (req, res) => {
 
     const user = await AllUser.findById(id).lean();
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     const devices = await DeviceFingerprint.find({ userId: id })
@@ -1781,7 +2047,9 @@ exports.getUserFraudEvents = async (req, res) => {
 
     const user = await AllUser.findById(id).lean();
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     const filter = { userId: id };
@@ -1789,7 +2057,11 @@ exports.getUserFraudEvents = async (req, res) => {
 
     const skip = (Number(page) - 1) * Number(limit);
     const [events, total, severityCounts] = await Promise.all([
-      FraudEvent.find(filter).sort({ createdAt: -1 }).skip(skip).limit(Number(limit)).lean(),
+      FraudEvent.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit))
+        .lean(),
       FraudEvent.countDocuments(filter),
       FraudEvent.aggregate([
         { $match: { userId: user._id } },
@@ -1798,14 +2070,21 @@ exports.getUserFraudEvents = async (req, res) => {
     ]);
 
     const severityMap = {};
-    severityCounts.forEach((s) => { severityMap[s._id] = s.count; });
+    severityCounts.forEach((s) => {
+      severityMap[s._id] = s.count;
+    });
 
     return res.status(200).json({
       success: true,
       events,
       severityCounts: severityMap,
       trustScore: user.trustScore,
-      pagination: { page: Number(page), limit: Number(limit), total, pages: Math.ceil(total / Number(limit)) },
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        pages: Math.ceil(total / Number(limit)),
+      },
     });
   } catch (error) {
     console.error("getUserFraudEvents error:", error.message);
@@ -1819,11 +2098,15 @@ exports.getUserEngagement = async (req, res) => {
     const { id } = req.params;
 
     const user = await AllUser.findById(id)
-      .select("likedVideos dislikedVideos subscribedChannels watchLaterVideos watchLater viewedVideos videos channels")
+      .select(
+        "likedVideos dislikedVideos subscribedChannels watchLaterVideos watchLater viewedVideos videos channels",
+      )
       .lean();
 
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     const [totalLikes, totalComments, totalViews] = await Promise.all([
@@ -1831,7 +2114,13 @@ exports.getUserEngagement = async (req, res) => {
       Video.countDocuments({ "comments.user": id }),
       WatchSession.aggregate([
         { $match: { userId: user._id } },
-        { $group: { _id: null, totalSeconds: { $sum: "$watchedSeconds" }, sessionCount: { $sum: 1 } } },
+        {
+          $group: {
+            _id: null,
+            totalSeconds: { $sum: "$watchedSeconds" },
+            sessionCount: { $sum: 1 },
+          },
+        },
       ]),
     ]);
 
@@ -1843,7 +2132,8 @@ exports.getUserEngagement = async (req, res) => {
         totalLikes: (user.likedVideos || []).length,
         totalDislikes: (user.dislikedVideos || []).length,
         totalSubscriptions: (user.subscribedChannels || []).length,
-        totalWatchLater: (user.watchLaterVideos || user.watchLater || []).length,
+        totalWatchLater: (user.watchLaterVideos || user.watchLater || [])
+          .length,
         totalViewedVideos: (user.viewedVideos || []).length,
         totalVideosUploaded: (user.videos || []).length,
         totalChannelsCreated: (user.channels || []).length,
@@ -1874,20 +2164,29 @@ exports.suspendUser = async (req, res) => {
     const adminId = req.admin && req.admin._id;
 
     if (!id || !/^[0-9a-fA-F]{24}$/.test(id)) {
-      return res.status(400).json({ success: false, message: "Invalid user ID format" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid user ID format" });
     }
 
     if (adminId && adminId.toString() === id) {
-      return res.status(400).json({ success: false, message: "You cannot suspend your own account" });
+      return res.status(400).json({
+        success: false,
+        message: "You cannot suspend your own account",
+      });
     }
 
     const user = await AllUser.findById(id);
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     if (user.role === "admin") {
-      return res.status(400).json({ success: false, message: "Cannot suspend admin accounts" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Cannot suspend admin accounts" });
     }
 
     if (!VALID_TRANSITIONS[user.status]?.includes("suspended")) {
@@ -1935,12 +2234,16 @@ exports.restoreUser = async (req, res) => {
     const adminId = req.admin && req.admin._id;
 
     if (!id || !/^[0-9a-fA-F]{24}$/.test(id)) {
-      return res.status(400).json({ success: false, message: "Invalid user ID format" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid user ID format" });
     }
 
     const user = await AllUser.findById(id);
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     if (!VALID_TRANSITIONS[user.status]?.includes("active")) {
@@ -1996,20 +2299,28 @@ exports.banUser = async (req, res) => {
     const adminId = req.admin && req.admin._id;
 
     if (!id || !/^[0-9a-fA-F]{24}$/.test(id)) {
-      return res.status(400).json({ success: false, message: "Invalid user ID format" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid user ID format" });
     }
 
     if (adminId && adminId.toString() === id) {
-      return res.status(400).json({ success: false, message: "You cannot ban your own account" });
+      return res
+        .status(400)
+        .json({ success: false, message: "You cannot ban your own account" });
     }
 
     const user = await AllUser.findById(id);
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     if (user.role === "admin") {
-      return res.status(400).json({ success: false, message: "Cannot ban admin accounts" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Cannot ban admin accounts" });
     }
 
     if (!VALID_TRANSITIONS[user.status]?.includes("banned")) {
@@ -2077,16 +2388,27 @@ exports.disableChannel = async (req, res) => {
 
     const ownership = await validateChannelOwnership(userId, channelId);
     if (ownership.error) {
-      return res.status(ownership.error === "Invalid ID format" ? 400 : ownership.error === "User not found" ? 404 : 403).json({
-        success: false,
-        message: ownership.error,
-      });
+      return res
+        .status(
+          ownership.error === "Invalid ID format"
+            ? 400
+            : ownership.error === "User not found"
+              ? 404
+              : 403,
+        )
+        .json({
+          success: false,
+          message: ownership.error,
+        });
     }
     const { channel } = ownership;
     const prevStatus = channel.status || "active";
 
     if (!CHANNEL_VALID_TRANSITIONS[prevStatus]?.includes("disabled")) {
-      return res.status(400).json({ success: false, message: `Cannot disable a channel with status "${prevStatus}"` });
+      return res.status(400).json({
+        success: false,
+        message: `Cannot disable a channel with status "${prevStatus}"`,
+      });
     }
 
     channel.status = "disabled";
@@ -2100,13 +2422,23 @@ exports.disableChannel = async (req, res) => {
       eventType: "ADMIN_CHANNEL_DISABLE",
       ip: req.ip,
       userAgent: req.get("user-agent"),
-      metadata: { adminId, channelId, channelName: channel.name, prevStatus, reason: reason || null },
+      metadata: {
+        adminId,
+        channelId,
+        channelName: channel.name,
+        prevStatus,
+        reason: reason || null,
+      },
     }).catch(() => {});
 
     res.status(200).json({
       success: true,
       message: "Channel disabled successfully",
-      data: { channelId, status: channel.status, disabledAt: channel.disabledAt },
+      data: {
+        channelId,
+        status: channel.status,
+        disabledAt: channel.disabledAt,
+      },
     });
   } catch (err) {
     console.error("disableChannel error:", err.message);
@@ -2122,16 +2454,27 @@ exports.enableChannel = async (req, res) => {
 
     const ownership = await validateChannelOwnership(userId, channelId);
     if (ownership.error) {
-      return res.status(ownership.error === "Invalid ID format" ? 400 : ownership.error === "User not found" ? 404 : 403).json({
-        success: false,
-        message: ownership.error,
-      });
+      return res
+        .status(
+          ownership.error === "Invalid ID format"
+            ? 400
+            : ownership.error === "User not found"
+              ? 404
+              : 403,
+        )
+        .json({
+          success: false,
+          message: ownership.error,
+        });
     }
     const { channel } = ownership;
     const prevStatus = channel.status || "active";
 
     if (!CHANNEL_VALID_TRANSITIONS[prevStatus]?.includes("active")) {
-      return res.status(400).json({ success: false, message: `Cannot enable a channel with status "${prevStatus}"` });
+      return res.status(400).json({
+        success: false,
+        message: `Cannot enable a channel with status "${prevStatus}"`,
+      });
     }
 
     channel.status = "active";
@@ -2168,16 +2511,27 @@ exports.banChannel = async (req, res) => {
 
     const ownership = await validateChannelOwnership(userId, channelId);
     if (ownership.error) {
-      return res.status(ownership.error === "Invalid ID format" ? 400 : ownership.error === "User not found" ? 404 : 403).json({
-        success: false,
-        message: ownership.error,
-      });
+      return res
+        .status(
+          ownership.error === "Invalid ID format"
+            ? 400
+            : ownership.error === "User not found"
+              ? 404
+              : 403,
+        )
+        .json({
+          success: false,
+          message: ownership.error,
+        });
     }
     const { channel } = ownership;
     const prevStatus = channel.status || "active";
 
     if (!CHANNEL_VALID_TRANSITIONS[prevStatus]?.includes("banned")) {
-      return res.status(400).json({ success: false, message: `Cannot ban a channel with status "${prevStatus}"` });
+      return res.status(400).json({
+        success: false,
+        message: `Cannot ban a channel with status "${prevStatus}"`,
+      });
     }
 
     channel.status = "banned";
@@ -2191,7 +2545,13 @@ exports.banChannel = async (req, res) => {
       eventType: "ADMIN_CHANNEL_BAN",
       ip: req.ip,
       userAgent: req.get("user-agent"),
-      metadata: { adminId, channelId, channelName: channel.name, prevStatus, reason: reason || null },
+      metadata: {
+        adminId,
+        channelId,
+        channelName: channel.name,
+        prevStatus,
+        reason: reason || null,
+      },
     }).catch(() => {});
 
     res.status(200).json({
@@ -2213,16 +2573,27 @@ exports.restoreChannel = async (req, res) => {
 
     const ownership = await validateChannelOwnership(userId, channelId);
     if (ownership.error) {
-      return res.status(ownership.error === "Invalid ID format" ? 400 : ownership.error === "User not found" ? 404 : 403).json({
-        success: false,
-        message: ownership.error,
-      });
+      return res
+        .status(
+          ownership.error === "Invalid ID format"
+            ? 400
+            : ownership.error === "User not found"
+              ? 404
+              : 403,
+        )
+        .json({
+          success: false,
+          message: ownership.error,
+        });
     }
     const { channel } = ownership;
     const prevStatus = channel.status || "active";
 
     if (!CHANNEL_VALID_TRANSITIONS[prevStatus]?.includes("active")) {
-      return res.status(400).json({ success: false, message: `Cannot restore a channel with status "${prevStatus}"` });
+      return res.status(400).json({
+        success: false,
+        message: `Cannot restore a channel with status "${prevStatus}"`,
+      });
     }
 
     channel.status = "active";
@@ -2262,10 +2633,18 @@ exports.deleteChannel = async (req, res) => {
 
     const ownership = await validateChannelOwnership(userId, channelId);
     if (ownership.error) {
-      return res.status(ownership.error === "Invalid ID format" ? 400 : ownership.error === "User not found" ? 404 : 403).json({
-        success: false,
-        message: ownership.error,
-      });
+      return res
+        .status(
+          ownership.error === "Invalid ID format"
+            ? 400
+            : ownership.error === "User not found"
+              ? 404
+              : 403,
+        )
+        .json({
+          success: false,
+          message: ownership.error,
+        });
     }
     const { channel } = ownership;
 
@@ -2287,7 +2666,12 @@ exports.deleteChannel = async (req, res) => {
       eventType: "ADMIN_CHANNEL_DELETE",
       ip: req.ip,
       userAgent: req.get("user-agent"),
-      metadata: { adminId, channelId, channelName: channel.name, reason: reason || null },
+      metadata: {
+        adminId,
+        channelId,
+        channelName: channel.name,
+        reason: reason || null,
+      },
     }).catch(() => {});
 
     res.status(200).json({
@@ -2345,19 +2729,28 @@ exports.disableVideo = async (req, res) => {
 
     const ownership = await validateVideoOwnership(userId, videoId, "long");
     if (ownership.error) {
-      return res.status(
-        ownership.error === "Invalid ID format" ? 400
-          : ownership.error === "User not found" ? 404
-            : ownership.error === "Video not found" ? 404
-              : ownership.error.includes("not a long") ? 400
-                : 403
-      ).json({ success: false, message: ownership.error });
+      return res
+        .status(
+          ownership.error === "Invalid ID format"
+            ? 400
+            : ownership.error === "User not found"
+              ? 404
+              : ownership.error === "Video not found"
+                ? 404
+                : ownership.error.includes("not a long")
+                  ? 400
+                  : 403,
+        )
+        .json({ success: false, message: ownership.error });
     }
     const { video } = ownership;
     const prevStatus = video.status || "active";
 
     if (!VIDEO_VALID_TRANSITIONS[prevStatus]?.includes("disabled")) {
-      return res.status(400).json({ success: false, message: `Cannot disable a video with status "${prevStatus}"` });
+      return res.status(400).json({
+        success: false,
+        message: `Cannot disable a video with status "${prevStatus}"`,
+      });
     }
 
     video.status = "disabled";
@@ -2371,7 +2764,13 @@ exports.disableVideo = async (req, res) => {
       eventType: "ADMIN_VIDEO_DISABLE",
       ip: req.ip,
       userAgent: req.get("user-agent"),
-      metadata: { adminId, videoId, title: video.title, prevStatus, reason: reason || null },
+      metadata: {
+        adminId,
+        videoId,
+        title: video.title,
+        prevStatus,
+        reason: reason || null,
+      },
     }).catch(() => {});
 
     res.status(200).json({
@@ -2393,19 +2792,28 @@ exports.enableVideo = async (req, res) => {
 
     const ownership = await validateVideoOwnership(userId, videoId, "long");
     if (ownership.error) {
-      return res.status(
-        ownership.error === "Invalid ID format" ? 400
-          : ownership.error === "User not found" ? 404
-            : ownership.error === "Video not found" ? 404
-              : ownership.error.includes("not a long") ? 400
-                : 403
-      ).json({ success: false, message: ownership.error });
+      return res
+        .status(
+          ownership.error === "Invalid ID format"
+            ? 400
+            : ownership.error === "User not found"
+              ? 404
+              : ownership.error === "Video not found"
+                ? 404
+                : ownership.error.includes("not a long")
+                  ? 400
+                  : 403,
+        )
+        .json({ success: false, message: ownership.error });
     }
     const { video } = ownership;
     const prevStatus = video.status || "active";
 
     if (!VIDEO_VALID_TRANSITIONS[prevStatus]?.includes("active")) {
-      return res.status(400).json({ success: false, message: `Cannot enable a video with status "${prevStatus}"` });
+      return res.status(400).json({
+        success: false,
+        message: `Cannot enable a video with status "${prevStatus}"`,
+      });
     }
 
     video.status = "active";
@@ -2442,13 +2850,19 @@ exports.deleteVideo = async (req, res) => {
 
     const ownership = await validateVideoOwnership(userId, videoId, "long");
     if (ownership.error) {
-      return res.status(
-        ownership.error === "Invalid ID format" ? 400
-          : ownership.error === "User not found" ? 404
-            : ownership.error === "Video not found" ? 404
-              : ownership.error.includes("not a long") ? 400
-                : 403
-      ).json({ success: false, message: ownership.error });
+      return res
+        .status(
+          ownership.error === "Invalid ID format"
+            ? 400
+            : ownership.error === "User not found"
+              ? 404
+              : ownership.error === "Video not found"
+                ? 404
+                : ownership.error.includes("not a long")
+                  ? 400
+                  : 403,
+        )
+        .json({ success: false, message: ownership.error });
     }
     const { video } = ownership;
 
@@ -2462,7 +2876,10 @@ exports.deleteVideo = async (req, res) => {
     // Remove video references from user and channel
     await AllUser.updateOne({ _id: userId }, { $pull: { videos: videoId } });
     if (video.channel) {
-      await Channel.updateOne({ _id: video.channel }, { $pull: { videos: videoId } });
+      await Channel.updateOne(
+        { _id: video.channel },
+        { $pull: { videos: videoId } },
+      );
     }
 
     logAuditEvent({
@@ -2470,7 +2887,13 @@ exports.deleteVideo = async (req, res) => {
       eventType: "ADMIN_VIDEO_DELETE",
       ip: req.ip,
       userAgent: req.get("user-agent"),
-      metadata: { adminId, videoId, title: video.title, channelId: video.channel, reason: reason || null },
+      metadata: {
+        adminId,
+        videoId,
+        title: video.title,
+        channelId: video.channel,
+        reason: reason || null,
+      },
     }).catch(() => {});
 
     res.status(200).json({
@@ -2493,19 +2916,28 @@ exports.disableShort = async (req, res) => {
 
     const ownership = await validateVideoOwnership(userId, videoId, "short");
     if (ownership.error) {
-      return res.status(
-        ownership.error === "Invalid ID format" ? 400
-          : ownership.error === "User not found" ? 404
-            : ownership.error === "Video not found" ? 404
-              : ownership.error.includes("not a short") ? 400
-                : 403
-      ).json({ success: false, message: ownership.error });
+      return res
+        .status(
+          ownership.error === "Invalid ID format"
+            ? 400
+            : ownership.error === "User not found"
+              ? 404
+              : ownership.error === "Video not found"
+                ? 404
+                : ownership.error.includes("not a short")
+                  ? 400
+                  : 403,
+        )
+        .json({ success: false, message: ownership.error });
     }
     const { video } = ownership;
     const prevStatus = video.status || "active";
 
     if (!VIDEO_VALID_TRANSITIONS[prevStatus]?.includes("disabled")) {
-      return res.status(400).json({ success: false, message: `Cannot disable a short with status "${prevStatus}"` });
+      return res.status(400).json({
+        success: false,
+        message: `Cannot disable a short with status "${prevStatus}"`,
+      });
     }
 
     video.status = "disabled";
@@ -2519,7 +2951,13 @@ exports.disableShort = async (req, res) => {
       eventType: "ADMIN_SHORT_DISABLE",
       ip: req.ip,
       userAgent: req.get("user-agent"),
-      metadata: { adminId, videoId, title: video.title, prevStatus, reason: reason || null },
+      metadata: {
+        adminId,
+        videoId,
+        title: video.title,
+        prevStatus,
+        reason: reason || null,
+      },
     }).catch(() => {});
 
     res.status(200).json({
@@ -2541,19 +2979,28 @@ exports.enableShort = async (req, res) => {
 
     const ownership = await validateVideoOwnership(userId, videoId, "short");
     if (ownership.error) {
-      return res.status(
-        ownership.error === "Invalid ID format" ? 400
-          : ownership.error === "User not found" ? 404
-            : ownership.error === "Video not found" ? 404
-              : ownership.error.includes("not a short") ? 400
-                : 403
-      ).json({ success: false, message: ownership.error });
+      return res
+        .status(
+          ownership.error === "Invalid ID format"
+            ? 400
+            : ownership.error === "User not found"
+              ? 404
+              : ownership.error === "Video not found"
+                ? 404
+                : ownership.error.includes("not a short")
+                  ? 400
+                  : 403,
+        )
+        .json({ success: false, message: ownership.error });
     }
     const { video } = ownership;
     const prevStatus = video.status || "active";
 
     if (!VIDEO_VALID_TRANSITIONS[prevStatus]?.includes("active")) {
-      return res.status(400).json({ success: false, message: `Cannot enable a short with status "${prevStatus}"` });
+      return res.status(400).json({
+        success: false,
+        message: `Cannot enable a short with status "${prevStatus}"`,
+      });
     }
 
     video.status = "active";
@@ -2590,13 +3037,19 @@ exports.deleteShort = async (req, res) => {
 
     const ownership = await validateVideoOwnership(userId, videoId, "short");
     if (ownership.error) {
-      return res.status(
-        ownership.error === "Invalid ID format" ? 400
-          : ownership.error === "User not found" ? 404
-            : ownership.error === "Video not found" ? 404
-              : ownership.error.includes("not a short") ? 400
-                : 403
-      ).json({ success: false, message: ownership.error });
+      return res
+        .status(
+          ownership.error === "Invalid ID format"
+            ? 400
+            : ownership.error === "User not found"
+              ? 404
+              : ownership.error === "Video not found"
+                ? 404
+                : ownership.error.includes("not a short")
+                  ? 400
+                  : 403,
+        )
+        .json({ success: false, message: ownership.error });
     }
     const { video } = ownership;
 
@@ -2610,7 +3063,10 @@ exports.deleteShort = async (req, res) => {
     // Remove references
     await AllUser.updateOne({ _id: userId }, { $pull: { videos: videoId } });
     if (video.channel) {
-      await Channel.updateOne({ _id: video.channel }, { $pull: { videos: videoId } });
+      await Channel.updateOne(
+        { _id: video.channel },
+        { $pull: { videos: videoId } },
+      );
     }
 
     logAuditEvent({
@@ -2618,7 +3074,13 @@ exports.deleteShort = async (req, res) => {
       eventType: "ADMIN_SHORT_DELETE",
       ip: req.ip,
       userAgent: req.get("user-agent"),
-      metadata: { adminId, videoId, title: video.title, channelId: video.channel, reason: reason || null },
+      metadata: {
+        adminId,
+        videoId,
+        title: video.title,
+        channelId: video.channel,
+        reason: reason || null,
+      },
     }).catch(() => {});
 
     res.status(200).json({

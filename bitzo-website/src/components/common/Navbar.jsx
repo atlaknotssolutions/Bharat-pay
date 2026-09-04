@@ -35,6 +35,7 @@ import {
 } from "../../features/notifications/notificationsSlice";
 import axios from "axios";
 import { API_ORIGIN as API_BASE_URL } from "../../config/api";
+import logo from "../../../dist/assets/Bharatplay.png";
 
 const HINTS_URL = `${API_BASE_URL}/api/uservideo/search/hints`;
 
@@ -48,9 +49,16 @@ export default function Navbar({ toggleSidebar }) {
   const [copyrightOpen, setCopyrightOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(Boolean(localStorage.getItem("token")));
+  const [isLoggedIn, setIsLoggedIn] = useState(
+    Boolean(localStorage.getItem("token")),
+  );
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  const trustScore = Math.max(0, Math.min(100, Number(user?.trustScore ?? 50)));
+  const trustTier =
+    user?.trustTier ||
+    (trustScore >= 70 ? "premium" : trustScore >= 40 ? "medium" : "restricted");
 
   const dropdownRef = useRef(null);
   const notifRef = useRef(null);
@@ -77,12 +85,13 @@ export default function Navbar({ toggleSidebar }) {
       setIsMobileSearchOpen(false);
       navigate(`/search?q=${encodeURIComponent(q)}`);
     },
-    [searchQuery, navigate]
+    [searchQuery, navigate],
   );
 
   // Speech Recognition
   useEffect(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
       setVoiceSupported(false);
       return;
@@ -204,10 +213,14 @@ export default function Navbar({ toggleSidebar }) {
       }
       const insideSearch =
         (searchBoxRef.current && searchBoxRef.current.contains(event.target)) ||
-        (mobileSearchBoxRef.current && mobileSearchBoxRef.current.contains(event.target));
+        (mobileSearchBoxRef.current &&
+          mobileSearchBoxRef.current.contains(event.target));
       if (!insideSearch) setShowHints(false);
 
-      if (mobileSearchRef.current && !mobileSearchRef.current.contains(event.target)) {
+      if (
+        mobileSearchRef.current &&
+        !mobileSearchRef.current.contains(event.target)
+      ) {
         setIsMobileSearchOpen(false);
       }
     };
@@ -271,7 +284,11 @@ export default function Navbar({ toggleSidebar }) {
       const token = localStorage.getItem("token");
       if (token) {
         await axios
-          .post(`${API_BASE_URL}/api/logout`, {}, { headers: { Authorization: `Bearer ${token}` } })
+          .post(
+            `${API_BASE_URL}/api/logout`,
+            {},
+            { headers: { Authorization: `Bearer ${token}` } },
+          )
           .catch(() => {});
       }
     } catch (err) {
@@ -291,7 +308,8 @@ export default function Navbar({ toggleSidebar }) {
   };
 
   const onHintClick = (hint) => {
-    const text = typeof hint === "string" ? hint : hint.text || hint.title || "";
+    const text =
+      typeof hint === "string" ? hint : hint.text || hint.title || "";
     setSearchQuery(text);
     setShowHints(false);
     setIsMobileSearchOpen(false);
@@ -301,7 +319,10 @@ export default function Navbar({ toggleSidebar }) {
   const renderHints = () => (
     <div className="absolute top-full left-0 right-0 mt-1.5 bg-[#212121] border border-gray-700/80 rounded-xl shadow-2xl z-50 max-h-80 overflow-y-auto py-1.5">
       {hints.map((hint, i) => {
-        const text = typeof hint === "string" ? hint : hint.text || hint.title || hint.name || "";
+        const text =
+          typeof hint === "string"
+            ? hint
+            : hint.text || hint.title || hint.name || "";
         const type = hint.type || "";
         return (
           <button
@@ -311,8 +332,12 @@ export default function Navbar({ toggleSidebar }) {
           >
             <Search size={16} className="text-gray-400 flex-shrink-0" />
             <span className="truncate flex-1">{text}</span>
-            {type === "channel" && <span className="text-xs text-gray-500">Channel</span>}
-            {type === "video" && <span className="text-xs text-gray-500">Video</span>}
+            {type === "channel" && (
+              <span className="text-xs text-gray-500">Channel</span>
+            )}
+            {type === "video" && (
+              <span className="text-xs text-gray-500">Video</span>
+            )}
           </button>
         );
       })}
@@ -333,21 +358,38 @@ export default function Navbar({ toggleSidebar }) {
           </button>
 
           <Link to="/" className="flex items-center gap-1.5 flex-shrink-0 ml-1">
-           <span className="text-[20px] font-bold tracking-tight text-white hidden sm:block">
+            <span className="text-[20px] font-bold tracking-tight text-white hidden sm:block">
               BharatPlay
             </span>
-            <div className="w-18 h-18 rounded-full  flex items-center justify-center text-white font-bold text-sm">
-              <img src="../../../dist/assets/Bharatplay.png" alt="BharatPlay Logo" w-8 h-8 />
+            <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm overflow-hidden">
+              <img
+                src={logo}
+                alt="BharatPlay Logo"
+                className="w-full h-full object-contain"
+              />
             </div>
-            
           </Link>
 
           {/* Points (desktop) */}
           <div className="hidden sm:flex items-center gap-1.5 bg-[#272727] px-2.5 py-1 rounded-full border border-yellow-600/30 ml-3">
             <Star size={14} className="text-yellow-400 fill-yellow-400" />
-            <span className="text-white font-semibold text-xs">{points.toFixed(1)}</span>
+            <span className="text-white font-semibold text-xs">
+              {points.toFixed(1)}
+            </span>
             <span className="text-gray-400 text-[10px]">pts</span>
           </div>
+          {isLoggedIn && (
+            <div
+              className="hidden lg:flex items-center gap-1.5 bg-[#272727] px-2.5 py-1 rounded-full border border-blue-500/30 ml-1"
+              title={`Trust Score: ${trustScore}/100 (${trustTier})`}
+            >
+              <Shield size={14} className="text-blue-400" />
+              <span className="text-white font-semibold text-xs">
+                {trustScore}
+              </span>
+              <span className="text-gray-400 text-[10px]">trust</span>
+            </div>
+          )}
         </div>
 
         {/* Center Search (desktop) */}
@@ -358,15 +400,18 @@ export default function Navbar({ toggleSidebar }) {
               placeholder={isListening ? "Listening..." : "Search"}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              onFocus={() => searchQuery.trim() && hints.length > 0 && setShowHints(true)}
+              onFocus={() =>
+                searchQuery.trim() && hints.length > 0 && setShowHints(true)
+              }
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleSearch();
                 if (e.key === "Escape") setShowHints(false);
               }}
               className={`w-full h-10 bg-[#121212] border rounded-full pl-4 pr-12 text-sm text-white placeholder-gray-500 focus:outline-none transition-all
-                ${isListening
-                  ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
-                  : "border-gray-700 hover:border-gray-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                ${
+                  isListening
+                    ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
+                    : "border-gray-700 hover:border-gray-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                 }`}
             />
             <button
@@ -384,7 +429,11 @@ export default function Navbar({ toggleSidebar }) {
               ${isListening ? "bg-red-600 hover:bg-red-700 animate-pulse" : "bg-[#272727] hover:bg-[#3a3a3a]"}`}
             title={isListening ? "Stop listening" : "Search with voice"}
           >
-            {isListening ? <MicOff size={20} className="text-white" /> : <Mic size={20} className="text-white" />}
+            {isListening ? (
+              <MicOff size={20} className="text-white" />
+            ) : (
+              <Mic size={20} className="text-white" />
+            )}
           </button>
         </div>
 
@@ -402,7 +451,10 @@ export default function Navbar({ toggleSidebar }) {
             <Search size={22} className="text-white" />
           </button>
 
-          <Link to="/uploadvideo" className="p-2 hover:bg-[#272727] rounded-full">
+          <Link
+            to="/uploadvideo"
+            className="p-2 hover:bg-[#272727] rounded-full"
+          >
             <Plus size={22} className="text-white" />
           </Link>
 
@@ -436,7 +488,11 @@ export default function Navbar({ toggleSidebar }) {
                 {loading ? (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : user?.avatar ? (
-                  <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+                  <img
+                    src={user.avatar}
+                    alt={user.name}
+                    className="w-full h-full object-cover"
+                  />
                 ) : (
                   <span className="text-white text-sm font-semibold">
                     {user?.name ? user.name.charAt(0).toUpperCase() : "U"}
@@ -460,7 +516,11 @@ export default function Navbar({ toggleSidebar }) {
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 overflow-hidden flex-shrink-0">
                       {user?.avatar ? (
-                        <img src={user.avatar} alt="" className="w-full h-full object-cover" />
+                        <img
+                          src={user.avatar}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-white font-bold text-lg">
                           {user?.name?.charAt(0)?.toUpperCase() || "U"}
@@ -468,11 +528,22 @@ export default function Navbar({ toggleSidebar }) {
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="font-semibold truncate">{user?.name || "User"}</p>
-                      <p className="text-sm text-gray-400 truncate">{user?.email || ""}</p>
+                      <p className="font-semibold truncate">
+                        {user?.name || "User"}
+                      </p>
+                      <p className="text-sm text-gray-400 truncate">
+                        {user?.email || ""}
+                      </p>
                       <div className="flex items-center gap-1 mt-1 text-xs text-yellow-400">
                         <Star size={12} className="fill-yellow-400" />
                         <span>{points.toFixed(0)} pts</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-2 text-xs text-blue-300">
+                        <Shield size={12} />
+                        <span>Trust Score: {trustScore}/100</span>
+                        <span className="capitalize text-gray-400">
+                          ({trustTier})
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -488,11 +559,24 @@ export default function Navbar({ toggleSidebar }) {
                 </div>
 
                 <div className="py-1">
-                  <button onClick={() => { navigate("/profile"); setIsDropdownOpen(false); }} className="w-full px-4 py-2.5 text-left hover:bg-[#272727] flex items-center gap-4 text-sm">
+                  <button
+                    onClick={() => {
+                      navigate("/profile");
+                      setIsDropdownOpen(false);
+                    }}
+                    className="w-full px-4 py-2.5 text-left hover:bg-[#272727] flex items-center gap-4 text-sm"
+                  >
                     <User size={20} className="text-gray-300" /> My Profile
                   </button>
-                  <button onClick={() => { navigate("/studio"); setIsDropdownOpen(false); }} className="w-full px-4 py-2.5 text-left hover:bg-[#272727] flex items-center gap-4 text-sm">
-                    <Video size={20} className="text-gray-300" /> Bharat Play Studio
+                  <button
+                    onClick={() => {
+                      navigate("/studio");
+                      setIsDropdownOpen(false);
+                    }}
+                    className="w-full px-4 py-2.5 text-left hover:bg-[#272727] flex items-center gap-4 text-sm"
+                  >
+                    <Video size={20} className="text-gray-300" /> Bharat Play
+                    Studio
                   </button>
 
                   {/* Settings sub */}
@@ -502,17 +586,34 @@ export default function Navbar({ toggleSidebar }) {
                       className="w-full px-4 py-2.5 text-left hover:bg-[#272727] flex items-center justify-between text-sm"
                     >
                       <div className="flex items-center gap-4">
-                        <Settings size={20} className="text-gray-300" /> Settings
+                        <Settings size={20} className="text-gray-300" />{" "}
+                        Settings
                       </div>
-                      {isSettingsOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                      {isSettingsOpen ? (
+                        <ChevronDown size={16} />
+                      ) : (
+                        <ChevronRight size={16} />
+                      )}
                     </button>
                     {isSettingsOpen && (
                       <div className="bg-[#1a1a1a] py-1">
                         {[
                           { path: "/history", icon: History, label: "History" },
-                          { path: "/liked-videos", icon: Heart, label: "Liked Videos" },
-                          { path: "/watch-later", icon: Clock, label: "Watch Later" },
-                          { path: "/your-videos", icon: Video, label: "Your Videos" },
+                          {
+                            path: "/liked-videos",
+                            icon: Heart,
+                            label: "Liked Videos",
+                          },
+                          {
+                            path: "/watch-later",
+                            icon: Clock,
+                            label: "Watch Later",
+                          },
+                          {
+                            path: "/your-videos",
+                            icon: Video,
+                            label: "Your Videos",
+                          },
                         ].map((item) => (
                           <button
                             key={item.path}
@@ -530,20 +631,38 @@ export default function Navbar({ toggleSidebar }) {
                     )}
                   </div>
 
-                  <Link to="/withdraw" onClick={() => setIsDropdownOpen(false)} className="w-full px-4 py-2.5 text-left hover:bg-[#272727] flex items-center gap-4 text-sm border-t border-gray-800">
-                    <Wallet size={20} className="text-gray-300" /> Withdraw Rewards
+                  <Link
+                    to="/withdraw"
+                    onClick={() => setIsDropdownOpen(false)}
+                    className="w-full px-4 py-2.5 text-left hover:bg-[#272727] flex items-center gap-4 text-sm border-t border-gray-800"
+                  >
+                    <Wallet size={20} className="text-gray-300" /> Withdraw
+                    Rewards
                   </Link>
-                  <Link to="/leaderboard" onClick={() => setIsDropdownOpen(false)} className="w-full px-4 py-2.5 text-left hover:bg-[#272727] flex items-center gap-4 text-sm">
+                  <Link
+                    to="/leaderboard"
+                    onClick={() => setIsDropdownOpen(false)}
+                    className="w-full px-4 py-2.5 text-left hover:bg-[#272727] flex items-center gap-4 text-sm"
+                  >
                     <Star size={20} className="text-gray-300" /> Leaderboard
                   </Link>
                 </div>
 
                 <div className="py-1 border-t border-gray-800">
-                  <Link to="/faq" onClick={() => setIsDropdownOpen(false)} className="w-full px-4 py-2.5 text-left hover:bg-[#272727] flex items-center gap-4 text-sm">
+                  <Link
+                    to="/faq"
+                    onClick={() => setIsDropdownOpen(false)}
+                    className="w-full px-4 py-2.5 text-left hover:bg-[#272727] flex items-center gap-4 text-sm"
+                  >
                     <HelpCircle size={20} className="text-gray-300" /> FAQ
                   </Link>
-                  <Link to="/feedback" onClick={() => setIsDropdownOpen(false)} className="w-full px-4 py-2.5 text-left hover:bg-[#272727] flex items-center gap-4 text-sm">
-                    <MessageCircle size={20} className="text-gray-300" /> Feedback
+                  <Link
+                    to="/feedback"
+                    onClick={() => setIsDropdownOpen(false)}
+                    className="w-full px-4 py-2.5 text-left hover:bg-[#272727] flex items-center gap-4 text-sm"
+                  >
+                    <MessageCircle size={20} className="text-gray-300" />{" "}
+                    Feedback
                   </Link>
 
                   {/* Copyright */}
@@ -555,25 +674,53 @@ export default function Navbar({ toggleSidebar }) {
                       <div className="flex items-center gap-4">
                         <Shield size={20} className="text-gray-300" /> Copyright
                       </div>
-                      {copyrightOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                      {copyrightOpen ? (
+                        <ChevronDown size={16} />
+                      ) : (
+                        <ChevronRight size={16} />
+                      )}
                     </button>
                     {copyrightOpen && (
                       <div className="bg-[#1a1a1a]">
-                        <Link to="/copyright" onClick={() => { setIsDropdownOpen(false); setCopyrightOpen(false); }} className="w-full pl-12 pr-4 py-2 text-left hover:bg-[#272727] text-sm text-gray-300 block">
+                        <Link
+                          to="/copyright"
+                          onClick={() => {
+                            setIsDropdownOpen(false);
+                            setCopyrightOpen(false);
+                          }}
+                          className="w-full pl-12 pr-4 py-2 text-left hover:bg-[#272727] text-sm text-gray-300 block"
+                        >
                           Copyright Center
                         </Link>
-                        <Link to="/copyright/my-claims" onClick={() => { setIsDropdownOpen(false); setCopyrightOpen(false); }} className="w-full pl-12 pr-4 py-2 text-left hover:bg-[#272727] text-sm text-gray-300 block">
+                        <Link
+                          to="/copyright/my-claims"
+                          onClick={() => {
+                            setIsDropdownOpen(false);
+                            setCopyrightOpen(false);
+                          }}
+                          className="w-full pl-12 pr-4 py-2 text-left hover:bg-[#272727] text-sm text-gray-300 block"
+                        >
                           My Claims
                         </Link>
                       </div>
                     )}
                   </div>
 
-                  <Link to="/customer-support" onClick={() => setIsDropdownOpen(false)} className="w-full px-4 py-2.5 text-left hover:bg-[#272727] flex items-center gap-4 text-sm">
-                    <PhoneCall size={20} className="text-gray-300" /> Customer Support
+                  <Link
+                    to="/customer-support"
+                    onClick={() => setIsDropdownOpen(false)}
+                    className="w-full px-4 py-2.5 text-left hover:bg-[#272727] flex items-center gap-4 text-sm"
+                  >
+                    <PhoneCall size={20} className="text-gray-300" /> Customer
+                    Support
                   </Link>
-                  <Link to="/terms-and-conditions" onClick={() => setIsDropdownOpen(false)} className="w-full px-4 py-2.5 text-left hover:bg-[#272727] flex items-center gap-4 text-sm">
-                    <FileText size={20} className="text-gray-300" /> Terms and Conditions
+                  <Link
+                    to="/terms-and-conditions"
+                    onClick={() => setIsDropdownOpen(false)}
+                    className="w-full px-4 py-2.5 text-left hover:bg-[#272727] flex items-center gap-4 text-sm"
+                  >
+                    <FileText size={20} className="text-gray-300" /> Terms and
+                    Conditions
                   </Link>
 
                   <button
@@ -599,7 +746,9 @@ export default function Navbar({ toggleSidebar }) {
                 <Mic size={36} className="text-white" />
               </div>
             </div>
-            <h3 className="text-lg font-semibold text-white mb-1">Listening...</h3>
+            <h3 className="text-lg font-semibold text-white mb-1">
+              Listening...
+            </h3>
             <p className="text-gray-400 text-sm mb-4">Speak now to search</p>
             {searchQuery && (
               <p className="text-white text-base font-medium mb-5 px-3 py-2 bg-[#272727] rounded-lg">
@@ -618,8 +767,14 @@ export default function Navbar({ toggleSidebar }) {
 
       {/* Mobile Search Overlay */}
       {isMobileSearchOpen && (
-        <div className="absolute inset-0 z-50 bg-[#0f0f0f] flex items-center gap-2 px-3" ref={mobileSearchRef}>
-          <button onClick={() => setIsMobileSearchOpen(false)} className="p-2 rounded-full hover:bg-[#272727]">
+        <div
+          className="absolute inset-0 z-50 bg-[#0f0f0f] flex items-center gap-2 px-3"
+          ref={mobileSearchRef}
+        >
+          <button
+            onClick={() => setIsMobileSearchOpen(false)}
+            className="p-2 rounded-full hover:bg-[#272727]"
+          >
             <ArrowLeft size={22} className="text-white" />
           </button>
 
@@ -630,7 +785,9 @@ export default function Navbar({ toggleSidebar }) {
               placeholder={isListening ? "Listening..." : "Search"}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              onFocus={() => searchQuery.trim() && hints.length > 0 && setShowHints(true)}
+              onFocus={() =>
+                searchQuery.trim() && hints.length > 0 && setShowHints(true)
+              }
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleSearch();
                 if (e.key === "Escape") setIsMobileSearchOpen(false);
@@ -651,10 +808,17 @@ export default function Navbar({ toggleSidebar }) {
             onClick={handleMicClick}
             className={`p-2.5 rounded-full ${isListening ? "bg-red-600 animate-pulse" : "hover:bg-[#272727]"}`}
           >
-            {isListening ? <MicOff size={22} className="text-white" /> : <Mic size={22} className="text-white" />}
+            {isListening ? (
+              <MicOff size={22} className="text-white" />
+            ) : (
+              <Mic size={22} className="text-white" />
+            )}
           </button>
 
-          <button onClick={() => setIsMobileSearchOpen(false)} className="p-2 rounded-full hover:bg-[#272727]">
+          <button
+            onClick={() => setIsMobileSearchOpen(false)}
+            className="p-2 rounded-full hover:bg-[#272727]"
+          >
             <X size={22} className="text-white" />
           </button>
         </div>

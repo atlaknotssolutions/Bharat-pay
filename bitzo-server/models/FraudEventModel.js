@@ -24,6 +24,10 @@ const fraudEventSchema = new mongoose.Schema(
         "SUSPICIOUS_BEHAVIOR",
         "HIGH_RISK_ACTION",
         "TRUST_SCORE_DROP",
+        "BOT",
+        "POLICY_ABUSE",
+        "ABNORMAL_BEHAVIOR",
+        "REPEATED_LOOPS",
       ],
       required: true,
     },
@@ -40,7 +44,7 @@ const fraudEventSchema = new mongoose.Schema(
     riskScoreImpact: { type: Number, default: 0 }, // negative impact
     metadata: mongoose.Schema.Types.Mixed,
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 fraudEventSchema.index({ userId: 1, createdAt: -1 });

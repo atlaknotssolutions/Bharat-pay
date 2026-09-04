@@ -1,4 +1,4 @@
-const AdFillRate = require("../models/AdFillRate");
+const AdFillRate = require("../models/VidooAds/AdFillRate");
 
 async function updateFillRate(networkId, filled) {
   let record = await AdFillRate.findOne({
@@ -20,10 +20,7 @@ async function updateFillRate(networkId, filled) {
     record.filled += 1;
   }
 
-  record.fillRate =
-    record.requests > 0
-      ? record.filled / record.requests
-      : 0;
+  record.fillRate = record.requests > 0 ? record.filled / record.requests : 0;
 
   record.updatedAt = new Date();
 

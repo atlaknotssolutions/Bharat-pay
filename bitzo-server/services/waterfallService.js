@@ -1,4 +1,4 @@
-const AdNetwork = require("../models/AdNetwork");
+const AdNetwork = require("../models/VidooAds/AdNetwork");
 const { fetchVast } = require("./vastService");
 const { updateFillRate } = require("./fillRateService");
 
@@ -14,17 +14,12 @@ async function getAdFromWaterfall() {
   }
 
   for (const network of networks) {
-    console.log(
-      `Trying ad network: ${network.name}`
-    );
+    console.log(`Trying ad network: ${network.name}`);
 
     const vast = await fetchVast(network);
 
     if (vast) {
-      await updateFillRate(
-        network._id,
-        true
-      );
+      await updateFillRate(network._id, true);
 
       return {
         network,
@@ -32,10 +27,7 @@ async function getAdFromWaterfall() {
       };
     }
 
-    await updateFillRate(
-      network._id,
-      false
-    );
+    await updateFillRate(network._id, false);
   }
 
   return null;

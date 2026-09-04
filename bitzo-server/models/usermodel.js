@@ -96,7 +96,7 @@ const userSchema = new mongoose.Schema(
 
     trustTier: {
       type: String,
-      default: "standard",
+      default: "medium",
       trim: true,
     },
 

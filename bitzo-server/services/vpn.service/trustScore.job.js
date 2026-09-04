@@ -1,12 +1,13 @@
 const cron = require("node-cron");
 const User = require("../../models/usermodel");
 const FraudEvent = require("../../models/FraudEventModel");
+const { TRUST_RULES, changeTrustScore } = require("../trustScoreService");
 
 let trustScoreJobRunning = false;
 
 function startTrustScoreJob() {
   cron.schedule(
-    "*/10 * * * *",
+    "5 0 * * *",
     async () => {
       if (trustScoreJobRunning) {
         console.warn("[TrustScore Job] Skipping overlapping run");
@@ -20,33 +21,31 @@ function startTrustScoreJob() {
         console.log("[TrustScore Job] Running...");
 
         const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
-        const users = await User.find({}).select("_id trustScore").lean();
+        const users = await User.find({}).select("_id").lean();
 
         for (const user of users) {
           const events = await FraudEvent.find({
             userId: user._id,
             createdAt: { $gte: last24h },
-          }).select("riskScoreImpact");
+          }).select("eventType riskScoreImpact");
 
-          let totalImpact = 0;
-          for (const event of events) {
-            totalImpact += event.riskScoreImpact || 0;
-          }
-
-          const recovery = totalImpact === 0 ? 2 : 0;
-          const newScore = Math.max(
-            0,
-            Math.min(
-              100,
-              Number(user.trustScore || 0) - totalImpact + recovery,
-            ),
+          const hasRisk = events.some(
+            (event) =>
+              Number(event.riskScoreImpact) > 0 ||
+              [
+                "RAPID_ACTIONS",
+                "SUSPICIOUS_BEHAVIOR",
+                "HIGH_RISK_ACTION",
+              ].includes(event.eventType),
           );
-
-          if (newScore !== Number(user.trustScore || 0)) {
-            await User.updateOne(
-              { _id: user._id },
-              { $set: { trustScore: newScore } },
-            );
+          if (!hasRisk) {
+            await changeTrustScore({
+              userId: user._id,
+              changeAmount: TRUST_RULES.CLEAN_24H,
+              eventType: "CLEAN_24H",
+              reason: "No fraud events detected in the last 24 hours",
+              eventKey: `clean-24h:${user._id}:${new Date().toISOString().slice(0, 10)}`,
+            });
           }
         }
 
