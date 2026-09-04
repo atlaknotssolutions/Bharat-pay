@@ -35,7 +35,8 @@ import {
 } from "../../features/notifications/notificationsSlice";
 import axios from "axios";
 import { API_ORIGIN as API_BASE_URL } from "../../config/api";
-import logo from "../../../dist/assets/Bharatplay.png";
+import logo from "../../../dist/assets/Bharatplay-Cb3qGLyP.png";
+import { io } from "socket.io-client";
 
 const HINTS_URL = `${API_BASE_URL}/api/uservideo/search/hints`;
 
@@ -265,6 +266,33 @@ export default function Navbar({ toggleSidebar }) {
   useEffect(() => {
     if (isLoggedIn) dispatch(fetchNotifications());
   }, [isLoggedIn, dispatch]);
+
+  useEffect(() => {
+    if (!isLoggedIn) return undefined;
+    const token = localStorage.getItem("token");
+    if (!token) return undefined;
+
+    const socket = io(API_BASE_URL, { auth: { token } });
+    socket.on("trust-score-updated", (update) => {
+      if (
+        update?.userId &&
+        user?._id &&
+        String(update.userId) !== String(user._id)
+      )
+        return;
+      setUser((current) =>
+        current
+          ? {
+              ...current,
+              trustScore: update.trustScore,
+              trustTier: update.trustTier,
+            }
+          : current,
+      );
+    });
+
+    return () => socket.disconnect();
+  }, [isLoggedIn, user?._id]);
 
   const toggleDropdown = () => {
     setIsDropdownOpen((prev) => !prev);

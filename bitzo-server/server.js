@@ -12,6 +12,10 @@ const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const path = require("node:path");
 const mongoose = require("mongoose");
+const http = require("node:http");
+const { Server: SocketIOServer } = require("socket.io");
+const { verifyAccessToken } = require("./utils/tokenService");
+const { attachSocketServer } = require("./services/socketService");
 const morgan = require("morgan");
 const dns = require("node:dns");
 
@@ -30,6 +34,24 @@ const userCopyrightRoutes = require("./routes/CopyrightRoutes/UserCopyrightRoute
 const { detectVPN } = require("./services/vpn.service/vpn.service.js");
 
 const app = express();
+const httpServer = http.createServer(app);
+const socketServer = new SocketIOServer(httpServer, {
+  cors: { origin: true, credentials: true },
+});
+
+socketServer.use((socket, next) => {
+  try {
+    const token = socket.handshake.auth?.token;
+    if (!token) return next(new Error("Unauthorized"));
+    const decoded = verifyAccessToken(token);
+    socket.authenticatedUserId = decoded.sub || decoded.userId || decoded.id;
+    if (!socket.authenticatedUserId) return next(new Error("Unauthorized"));
+    next();
+  } catch (_) {
+    next(new Error("Unauthorized"));
+  }
+});
+attachSocketServer(socketServer);
 
 const PORT = process.env.PORT || 8000;
 
@@ -210,6 +232,6 @@ app.use((err, req, res, next) => {
 startTrustScoreJob();
 startStrikeExpiryJob();
 
-app.listen(PORT, () => {
+httpServer.listen(PORT, () => {
   console.log(`🌐 Server running on port ${PORT}`);
 });

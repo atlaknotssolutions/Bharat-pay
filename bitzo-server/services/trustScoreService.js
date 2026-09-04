@@ -1,5 +1,6 @@
 const User = require("../models/usermodel");
 const TrustScoreLog = require("../models/TrustScoreLog");
+const { emitTrustScoreUpdated } = require("./socketService");
 
 const TRUST_RULES = Object.freeze({
   SESSION_OVER_3_MIN: 1,
@@ -85,7 +86,7 @@ async function changeTrustScore({
   await user.save();
 
   try {
-    return await TrustScoreLog.create({
+    const scoreLog = await TrustScoreLog.create({
       userId,
       previousScore,
       changeAmount: newScore - previousScore,
@@ -99,6 +100,13 @@ async function changeTrustScore({
       metadata,
       eventKey,
     });
+    emitTrustScoreUpdated(
+      userId,
+      scoreLog,
+      user.trustTier,
+      getAdAccess(newScore),
+    );
+    return scoreLog;
   } catch (error) {
     if (error?.code === 11000 && eventKey) {
       return TrustScoreLog.findOne({ userId, eventKey }).lean();
