@@ -77,7 +77,7 @@ export default function AppRoutes() {
           <Route path="/liked-videos" element={<LikedVideosTab />} />
           <Route path="/watch-later" element={<WatchLaterTab />} />
           <Route path="/your-videos" element={<YourVideosTab />} />
-          <Route path ="/leaderboard" element={<Leaderboard/>} />
+          <Route path="/leaderboard" element={<Leaderboard />} />
           <Route path="/withdraw" element={<WithdrawPage />} />
           <Route path="/channel/:id" element={<ChannelPage />} />
           <Route path="/channel/customize" element={<ChannelCustomization />} />
@@ -89,6 +89,7 @@ export default function AppRoutes() {
           <Route path="/customer-support" element={<SupportPage />} />
           <Route path="/terms-and-conditions" element={<TermsPage />} />
           <Route path="/studio" element={<BharatPlayStudio />} />
+         
         </Route>
       </Route>
 
