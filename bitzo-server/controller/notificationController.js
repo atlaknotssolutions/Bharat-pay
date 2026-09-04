@@ -1,4 +1,5 @@
 const Notification = require("../models/NotificationModel");
+const { emitNotificationRead } = require("../services/socketService");
 
 const getNotifications = async (req, res) => {
   try {
@@ -31,7 +32,7 @@ const markNotificationRead = async (req, res) => {
     const notification = await Notification.findOneAndUpdate(
       { _id: id, recipient: userId },
       { isRead: true },
-      { new: true }
+      { new: true },
     )
       .populate("actor", "name avatar")
       .populate("video", "title thumbnail videoType")
@@ -48,6 +49,8 @@ const markNotificationRead = async (req, res) => {
       isRead: false,
     });
 
+    emitNotificationRead(userId, notification._id, unreadCount);
+
     res.status(200).json({ success: true, notification, unreadCount });
   } catch (error) {
     console.error("Error in markNotificationRead:", error);
@@ -61,8 +64,10 @@ const markAllNotificationsRead = async (req, res) => {
 
     await Notification.updateMany(
       { recipient: userId, isRead: false },
-      { isRead: true }
+      { isRead: true },
     );
+
+    emitNotificationRead(userId, null, 0, true);
 
     res.status(200).json({ success: true, unreadCount: 0 });
   } catch (error) {

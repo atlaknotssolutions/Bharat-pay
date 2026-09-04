@@ -32,10 +32,12 @@ import NotificationPanel from "./NotificationPanel";
 import {
   fetchNotifications,
   resetNotifications,
+  notificationReceived,
+  notificationReadReceived,
 } from "../../features/notifications/notificationsSlice";
 import axios from "axios";
 import { API_ORIGIN as API_BASE_URL } from "../../config/api";
-import logo from "../../../dist/assets/Bharatplay-Cb3qGLyP.png";
+import logo from "../../../dist/assets/Bharatplay-Cb3qGLyP-Cb3qGLyP.png";
 import { io } from "socket.io-client";
 
 const HINTS_URL = `${API_BASE_URL}/api/uservideo/search/hints`;
@@ -273,6 +275,12 @@ export default function Navbar({ toggleSidebar }) {
     if (!token) return undefined;
 
     const socket = io(API_BASE_URL, { auth: { token } });
+    socket.on("notification-created", (payload) => {
+      dispatch(notificationReceived(payload));
+    });
+    socket.on("notification-read", (payload) => {
+      dispatch(notificationReadReceived(payload));
+    });
     socket.on("trust-score-updated", (update) => {
       if (
         update?.userId &&

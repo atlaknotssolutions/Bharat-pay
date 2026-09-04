@@ -121,6 +121,29 @@ const notificationsSlice = createSlice({
   name: "notifications",
   initialState,
   reducers: {
+    notificationReceived: (state, action) => {
+      const { notification, unreadCount } = action.payload || {};
+      if (!notification?._id) return;
+      const exists = state.notifications.some(
+        (item) => item._id === notification._id,
+      );
+      if (!exists) state.notifications.unshift(notification);
+      state.unreadCount = Number(unreadCount ?? state.unreadCount + 1);
+    },
+    notificationReadReceived: (state, action) => {
+      const { notificationId, unreadCount, markAll } = action.payload || {};
+      if (markAll) {
+        state.notifications.forEach((notification) => {
+          notification.isRead = true;
+        });
+      } else {
+        const notification = state.notifications.find(
+          (item) => item._id === notificationId,
+        );
+        if (notification) notification.isRead = true;
+      }
+      state.unreadCount = Number(unreadCount ?? state.unreadCount);
+    },
     clearNotificationsError: (state) => {
       state.error = null;
     },
@@ -174,6 +197,10 @@ const notificationsSlice = createSlice({
   },
 });
 
-export const { clearNotificationsError, resetNotifications } =
-  notificationsSlice.actions;
+export const {
+  clearNotificationsError,
+  resetNotifications,
+  notificationReceived,
+  notificationReadReceived,
+} = notificationsSlice.actions;
 export default notificationsSlice.reducer;

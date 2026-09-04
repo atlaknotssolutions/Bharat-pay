@@ -24,4 +24,31 @@ function emitTrustScoreUpdated(userId, scoreLog, trustTier, adAccess) {
   });
 }
 
-module.exports = { attachSocketServer, emitTrustScoreUpdated };
+function emitNotificationCreated(userId, notification, unreadCount) {
+  if (!io || !userId || !notification) return;
+  io.to(`user:${userId}`).emit("notification-created", {
+    notification,
+    unreadCount,
+  });
+}
+
+function emitNotificationRead(
+  userId,
+  notificationId,
+  unreadCount,
+  markAll = false,
+) {
+  if (!io || !userId) return;
+  io.to(`user:${userId}`).emit("notification-read", {
+    notificationId: notificationId || null,
+    unreadCount,
+    markAll,
+  });
+}
+
+module.exports = {
+  attachSocketServer,
+  emitTrustScoreUpdated,
+  emitNotificationCreated,
+  emitNotificationRead,
+};
