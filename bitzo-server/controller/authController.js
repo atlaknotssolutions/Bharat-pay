@@ -119,7 +119,7 @@ exports.registerUser = async (req, res) => {
       });
     }
 
-    const deviceId = resolveDeviceId(req, res);
+    let deviceId = resolveDeviceId(req, res);
     const ip = getClientIp(req);
     const ua = req.headers["user-agent"] || "unknown";
 
@@ -130,6 +130,9 @@ exports.registerUser = async (req, res) => {
         code: deviceCheck.code,
         message: deviceCheck.message,
       });
+    }
+    if (!deviceCheck.legacy && deviceCheck.deviceId) {
+      deviceId = deviceCheck.deviceId;
     }
 
     const deviceExists = await User.findOne({ deviceId });
@@ -467,7 +470,7 @@ exports.loginUser = async (req, res) => {
 
     const ip = getClientIp(req);
     const ua = req.headers["user-agent"] || "unknown";
-    const deviceId = resolveDeviceId(req, res);
+    let deviceId = resolveDeviceId(req, res);
 
     const user = await User.findOne({ email }).select("+password");
     if (!user) {
@@ -531,6 +534,9 @@ exports.loginUser = async (req, res) => {
           code: deviceCheck.code,
           message: deviceCheck.message,
         });
+      }
+      if (!deviceCheck.legacy && deviceCheck.deviceId) {
+        deviceId = deviceCheck.deviceId;
       }
 
       // ---------- Safe device binding ----------
@@ -605,6 +611,21 @@ exports.loginUser = async (req, res) => {
     }
 
     // ========== OTP VERIFICATION STEP ==========
+    const otpDeviceCheck = await registerOrVerifyDevice({
+      req,
+      userId: user._id,
+    });
+    if (!otpDeviceCheck.ok) {
+      return res.status(otpDeviceCheck.status).json({
+        success: false,
+        code: otpDeviceCheck.code,
+        message: otpDeviceCheck.message,
+      });
+    }
+    if (!otpDeviceCheck.legacy && otpDeviceCheck.deviceId) {
+      deviceId = otpDeviceCheck.deviceId;
+    }
+
     const fingerprintRecord = await DeviceFingerprint.findOne({ deviceId });
     if (!fingerprintRecord || !fingerprintRecord.pendingOtp) {
       return res.status(401).json({

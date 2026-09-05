@@ -393,27 +393,20 @@ export default function Navbar({ toggleSidebar }) {
             <Menu size={22} className="text-white" />
           </button>
 
-          <Link to="/" className="flex items-center gap-1.5 flex-shrink-0 ml-1">
-            <span className="text-[20px] font-bold tracking-tight text-white hidden sm:block">
-              BharatPlay
-            </span>
-            <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm overflow-hidden">
+          <Link to="/" className="flex items-center flex-shrink-0 gap-0 ml-1">
+            <div className="w-16 h-12 rounded-md overflow-hidden flex items-center justify-center">
               <img
                 src={logo}
-                alt="BharatPlay Logo"
-                className="w-full h-full object-contain"
+                alt="BharatPlay"
+                className="w-full rounded-2xl h-full object-contain"
               />
             </div>
-          </Link>
-
-          {/* Points (desktop) */}
-          <div className="hidden sm:flex items-center gap-1.5 bg-[#272727] px-2.5 py-1 rounded-full border border-yellow-600/30 ml-3">
-            <Star size={14} className="text-yellow-400 fill-yellow-400" />
-            <span className="text-white font-semibold text-xs">
-              {points.toFixed(1)}
+            <span className="text-xl font-bold tracking-tight text-white dark:text-white">
+              BharatPlay
             </span>
-            <span className="text-gray-400 text-[10px]">pts</span>
-          </div>
+          </Link>
+          {/* Points (desktop) */}
+
           {isLoggedIn && (
             <div
               className="hidden lg:flex items-center gap-1.5 bg-[#272727] px-2.5 py-1 rounded-full border border-blue-500/30 ml-1"
@@ -487,26 +480,37 @@ export default function Navbar({ toggleSidebar }) {
             <Search size={22} className="text-white" />
           </button>
 
+          <div className="hidden sm:flex items-center gap-1.5 bg-[#272727] px-2.5 py-1 rounded-full border border-yellow-600/30 ml-3">
+            <Star size={14} className="text-yellow-400 fill-yellow-400" />
+            <span className="text-white font-semibold text-xs">
+              {points.toFixed(1)}
+            </span>
+            <span className="text-gray-400 text-[10px]">pts</span>
+          </div>
           <Link
             to="/uploadvideo"
-            className="p-2 hover:bg-[#272727] rounded-full"
+            className="flex items-center gap-1.5 px-3 py-1.5 hover:bg-[#272727] rounded-full transition-colors"
           >
-            <Plus size={22} className="text-white" />
+            <Plus size={20} className="text-white" strokeWidth={2.5} />
+            <span className="text-sm font-medium text-white">Create</span>
           </Link>
 
           {/* Notifications */}
           <div className="relative" ref={notifRef}>
             <button
               onClick={toggleNotifications}
-              className="p-2 hover:bg-[#272727] rounded-full relative"
+              className="p-2 hover:bg-[#272727] rounded-full relative transition-colors"
             >
               <Bell size={22} className="text-white" />
+
+              {/* YouTube-style unread badge */}
               {unreadCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-red-600 border-2 border-[#0f0f0f] rounded-full text-[11px] font-semibold text-white flex items-center justify-center">
-                  {unreadCount > 99 ? "99+" : unreadCount}
+                <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 bg-[#cc0000] rounded-full text-[10px] font-medium text-white flex items-center justify-center leading-none border border-[#0f0f0f]">
+                  {unreadCount > 9 ? "9+" : unreadCount}
                 </span>
               )}
             </button>
+
             <NotificationPanel
               isOpen={isNotificationsOpen}
               onClose={() => setIsNotificationsOpen(false)}
