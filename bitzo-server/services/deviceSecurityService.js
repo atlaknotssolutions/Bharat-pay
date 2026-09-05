@@ -132,17 +132,24 @@ async function registerOrVerifyDevice({ req, userId = null }) {
   if (!deviceId || !isValidIdentifier(deviceId))
     return { ok: true, legacy: true, signals };
 
-  const hmac = verifyHmacRequest(req);
-  if (
-    (process.env.REQUIRE_DEVICE_HMAC === "true" || hmac.required) &&
-    !hmac.verified
-  ) {
-    return {
-      ok: false,
-      status: 401,
-      code: "INVALID_DEVICE_SIGNATURE",
-      message: hmac.reason,
-    };
+  // HMAC is for trusted mobile device payloads. Browser sessions use the
+  // server-issued device cookie and must not be blocked by mobile headers.
+  const isMobileDeviceRequest = Boolean(
+    signals.hardwareId || signals.playIntegrityToken,
+  );
+  if (isMobileDeviceRequest) {
+    const hmac = verifyHmacRequest(req);
+    if (
+      (process.env.REQUIRE_DEVICE_HMAC === "true" || hmac.required) &&
+      !hmac.verified
+    ) {
+      return {
+        ok: false,
+        status: 401,
+        code: "INVALID_DEVICE_SIGNATURE",
+        message: hmac.reason,
+      };
+    }
   }
   const integrity = await verifyPlayIntegrity(signals);
   const serverVirtual = serverVirtualCheck(req, signals);
