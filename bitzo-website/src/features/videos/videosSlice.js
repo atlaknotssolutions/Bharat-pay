@@ -67,7 +67,7 @@ let homeFetchRequestId = 0;
 
 export const fetchHomeVideos = createAsyncThunk(
   "videos/fetchHomeVideos",
-  async (category, { rejectWithValue }) => {
+  async ({ category, page = 1, limit = 5 } = {}, { rejectWithValue }) => {
     const requestId = ++homeFetchRequestId;
     try {
       const token = localStorage.getItem("token");
@@ -80,7 +80,12 @@ export const fetchHomeVideos = createAsyncThunk(
           shorts: [],
         };
 
-      const categoryParam = category ? `?category=${category}` : "";
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(limit),
+      });
+      if (category) params.set("category", category);
+      const categoryParam = `?${params.toString()}`;
 
       const [
         recommendedRes,
@@ -124,16 +129,21 @@ export const fetchHomeVideos = createAsyncThunk(
 
       if (requestId !== homeFetchRequestId) return { cancelled: true };
 
+      const getSection = (data, normalize) => {
+        const list = getVideosArray(data);
+        return {
+          items: list.map(normalize),
+          hasMore: Number(data?.total) > page * limit || list.length === limit,
+        };
+      };
+
       return {
-        recommended: getVideosArray(recommendedData).map(
-          normalizeVideoListItem,
-        ),
-        trending: getVideosArray(trendingData).map(normalizeVideoListItem),
-        latest: getVideosArray(latestData).map(normalizeVideoListItem),
-        subscriptions: getVideosArray(subscriptionsData).map(
-          normalizeVideoListItem,
-        ),
-        shorts: getVideosArray(shortsData).map(normalizeShort),
+        page,
+        recommended: getSection(recommendedData, normalizeVideoListItem),
+        trending: getSection(trendingData, normalizeVideoListItem),
+        latest: getSection(latestData, normalizeVideoListItem),
+        subscriptions: getSection(subscriptionsData, normalizeVideoListItem),
+        shorts: getSection(shortsData, normalizeShort),
       };
     } catch (error) {
       return rejectWithValue(error.message || "Failed to load videos");
@@ -225,6 +235,8 @@ const initialState = {
   latest: [],
   subscriptions: [],
   shorts: [],
+  homePage: 0,
+  homeHasMore: true,
   myVideos: [],
   selectedCategory: null,
   loading: false,
@@ -261,6 +273,8 @@ const videosSlice = createSlice({
       state.latest = [];
       state.subscriptions = [];
       state.shorts = [];
+      state.homePage = 0;
+      state.homeHasMore = true;
       state.loading = true;
       state.error = null;
     },
@@ -275,11 +289,28 @@ const videosSlice = createSlice({
         if (action.payload?.cancelled) return;
         state.loading = false;
         state.error = null;
-        state.recommended = action.payload.recommended;
-        state.trending = action.payload.trending;
-        state.latest = action.payload.latest;
-        state.subscriptions = action.payload.subscriptions;
-        state.shorts = action.payload.shorts;
+        const isFirstPage = action.payload.page === 1;
+        const append = (current, section) =>
+          isFirstPage ? section.items : [...current, ...section.items];
+        state.recommended = append(
+          state.recommended,
+          action.payload.recommended,
+        );
+        state.trending = append(state.trending, action.payload.trending);
+        state.latest = append(state.latest, action.payload.latest);
+        state.subscriptions = append(
+          state.subscriptions,
+          action.payload.subscriptions,
+        );
+        state.shorts = append(state.shorts, action.payload.shorts);
+        state.homePage = action.payload.page;
+        state.homeHasMore = [
+          action.payload.recommended,
+          action.payload.trending,
+          action.payload.latest,
+          action.payload.subscriptions,
+          action.payload.shorts,
+        ].some((section) => section.hasMore);
       })
       .addCase(fetchHomeVideos.rejected, (state, action) => {
         state.loading = false;

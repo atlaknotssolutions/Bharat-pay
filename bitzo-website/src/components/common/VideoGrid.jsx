@@ -31,15 +31,6 @@ const stopActivePreview = () => {
   }
 };
 
-const HOMEPAGE_SECTION_LIMITS = {
-  recommended: 5,
-  trending: 5,
-  trendingShorts: 10,
-  latest: 5,
-  subscriptions: 5,
-  topShorts: 10,
-};
-
 const romanticShows = [
   {
     id: 1,
@@ -508,11 +499,36 @@ export default function NetflixStylePage() {
     shorts,
     loading,
     selectedCategory,
+    homePage,
+    homeHasMore,
   } = useSelector((state) => state.videos);
+  const loadMoreRef = useRef(null);
 
   useEffect(() => {
-    dispatch(fetchHomeVideos(selectedCategory));
+    dispatch(fetchHomeVideos({ category: selectedCategory, page: 1 }));
   }, [dispatch, selectedCategory]);
+
+  useEffect(() => {
+    const loadMore = loadMoreRef.current;
+    if (!loadMore || !homeHasMore) return undefined;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !loading) {
+          dispatch(
+            fetchHomeVideos({
+              category: selectedCategory,
+              page: homePage + 1,
+            }),
+          );
+        }
+      },
+      { rootMargin: "500px 0px" },
+    );
+
+    observer.observe(loadMore);
+    return () => observer.disconnect();
+  }, [dispatch, homeHasMore, homePage, loading, selectedCategory]);
 
   const isShortContent = (item) => {
     const rawTypes = item?.videoType ?? item?.raw?.videoType ?? [];
@@ -562,19 +578,17 @@ export default function NetflixStylePage() {
             {loading && recommended.length === 0 ? (
               <VideoCardSkeletonRow />
             ) : recommended.length > 0 ? (
-              recommended
-                .slice(0, HOMEPAGE_SECTION_LIMITS.recommended)
-                .map((item) => (
-                  <div key={item.id} className="shrink-0 w-64 md:w-72">
-                    <MovieCard
-                      item={item}
-                      onClick={handleItemClick}
-                      onAddToWatchLater={addToWatchLater}
-                      onRemoveFromWatchLater={removeFromWatchLater}
-                      progress={70}
-                    />
-                  </div>
-                ))
+              recommended.map((item) => (
+                <div key={item.id} className="shrink-0 w-64 md:w-72">
+                  <MovieCard
+                    item={item}
+                    onClick={handleItemClick}
+                    onAddToWatchLater={addToWatchLater}
+                    onRemoveFromWatchLater={removeFromWatchLater}
+                    progress={70}
+                  />
+                </div>
+              ))
             ) : (
               <p className="text-sm text-gray-400">
                 No recommended videos available right now.
@@ -593,19 +607,17 @@ export default function NetflixStylePage() {
             {loading && trending.length === 0 ? (
               <VideoCardSkeletonRow />
             ) : trending.length > 0 ? (
-              trending
-                .slice(0, HOMEPAGE_SECTION_LIMITS.trending)
-                .map((item) => (
-                  <div key={item.id} className="shrink-0 w-64 md:w-72">
-                    <MovieCard
-                      item={item}
-                      onClick={handleItemClick}
-                      onAddToWatchLater={addToWatchLater}
-                      onRemoveFromWatchLater={removeFromWatchLater}
-                      progress={70}
-                    />
-                  </div>
-                ))
+              trending.map((item) => (
+                <div key={item.id} className="shrink-0 w-64 md:w-72">
+                  <MovieCard
+                    item={item}
+                    onClick={handleItemClick}
+                    onAddToWatchLater={addToWatchLater}
+                    onRemoveFromWatchLater={removeFromWatchLater}
+                    progress={70}
+                  />
+                </div>
+              ))
             ) : (
               <p className="text-sm text-gray-400">
                 No trending videos available right now.
@@ -624,16 +636,14 @@ export default function NetflixStylePage() {
             {loading && shorts.length === 0 ? (
               <ShortsCardSkeletonRow />
             ) : shorts.length > 0 ? (
-              shorts
-                .slice(0, HOMEPAGE_SECTION_LIMITS.trendingShorts)
-                .map((item) => (
-                  <div
-                    key={item.id}
-                    className="shrink-0 w-40 sm:w-44 md:w-48 lg:w-52 snap-start"
-                  >
-                    <ShortCard item={item} onClick={handleItemClick} />
-                  </div>
-                ))
+              shorts.map((item) => (
+                <div
+                  key={item.id}
+                  className="shrink-0 w-40 sm:w-44 md:w-48 lg:w-52 snap-start"
+                >
+                  <ShortCard item={item} onClick={handleItemClick} />
+                </div>
+              ))
             ) : (
               <p className="text-sm text-gray-400">
                 No trending shorts available right now.
@@ -652,7 +662,7 @@ export default function NetflixStylePage() {
             {loading && latest.length === 0 ? (
               <VideoCardSkeletonRow />
             ) : latest.length > 0 ? (
-              latest.slice(0, HOMEPAGE_SECTION_LIMITS.latest).map((item) => (
+              latest.map((item) => (
                 <div key={item.id} className="shrink-0 w-64 md:w-72">
                   <MovieCard
                     item={item}
@@ -681,18 +691,16 @@ export default function NetflixStylePage() {
             {loading && subscriptions.length === 0 ? (
               <VideoCardSkeletonRow />
             ) : subscriptions.length > 0 ? (
-              subscriptions
-                .slice(0, HOMEPAGE_SECTION_LIMITS.subscriptions)
-                .map((item) => (
-                  <div key={item.id} className="shrink-0 w-64 md:w-72">
-                    <MovieCard
-                      item={item}
-                      onClick={handleItemClick}
-                      onAddToWatchLater={addToWatchLater}
-                      onRemoveFromWatchLater={removeFromWatchLater}
-                    />
-                  </div>
-                ))
+              subscriptions.map((item) => (
+                <div key={item.id} className="shrink-0 w-64 md:w-72">
+                  <MovieCard
+                    item={item}
+                    onClick={handleItemClick}
+                    onAddToWatchLater={addToWatchLater}
+                    onRemoveFromWatchLater={removeFromWatchLater}
+                  />
+                </div>
+              ))
             ) : (
               <p className="text-sm text-gray-400">
                 Subscribe to channels to see their videos here.
@@ -711,7 +719,7 @@ export default function NetflixStylePage() {
             {loading && shorts.length === 0 ? (
               <ShortsCardSkeletonRow />
             ) : shorts.length > 0 ? (
-              shorts.slice(0, HOMEPAGE_SECTION_LIMITS.topShorts).map((item) => (
+              shorts.map((item) => (
                 <div
                   key={item.id}
                   className="shrink-0 w-40 sm:w-44 md:w-48 lg:w-52 snap-start"
@@ -725,6 +733,18 @@ export default function NetflixStylePage() {
               </p>
             )}
           </div>
+        </div>
+
+        <div
+          ref={loadMoreRef}
+          className="flex min-h-12 items-center justify-center"
+        >
+          {loading && homePage > 0 && (
+            <p className="text-sm text-gray-400">Loading more videos...</p>
+          )}
+          {!loading && !homeHasMore && homePage > 0 && (
+            <p className="text-sm text-gray-500">You&apos;re all caught up.</p>
+          )}
         </div>
       </div>
     </div>
