@@ -549,6 +549,19 @@ exports.loginUser = async (req, res) => {
       // Keep the account binding unchanged until the OTP is verified.
 
       // Create / update fingerprint for current device
+      const existingByDevice = await DeviceFingerprint.findOne({ deviceId });
+      const existingByUser = await DeviceFingerprint.findOne({
+        userId: user._id,
+      });
+
+      if (
+        existingByUser &&
+        existingByDevice &&
+        String(existingByUser._id) !== String(existingByDevice._id)
+      ) {
+        await DeviceFingerprint.deleteOne({ _id: existingByUser._id });
+      }
+
       await DeviceFingerprint.findOneAndUpdate(
         { deviceId },
         {

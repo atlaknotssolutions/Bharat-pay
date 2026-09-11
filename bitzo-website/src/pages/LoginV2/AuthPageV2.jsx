@@ -5,7 +5,6 @@ import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
 import { toast } from "react-toastify";
 import { API_BASE } from "../../config/api";
 import AnimatedBackground from "./AnimatedBackground";
-
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 
 export default function AuthPageV2() {
@@ -150,7 +149,7 @@ export default function AuthPageV2() {
         setError(
           isLogin
             ? "OTP sent to your email. Enter the 6-digit code to continue."
-            : "OTP sent to your email. Verify it to complete registration."
+            : "OTP sent to your email. Verify it to complete registration.",
         );
         toast.info("OTP sent to your email. Please verify it.");
         return;
@@ -174,7 +173,11 @@ export default function AuthPageV2() {
       const endpoint = isLogin ? "/login" : "/register";
       const payload = isLogin
         ? { email: formData.email, password: formData.password }
-        : { name: formData.name, email: formData.email, password: formData.password };
+        : {
+            name: formData.name,
+            email: formData.email,
+            password: formData.password,
+          };
 
       const res = await fetch(`${API_BASE}${endpoint}`, {
         method: "POST",
@@ -218,17 +221,22 @@ export default function AuthPageV2() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Could not continue on this device");
+      if (!res.ok)
+        throw new Error(data.message || "Could not continue on this device");
 
       setShowClaimModal(false);
       setDeviceLocked(false);
       setClaimError("");
       setClaimPassword("");
-      toast.success("All other sessions have been signed out. Signing you in...");
+      toast.success(
+        "All other sessions have been signed out. Signing you in...",
+      );
       setFormData((f) => ({ ...f, email }));
       await performLogin(email, password);
     } catch (err) {
-      setClaimError(err.message || "Could not continue on this device. Please try again.");
+      setClaimError(
+        err.message || "Could not continue on this device. Please try again.",
+      );
       toast.error("Could not continue on this device. Please try again.");
     } finally {
       setClaiming(false);
@@ -237,7 +245,10 @@ export default function AuthPageV2() {
 
   const decodeGoogleEmail = (credential) => {
     try {
-      const payload = credential.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+      const payload = credential
+        .split(".")[1]
+        .replace(/-/g, "+")
+        .replace(/_/g, "/");
       return JSON.parse(atob(payload)).email || "";
     } catch (_) {
       return "";
@@ -302,7 +313,9 @@ export default function AuthPageV2() {
           {/* Header - compact */}
           <div className="text-center mb-5">
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-red-500/20 to-red-700/20 border border-red-500/20 mb-3">
-              <span className="text-xl font-black text-red-500 tracking-tight">BP</span>
+              <span className="text-xl font-black text-red-500 tracking-tight">
+                BP
+              </span>
             </div>
             <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
               Bharat Play
@@ -403,7 +416,9 @@ export default function AuthPageV2() {
                       d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
                     />
                   </svg>
-                  <span>{isLogin ? "Sign in with Google" : "Sign up with Google"}</span>
+                  <span>
+                    {isLogin ? "Sign in with Google" : "Sign up with Google"}
+                  </span>
                 </div>
 
                 <div className="absolute inset-0 opacity-0 cursor-pointer">
@@ -539,8 +554,8 @@ export default function AuthPageV2() {
                         ? "Verify OTP & Sign In"
                         : "Verify OTP & Create Account"
                       : isLogin
-                      ? "Sign In"
-                      : "Create Account"}
+                        ? "Sign In"
+                        : "Create Account"}
                     <ArrowRight size={15} className="ml-0.5" />
                   </>
                 )}
@@ -817,9 +832,6 @@ export default function AuthPageV2() {
     </GoogleOAuthProvider>
   );
 }
-
-
-
 
 // import React, { useState, useEffect } from "react";
 // import { useNavigate, useLocation } from "react-router-dom";

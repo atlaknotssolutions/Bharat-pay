@@ -1,5 +1,5 @@
 const API_ORIGIN = String(
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000",
+  import.meta.env.VITE_API_BASE_URL || "http://192.168.1.23:8000",
 ).replace(/\/+$/, "");
 
 const API_BASE = `${API_ORIGIN}/api`;
